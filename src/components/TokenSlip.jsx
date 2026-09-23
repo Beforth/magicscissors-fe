@@ -1,4 +1,4 @@
-import { formatDateTimeStored } from '@/lib/utils'
+import { formatDateTime } from '@/lib/utils'
 import { tokenQrToDataUrl } from '@/lib/tokenQr'
 import { serviceService } from '@/services/service.service'
 
@@ -38,7 +38,7 @@ function buildPackageServicesMap(packages) {
 function buildTokenSlipHTML(token, qrDataUrl = null, packagesMap = {}) {
   const items = token.services_requested || []
   const branchName = token.branch?.name || ''
-  const issuedAt = token.created_at ? formatDateTimeStored(token.created_at) : ''
+  const issuedAt = token.created_at ? formatDateTime(token.created_at) : ''
   const maskedPhone = maskPhone(token.customer_phone_snap)
   const customerLine = `${token.customer_name_snap || ''}${maskedPhone ? ` · ${maskedPhone}` : ''}`
 
