@@ -17,13 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+
 import {
   Table,
   TableBody,
@@ -236,18 +230,13 @@ export default function PurchaseBatchCreatePage() {
                 <div className="space-y-1.5">
                   <Label>Supplier</Label>
                   <div className="flex gap-2">
-                    <Select value={supplierId} onValueChange={setSupplierId}>
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Select supplier" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {suppliers.map((s) => (
-                          <SelectItem key={s.supplier_id} value={s.supplier_id}>
-                            {s.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={suppliers.map((s) => ({ value: s.supplier_id, label: s.name }))}
+                      value={supplierId}
+                      onChange={setSupplierId}
+                      placeholder="Select supplier"
+                      triggerClassName="flex-1"
+                    />
                     <Button
                       type="button"
                       variant="outline"
@@ -291,21 +280,12 @@ export default function PurchaseBatchCreatePage() {
 
               <div className="space-y-1.5">
                 <Label>Destination branch</Label>
-                <Select value={branchId} onValueChange={setBranchId}>
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={emergencyMode ? 'Select salon branch' : 'Select warehouse'}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {destinationOptions.map((b) => (
-                      <SelectItem key={b.branch_id} value={b.branch_id}>
-                        {b.name}
-                        {b.is_warehouse ? ' (warehouse)' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={destinationOptions.map((b) => ({ value: b.branch_id, label: `${b.name}${b.is_warehouse ? ' (warehouse)' : ''}` }))}
+                  value={branchId}
+                  onChange={setBranchId}
+                  placeholder={emergencyMode ? 'Select salon branch' : 'Select warehouse'}
+                />
                 {!emergencyMode && warehouseBranches.length === 0 && (
                   <p className="text-xs text-red-600">
                     No warehouse branch configured. Mark a branch as warehouse or use emergency mode.
@@ -457,20 +437,16 @@ export default function PurchaseBatchCreatePage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Payment mode</Label>
-                    <Select
+                    <SearchableSelect
+                      options={[
+                        { value: 'cash', label: 'Cash' },
+                        { value: 'upi', label: 'UPI' },
+                        { value: 'card', label: 'Card' },
+                        { value: 'online', label: 'Online' },
+                      ]}
                       value={payment.payment_mode}
-                      onValueChange={(val) => setPayment({ ...payment, payment_mode: val })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="upi">UPI</SelectItem>
-                        <SelectItem value="card">Card</SelectItem>
-                        <SelectItem value="online">Online</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      onChange={(val) => setPayment({ ...payment, payment_mode: val })}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Notes</Label>

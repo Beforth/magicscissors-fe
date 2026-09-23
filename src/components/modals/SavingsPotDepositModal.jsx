@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency } from '@/lib/utils'
 import { savingsPotService } from '@/services/savingsPot.service'
 
@@ -120,20 +120,13 @@ export default function SavingsPotDepositModal({ open, onOpenChange, allPots, pe
           {/* Person Selection */}
           <div>
             <Label>Person *</Label>
-            <Select
+            <SearchableSelect
+              options={(persons || []).map(p => ({ value: p.id, label: p.name }))}
               value={formData.person_id}
-              onValueChange={handlePersonChange}
+              onChange={handlePersonChange}
+              placeholder="Select person"
               disabled={!!initialPersonId}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select person" />
-              </SelectTrigger>
-              <SelectContent>
-                {(persons || []).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { incentiveService } from '@/services/incentive.service'
 import { productService } from '@/services/product.service'
 import { branchService } from '@/services/branch.service'
@@ -98,16 +98,12 @@ export default function IncentiveConfigModal({ open, onOpenChange, editConfig })
           {!formData.is_default && (
             <div>
               <Label>Product Category</Label>
-              <Select value={formData.product_category_id} onValueChange={(val) => setFormData({ ...formData, product_category_id: val })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.category_id} value={c.category_id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={categories.map(c => ({ value: c.category_id, label: c.name }))}
+                value={formData.product_category_id}
+                onChange={(val) => setFormData({ ...formData, product_category_id: val })}
+                placeholder="Select category"
+              />
             </div>
           )}
 
@@ -125,16 +121,12 @@ export default function IncentiveConfigModal({ open, onOpenChange, editConfig })
 
           <div>
             <Label>Branch</Label>
-            <Select value={formData.branch_id} onValueChange={(val) => setFormData({ ...formData, branch_id: val })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select branch" />
-              </SelectTrigger>
-              <SelectContent>
-                {branches.map((b) => (
-                  <SelectItem key={b.branch_id} value={b.branch_id}>{b.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              options={branches.map(b => ({ value: b.branch_id, label: b.name }))}
+              value={formData.branch_id}
+              onChange={(val) => setFormData({ ...formData, branch_id: val })}
+              placeholder="Select branch"
+            />
           </div>
         </div>
         <DialogFooter>

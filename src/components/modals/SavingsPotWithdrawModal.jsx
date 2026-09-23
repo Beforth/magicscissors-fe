@@ -73,7 +73,7 @@ export default function SavingsPotWithdrawModal({ open, onOpenChange, pot }) {
             {pot.maturity_date && (
               <div className="flex justify-between">
                 <span className="text-gray-500">Maturity</span>
-                <span>{new Date(pot.maturity_date).toLocaleDateString()}</span>
+                <span>{new Date(pot.maturity_date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</span>
               </div>
             )}
             {formData.amount && (

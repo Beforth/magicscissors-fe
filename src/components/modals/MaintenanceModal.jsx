@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { maintenanceService } from '@/services/maintenance.service'
 import { branchService } from '@/services/branch.service'
 
@@ -127,16 +127,12 @@ export default function MaintenanceModal({ open, onOpenChange, editRecord }) {
             </div>
             <div>
               <Label>Item Type</Label>
-              <Select value={formData.item_type} onValueChange={(val) => handleChange('item_type', val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ITEM_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={ITEM_TYPES.map(t => ({ value: t.value, label: t.label }))}
+                value={formData.item_type}
+                onChange={(val) => handleChange('item_type', val)}
+                placeholder="Select type"
+              />
             </div>
           </div>
           <div>
@@ -230,16 +226,12 @@ export default function MaintenanceModal({ open, onOpenChange, editRecord }) {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Status</Label>
-                <Select value={formData.status} onValueChange={(val) => handleChange('status', val)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUSES.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={STATUSES.map(s => ({ value: s.value, label: s.label }))}
+                  value={formData.status}
+                  onChange={(val) => handleChange('status', val)}
+                  placeholder="Select status"
+                />
               </div>
               <div>
                 <Label>Actual Return Date</Label>
@@ -256,16 +248,12 @@ export default function MaintenanceModal({ open, onOpenChange, editRecord }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Branch *</Label>
-              <Select value={formData.branch_id} onValueChange={(val) => handleChange('branch_id', val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((b) => (
-                    <SelectItem key={b.branch_id} value={b.branch_id}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={branches.map(b => ({ value: b.branch_id, label: b.name }))}
+                value={formData.branch_id}
+                onChange={(val) => handleChange('branch_id', val)}
+                placeholder="Select branch"
+              />
             </div>
             <div>
               <Label>Notes</Label>

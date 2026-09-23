@@ -14,13 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -268,21 +262,12 @@ function ServiceModal({ open, onOpenChange, service = null }) {
           {/* Category */}
           <div className="space-y-2">
             <Label>Category</Label>
-            <Select
+            <SearchableSelect
+              options={categories.map(cat => ({ value: cat.category_id, label: cat.name }))}
               value={formData.category_id}
-              onValueChange={(value) => handleChange('category_id', value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.category_id} value={cat.category_id}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(value) => handleChange('category_id', value)}
+              placeholder="Select category"
+            />
           </div>
 
           {/* Price & Duration */}
@@ -353,22 +338,19 @@ function ServiceModal({ open, onOpenChange, service = null }) {
           {/* Single vs Multiple Employee */}
           <div className="space-y-2">
             <Label>Employee Type</Label>
-            <Select
+            <SearchableSelect
+              options={[
+                { value: 'single', label: 'Single employee (one staff does this service)' },
+                { value: 'multiple', label: 'Multiple employees (can be done by multiple staff)' },
+              ]}
               value={formData.is_multi_employee ? 'multiple' : 'single'}
-              onValueChange={(value) => {
+              onChange={(value) => {
                 const isMulti = value === 'multiple'
                 handleChange('is_multi_employee', isMulti)
                 if (!isMulti) handleChange('employee_count', null)
               }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="single">Single employee (one staff does this service)</SelectItem>
-                <SelectItem value="multiple">Multiple employees (can be done by multiple staff)</SelectItem>
-              </SelectContent>
-            </Select>
+              placeholder="Select type"
+            />
           </div>
 
           {formData.is_multi_employee && (
@@ -420,21 +402,13 @@ function ServiceModal({ open, onOpenChange, service = null }) {
                     <div key={index} className="flex gap-2 items-end">
                       <div className="flex-1 space-y-1">
                         <Label className="text-xs">Product</Label>
-                        <Select
+                        <SearchableSelect
+                          options={recipeProducts.map(p => ({ value: p.product_id, label: `${p.product_name}${productUsageLabel(p)}` }))}
                           value={line.product_id}
-                          onValueChange={(v) => updateRecipeLine(index, 'product_id', v)}
-                        >
-                          <SelectTrigger className="h-9">
-                            <SelectValue placeholder="Product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {recipeProducts.map((p) => (
-                              <SelectItem key={p.product_id} value={p.product_id}>
-                                {p.product_name}{productUsageLabel(p)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          onChange={(v) => updateRecipeLine(index, 'product_id', v)}
+                          placeholder="Product"
+                          triggerClassName="h-9"
+                        />
                       </div>
                       <div className="w-20 space-y-1">
                         <Label className="text-xs">Qty</Label>

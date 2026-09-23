@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { maintenanceService } from '@/services/maintenance.service'
 import { branchService } from '@/services/branch.service'
@@ -122,32 +122,24 @@ export default function MaintenancePage() {
             {isOwner && (
               <div>
                 <Label className="text-xs">Branch</Label>
-                <Select value={filterBranch} onValueChange={(val) => { setFilterBranch(val === 'all' ? '' : val); setPage(1) }}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="All branches" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Branches</SelectItem>
-                    {branches.map((b) => (
-                      <SelectItem key={b.branch_id} value={b.branch_id}>{b.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={[{ value: 'all', label: 'All Branches' }, ...branches.map(b => ({ value: b.branch_id, label: b.name }))]}
+                  value={filterBranch}
+                  onChange={(val) => { setFilterBranch(val === 'all' ? '' : val); setPage(1) }}
+                  placeholder="All branches"
+                  triggerClassName="w-[160px]"
+                />
               </div>
             )}
             <div>
               <Label className="text-xs">Status</Label>
-              <Select value={filterStatus} onValueChange={(val) => { setFilterStatus(val === 'all' ? '' : val); setPage(1) }}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  {STATUS_OPTIONS.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <SearchableSelect
+                  options={[{ value: 'all', label: 'All Statuses' }, ...STATUS_OPTIONS]}
+                  value={filterStatus}
+                  onChange={(val) => { setFilterStatus(val === 'all' ? '' : val); setPage(1) }}
+                  placeholder="All statuses"
+                  triggerClassName="w-[150px]"
+                />
             </div>
             <div>
               <Label className="text-xs">Start Date</Label>

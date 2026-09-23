@@ -41,3 +41,4 @@ coverage/
 .cache/
 vite.config.js
 .dev/
+/salon-erp-be/

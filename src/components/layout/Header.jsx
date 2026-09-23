@@ -1,8 +1,10 @@
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { logout } from '@/store/slices/authSlice'
 import { notificationService } from '@/services/notification.service'
+import { branchService } from '@/services/branch.service'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -13,13 +15,25 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Bell, Menu, LogOut, User, Settings, ArrowRightLeft } from 'lucide-react'
+import { Bell, Menu, LogOut, User, Settings, ArrowRightLeft, Users } from 'lucide-react'
+import EmployeeRotationPanel from '@/components/billing/EmployeeRotationPanel'
 
 function Header({ onMenuClick }) {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useSelector((state) => state.auth)
+  const [queueOpen, setQueueOpen] = useState(false)
+
+  const queueBranchId = user?.branchId || null
+
+  const { data: branchesData } = useQuery({
+    queryKey: ['branches'],
+    queryFn: () => branchService.getBranches({ is_active: 'true' }),
+    enabled: !queueBranchId && queueOpen,
+  })
+  const fallbackBranchId = branchesData?.data?.[0]?.branch_id || null
+  const effectiveBranchId = queueBranchId || fallbackBranchId
 
   const { data: notificationsData } = useQuery({
     queryKey: ['notifications'],
@@ -79,6 +93,32 @@ function Header({ onMenuClick }) {
 
         {/* Right side */}
         <div className="flex items-center gap-x-4 lg:gap-x-6">
+          {/* Check-in Queue */}
+          <DropdownMenu open={queueOpen} onOpenChange={setQueueOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Users className="h-5 w-5 text-gray-500" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-80 max-h-[19rem] overflow-y-auto"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              {queueOpen && effectiveBranchId && (
+                <EmployeeRotationPanel
+                  branchId={effectiveBranchId}
+                  compact
+                  bare
+                  hideMeta
+                />
+              )}
+              {queueOpen && !effectiveBranchId && (
+                <p className="px-3 py-4 text-sm text-gray-500 text-center">No branch assigned</p>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

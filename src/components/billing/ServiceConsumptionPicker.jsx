@@ -5,13 +5,7 @@ import { inventoryService } from '@/services/inventory.service'
 import TakeInUseModal from '@/components/modals/TakeInUseModal'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -190,9 +184,10 @@ export default function ServiceConsumptionPicker({
                 {line.product_name} — uses {line.amount_per_service} {line.unit} per service
               </Label>
               {line.active_containers?.length > 0 ? (
-                <Select
+                <SearchableSelect
+                  options={line.active_containers.map((c) => ({ value: c.open_container_id, label: c.label }))}
                   value={selections?.[req.bill_item_id]?.[line.product_id] || ''}
-                  onValueChange={(value) => {
+                  onChange={(value) => {
                     onChange?.({
                       ...(selections || {}),
                       [req.bill_item_id]: {
@@ -201,18 +196,9 @@ export default function ServiceConsumptionPicker({
                       },
                     })
                   }}
-                >
-                  <SelectTrigger className="h-9 bg-white">
-                    <SelectValue placeholder="Select open bottle" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {line.active_containers.map((c) => (
-                      <SelectItem key={c.open_container_id} value={c.open_container_id}>
-                        {c.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Select open bottle"
+                  triggerClassName="h-9 bg-white"
+                />
               ) : (
                 <p className="text-xs text-red-600">
                   No open bottle for {line.product_name}.{' '}

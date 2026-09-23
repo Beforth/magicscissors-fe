@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency } from '@/lib/utils'
 import { purchaseBatchService } from '@/services/purchaseBatch.service'
 
@@ -110,17 +110,17 @@ export default function RecordPaymentModal({ open, onOpenChange, batch }) {
           </div>
           <div>
             <Label>Payment Mode</Label>
-            <Select value={formData.payment_mode} onValueChange={(val) => setFormData({ ...formData, payment_mode: val })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="upi">UPI</SelectItem>
-                <SelectItem value="card">Card</SelectItem>
-                <SelectItem value="online">Online</SelectItem>
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              options={[
+                { value: 'cash', label: 'Cash' },
+                { value: 'upi', label: 'UPI' },
+                { value: 'card', label: 'Card' },
+                { value: 'online', label: 'Online' },
+              ]}
+              value={formData.payment_mode}
+              onChange={(val) => setFormData({ ...formData, payment_mode: val })}
+              placeholder="Select payment mode"
+            />
           </div>
           <div>
             <Label>Date</Label>

@@ -422,6 +422,7 @@ export default function SavingsPotsPage() {
         open={historyModalOpen}
         onOpenChange={(open) => { setHistoryModalOpen(open); if (!open) setSelectedPot(null) }}
         pot={selectedPot}
+        canManage={canManagePots}
       />
       <SavingsPotPersonModal
         open={personModalOpen}

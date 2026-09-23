@@ -1098,7 +1098,7 @@ function ReportsPage() {
                                 {row.wasted_volume} {row.volume_unit}
                               </TableCell>
                               <TableCell className="text-sm text-gray-500">
-                                {row.discarded_at ? new Date(row.discarded_at).toLocaleDateString('en-IN') : '—'}
+                                {row.discarded_at ? new Date(row.discarded_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -1162,7 +1162,7 @@ function ReportsPage() {
                               </TableCell>
                               <TableCell className="text-right">{row.usage_count}</TableCell>
                               <TableCell className="text-sm text-gray-500">
-                                {row.opened_at ? new Date(row.opened_at).toLocaleDateString('en-IN') : '—'}
+                                {row.opened_at ? new Date(row.opened_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -1207,7 +1207,7 @@ function ReportsPage() {
                       <TableBody>
                         {bottleDetail.usage_log.map((log) => (
                           <TableRow key={log.log_id}>
-                            <TableCell className="text-sm">{log.used_at ? new Date(log.used_at).toLocaleString('en-IN') : '—'}</TableCell>
+                            <TableCell className="text-sm">{log.used_at ? new Date(log.used_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}</TableCell>
                             <TableCell>{log.service_name || log.item_name || '—'}</TableCell>
                             <TableCell className="font-mono text-xs">{log.bill_number || '—'}</TableCell>
                             <TableCell className="text-right font-mono">{log.amount} {log.unit}</TableCell>
@@ -1298,7 +1298,7 @@ function ReportsPage() {
                             >
                               <TableCell className="font-medium">{b.bill_number}</TableCell>
                               <TableCell>{b.customer?.customer_name || '—'}</TableCell>
-                              <TableCell>{b.bill_date ? new Date(b.bill_date).toLocaleDateString() : '—'}</TableCell>
+                              <TableCell>{b.bill_date ? new Date(b.bill_date).toLocaleDateString('en-IN', { timeZone: 'UTC' }) : '—'}</TableCell>
                               <TableCell className="text-right">{formatCurrency(b.total_received)}</TableCell>
                               <TableCell className="text-right text-amber-600 font-semibold">{formatCurrency(b.pending_amount)}</TableCell>
                               <TableCell className="text-center">{(b.pending_items || []).length}</TableCell>

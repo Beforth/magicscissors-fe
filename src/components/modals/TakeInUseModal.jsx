@@ -14,13 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import BarcodeImage from '@/components/BarcodeImage'
@@ -134,7 +128,7 @@ export default function TakeInUseModal({
                 {takenContainer.opened_at && (
                   <p className="text-xs text-gray-500">
                     In use since {new Date(takenContainer.opened_at).toLocaleString('en-IN', {
-                      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                      timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
                     })}
                   </p>
                 )}
@@ -184,19 +178,12 @@ export default function TakeInUseModal({
               </p>
               <div className="space-y-2">
                 <Label>Branch</Label>
-                <Select
+                <SearchableSelect
+                  options={branches.map(b => ({ value: b.branch_id, label: b.name }))}
                   value={form.branch_id}
-                  onValueChange={(v) => setForm({ ...form, branch_id: v, product_id: '' })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((b) => (
-                      <SelectItem key={b.branch_id} value={b.branch_id}>{b.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setForm({ ...form, branch_id: v, product_id: '' })}
+                  placeholder="Select branch"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Product</Label>
@@ -208,24 +195,15 @@ export default function TakeInUseModal({
                   </div>
                 ) : (
                   <>
-                    <Select
+                    <SearchableSelect
+                      options={usableProducts.map(p => {
+                        const avail = p.branch_available_stock ?? 0
+                        return { value: p.product_id, label: `${p.product_name}${usageLabel(p)} — ${branchStockLabel(avail)} at branch` }
+                      })}
                       value={form.product_id}
-                      onValueChange={(v) => setForm({ ...form, product_id: v })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select product" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {usableProducts.map((p) => {
-                          const avail = p.branch_available_stock ?? 0
-                          return (
-                            <SelectItem key={p.product_id} value={p.product_id}>
-                              {p.product_name}{usageLabel(p)} — {branchStockLabel(avail)} at branch
-                            </SelectItem>
-                          )
-                        })}
-                      </SelectContent>
-                    </Select>
+                      onChange={(v) => setForm({ ...form, product_id: v })}
+                      placeholder="Select product"
+                    />
                     {selectedProduct && (
                       <div className={`rounded-md border px-3 py-2 text-sm flex items-center justify-between gap-2 ${
                         canTakeInUse ? 'border-green-200 bg-green-50/60' : 'border-amber-200 bg-amber-50/60'

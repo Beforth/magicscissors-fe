@@ -43,6 +43,17 @@ function buildReceiptHTML(bill) {
 
   let itemRows = ''
 
+  const itemStatusById = {}
+  items.forEach((item) => {
+    if (item.item_id) itemStatusById[item.item_id] = item.status
+  })
+
+  const rightLabel = (empName, status) => {
+    if (empName) return empName
+    if (status === 'pending') return 'Pending'
+    return ''
+  }
+
   // Build a map of package_instance_id -> services from package_summary for employee info
   const pkgServiceMap = {}
   if (bill.package_summary?.length) {
@@ -56,25 +67,28 @@ function buildReceiptHTML(bill) {
     const services = pkgServiceMap[pkgKey] || []
     itemRows += `
       <div style="margin-bottom:4px;">
-        <div style="font-size:10px;font-weight:bold;">${pkg.name}</div>`
+        <div style="font-size:13px;font-weight:700;">${pkg.name}</div>`
     if (services.length > 0) {
       services.forEach((svc) => {
         const empName = svc.employee_name || (svc.employees || []).map((e) => e.full_name).join(', ') || ''
+        const label = rightLabel(empName, itemStatusById[svc.item_id] || svc.status)
         itemRows += `
-        <div style="display:flex;justify-content:space-between;font-size:9px;padding-left:8px;">
-          <span>- ${svc.service_name}</span>
-          <span>${empName}</span>
-        </div>`
+        <table style="width:100%;border-collapse:collapse;font-size:13px;font-weight:700;margin:0;padding-left:8px;">
+          <tr>
+            <td style="text-align:left;vertical-align:top;padding:0 8px 0 8px;">${svc.service_name}</td>
+            ${label ? `<td style="text-align:right;vertical-align:top;white-space:nowrap;padding:0;">${label}</td>` : ''}
+          </tr>
+        </table>`
       })
     }
     itemRows += `
-        <div style="display:flex;justify-content:space-between;font-size:9px;margin-top:2px;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-top:2px;">
           <span>Package Total:</span>
           <span>${formatAmt(pkg.total)}</span>
         </div>`
     if (pkg.discount > 0) {
       itemRows += `
-        <div style="font-size:8px;color:#666;">
+        <div style="font-size:13px;font-weight:700;color:#000;">
           Disc: -${formatAmt(pkg.discount)}
         </div>`
     }
@@ -85,7 +99,11 @@ function buildReceiptHTML(bill) {
   standaloneItems.forEach((item) => {
     const name = item.item_name || 'Item'
     const typeLabel = item.item_type === 'product' ? ' (Product)' : ''
-    const empName = item.employee_name || ''
+    const empName = item.employee_name ||
+      (item.employees || []).map((e) => e.full_name).join(', ') ||
+      item.employee?.full_name ||
+      ''
+    const label = rightLabel(empName, item.status)
     const qty = item.quantity
     const unitPrice = item.unit_price
     const total = item.total_price
@@ -93,18 +111,20 @@ function buildReceiptHTML(bill) {
 
     itemRows += `
       <div style="margin-bottom:4px;">
-        <div style="display:flex;justify-content:space-between;font-size:10px;">
-          <span>${name}${typeLabel}</span>
-          ${empName ? `<span style="font-size:9px;color:#444;">${empName}</span>` : ''}
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:9px;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;font-weight:700;margin:0;">
+          <tr>
+            <td style="text-align:left;vertical-align:top;padding:0 8px 0 0;">${name}${typeLabel}</td>
+            ${label ? `<td style="text-align:right;vertical-align:top;white-space:nowrap;padding:0;">${label}</td>` : ''}
+          </tr>
+        </table>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;">
           <span>${qty} x ${formatAmt(unitPrice)}</span>
           <span>${formatAmt(total)}</span>
         </div>`
 
     if (discount > 0) {
       itemRows += `
-        <div style="font-size:8px;color:#666;">
+        <div style="font-size:13px;font-weight:700;color:#000;">
           Disc: -${formatAmt(discount)}
         </div>`
     }
@@ -120,7 +140,7 @@ function buildReceiptHTML(bill) {
           modeLabel = `UPI (${p.upi_account_name})`
         }
         return `
-      <div style="display:flex;justify-content:space-between;font-size:9px;margin-bottom:2px;">
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:2px;">
         <span>${modeLabel}</span>
         <span>${formatAmt(p.amount)}</span>
       </div>`
@@ -185,25 +205,29 @@ function buildReceiptHTML(bill) {
         }
         body {
           font-family: 'Courier New', monospace;
-          font-size: 10px;
-          width: 76mm;
+          font-size: 13px;
+          font-weight: 700;
+          width: 74mm;
           padding: 2mm;
           color: #000;
           line-height: 1.3;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         .center { text-align: center; }
-        .bold { font-weight: bold; }
+        .bold { font-weight: 800; }
         .right { text-align: right; }
         .row {
           display: flex;
           justify-content: space-between;
-          font-size: 9px;
+          font-size: 13px;
+          font-weight: 700;
         }
         .total-row {
           display: flex;
           justify-content: space-between;
-          font-size: 11px;
-          font-weight: bold;
+          font-size: 13px;
+          font-weight: 800;
         }
       </style>
     </head>
@@ -212,13 +236,13 @@ function buildReceiptHTML(bill) {
       <div class="center bold" style="font-size:13px;margin-bottom:2px;">
         ${branchName}
       </div>
-      ${branchAddress ? `<div class="center" style="font-size:8px;margin-bottom:1px;">${branchAddress}</div>` : ''}
-      ${branchPhone ? `<div class="center" style="font-size:9px;">Ph: ${branchPhone}</div>` : ''}
+      ${branchAddress ? `<div class="center" style="font-size:13px;font-weight:700;margin-bottom:1px;">${branchAddress}</div>` : ''}
+      ${branchPhone ? `<div class="center" style="font-size:13px;font-weight:700;">Ph: ${branchPhone}</div>` : ''}
 
       ${separator}
 
       <!-- Bill Info -->
-      <div style="font-size:9px;">
+      <div style="font-size:13px;font-weight:700;">
         <div>Bill #: ${billNumber}</div>
         ${bookNumber ? `<div>No.   : ${bookNumber}</div>` : ''}
         <div>Date  : ${billDate}</div>
@@ -228,7 +252,7 @@ function buildReceiptHTML(bill) {
 
       ${separator}
 
-      <div class="center bold" style="font-size:9px;margin-bottom:4px;">ITEMS</div>
+      <div class="center bold" style="font-size:13px;margin-bottom:4px;">ITEMS</div>
 
       ${separator}
 
@@ -269,26 +293,26 @@ function buildReceiptHTML(bill) {
       ${separator}
 
       <!-- Payments -->
-      <div class="center bold" style="font-size:9px;margin-bottom:4px;">PAYMENT</div>
+      <div class="center bold" style="font-size:13px;margin-bottom:4px;">PAYMENT</div>
       ${separator}
       ${paymentRows}
 
       ${separator}
 
       ${notes ? `
-      <div style="font-size:8px;">
+      <div style="font-size:13px;font-weight:700;">
         Notes: ${notes}
       </div>
       ${separator}
       ` : ''}
 
-      ${employeeLine ? `<div style="font-size:8px;">Employee: ${employeeLine}</div>` : ''}
-      ${cashierName ? `<div style="font-size:8px;">Cashier: ${cashierName}</div>` : ''}
+      ${employeeLine ? `<div style="font-size:13px;font-weight:700;">Employee: ${employeeLine}</div>` : ''}
+      ${cashierName ? `<div style="font-size:13px;font-weight:700;">Cashier: ${cashierName}</div>` : ''}
 
-      <div class="center" style="margin-top:6px;font-size:9px;">
+      <div class="center" style="margin-top:6px;font-size:13px;font-weight:700;">
         Thank you for your visit!
       </div>
-      <div class="center" style="font-size:8px;margin-top:1px;">
+      <div class="center" style="font-size:13px;font-weight:700;margin-top:1px;">
         See you again :)
       </div>
     </body>

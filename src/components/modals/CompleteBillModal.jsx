@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency } from '@/lib/utils'
 import {
   Loader2,
@@ -57,7 +57,7 @@ function CompleteBillModal({ open, onOpenChange, bill }) {
   useEffect(() => {
     if (open && bill) {
       setNotes('')
-      setPendingItemIds([])
+      setPendingItemIds(bill.items?.filter((i) => i.status === 'pending').map((i) => i.item_id) || [])
       setContainerSelections({})
       setPayments([{ payment_mode: 'cash', amount: totalAmount > 0 ? totalAmount.toFixed(2) : '' }])
     }
@@ -302,19 +302,13 @@ function CompleteBillModal({ open, onOpenChange, bill }) {
                     ))}
                   </div>
                   {payment.payment_mode === 'upi' && upiAccounts.length > 0 && (
-                    <Select
+                    <SearchableSelect
                       value={payment.upi_account_id || ''}
-                      onValueChange={(val) => handlePaymentChange(index, 'upi_account_id', val)}
-                    >
-                      <SelectTrigger className="w-[100px]">
-                        <SelectValue placeholder="UPI Acct" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {upiAccounts.map((acc) => (
-                          <SelectItem key={acc.account_id} value={acc.account_id}>{acc.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(val) => handlePaymentChange(index, 'upi_account_id', val)}
+                      placeholder="UPI Acct"
+                      options={upiAccounts.map(acc => ({ value: acc.account_id, label: acc.name }))}
+                      triggerClassName="w-[100px]"
+                    />
                   )}
                   <div className="flex-1 relative">
                     <Input

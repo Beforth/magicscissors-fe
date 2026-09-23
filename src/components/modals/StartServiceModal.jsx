@@ -15,18 +15,13 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency } from '@/lib/utils'
-import { Loader2, Check, Users } from 'lucide-react'
+import { Loader2, Play, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import ServiceConsumptionPicker, {
-  buildContainerSelections,
-  isConsumptionComplete,
-} from '@/components/billing/ServiceConsumptionPicker'
 
-function CompletePendingServiceModal({ open, onOpenChange, item }) {
+function StartServiceModal({ open, onOpenChange, item }) {
   const queryClient = useQueryClient()
   const { user } = useSelector((state) => state.auth)
   const [selectedEmployee, setSelectedEmployee] = useState('')
-  const [containerSelections, setContainerSelections] = useState({})
   const [pickingQueue, setPickingQueue] = useState(false)
 
   const branchId = item?.branch_id || user?.branchId
@@ -59,7 +54,6 @@ function CompletePendingServiceModal({ open, onOpenChange, item }) {
   useEffect(() => {
     if (!open) return
     setSelectedEmployee('')
-    setContainerSelections({})
   }, [open, item?.item_id])
 
   const handlePickFromQueue = async () => {
@@ -74,40 +68,24 @@ function CompletePendingServiceModal({ open, onOpenChange, item }) {
     toast.success(`Assigned ${row.full_name} from queue`)
   }
 
-  const { data: previewData } = useQuery({
-    queryKey: ['consumption-preview', item?.bill_id, item?.item_id],
-    queryFn: () =>
-      billService.getConsumptionPreview(item.bill_id, {
-        bill_item_ids: [item.item_id],
-      }),
-    enabled: open && !!item?.bill_id && !!item?.item_id,
-  })
-  const consumptionRequirements = previewData?.data?.requirements || previewData?.requirements || []
-
-  const completeMutation = useMutation({
+  const startServiceMutation = useMutation({
     mutationFn: () => {
       const payload = {}
       if (selectedEmployee) {
-        payload.employee_ids = [selectedEmployee]
+        payload.employee_id = selectedEmployee
       }
-      const containerSelectionsPayload = buildContainerSelections(containerSelections)
-      if (containerSelectionsPayload.length > 0) {
-        payload.container_selections = containerSelectionsPayload
-      }
-      return billService.completeBillItem(item.bill_id, item.item_id, payload)
+      return billService.assignEmployeeFromQueue(item.bill_id, item.item_id, payload)
     },
     onSuccess: () => {
-      toast.success('Service completed successfully!')
+      toast.success('Service started successfully!')
       queryClient.invalidateQueries({ queryKey: ['pending-services'] })
       queryClient.invalidateQueries({ queryKey: ['bills'] })
       queryClient.invalidateQueries({ queryKey: ['bill', String(item.bill_id)] })
-      queryClient.invalidateQueries({ queryKey: ['open-containers'] })
       queryClient.invalidateQueries({ queryKey: ['rotation-queue'] })
-      queryClient.invalidateQueries({ queryKey: ['staff-performance'] })
       onOpenChange(false)
     },
     onError: (error) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to complete service')
+      toast.error(error.response?.data?.error?.message || 'Failed to start service')
     },
   })
 
@@ -117,7 +95,7 @@ function CompletePendingServiceModal({ open, onOpenChange, item }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Complete Pending Service</DialogTitle>
+          <DialogTitle>Start Service</DialogTitle>
           <p className="text-sm text-gray-500">
             {item.bill_number} &bull; {item.customer_name || 'Customer'}
           </p>
@@ -134,22 +112,13 @@ function CompletePendingServiceModal({ open, onOpenChange, item }) {
             </p>
           </div>
 
-          <ServiceConsumptionPicker
-            billId={item.bill_id}
-            branchId={branchId}
-            billItemIds={item.item_id ? [item.item_id] : []}
-            selections={containerSelections}
-            onChange={setContainerSelections}
-            enabled={open}
-          />
-
           <div className="space-y-2">
             <Label>Assign Employee</Label>
             <p className="text-xs text-muted-foreground">
               Select an employee from the dropdown or pick from the check-in queue.
             </p>
             <SearchableSelect
-              options={employees.map((emp) => ({ value: emp.employee_id, label: emp.full_name }))}
+              options={employees.map(emp => ({ value: emp.employee_id, label: emp.full_name }))}
               value={selectedEmployee}
               onChange={setSelectedEmployee}
               placeholder={pickingQueue ? 'Picking from queue…' : 'Select employee…'}
@@ -179,32 +148,29 @@ function CompletePendingServiceModal({ open, onOpenChange, item }) {
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={completeMutation.isPending}
+            disabled={startServiceMutation.isPending}
           >
             Cancel
           </Button>
           <Button
             onClick={() => {
-              if (
-                consumptionRequirements.length > 0 &&
-                !isConsumptionComplete(consumptionRequirements, containerSelections)
-              ) {
-                toast.error('Select open bottles for all backbar products')
+              if (!selectedEmployee) {
+                toast.error('Please select an employee or pick from queue')
                 return
               }
-              completeMutation.mutate()
+              startServiceMutation.mutate()
             }}
-            disabled={completeMutation.isPending || pickingQueue}
+            disabled={startServiceMutation.isPending || pickingQueue}
           >
-            {completeMutation.isPending ? (
+            {startServiceMutation.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Completing...
+                Starting...
               </>
             ) : (
               <>
-                <Check className="h-4 w-4 mr-2" />
-                Complete Service
+                <Play className="h-4 w-4 mr-2" />
+                Start Service
               </>
             )}
           </Button>
@@ -214,4 +180,4 @@ function CompletePendingServiceModal({ open, onOpenChange, item }) {
   )
 }
 
-export default CompletePendingServiceModal
+export default StartServiceModal

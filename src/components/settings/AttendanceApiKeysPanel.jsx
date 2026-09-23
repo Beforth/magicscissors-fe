@@ -21,6 +21,7 @@ import { Key, Plus, Trash2, Loader2, Copy, Check } from 'lucide-react'
 export default function AttendanceApiKeysPanel() {
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
+  const [type, setType] = useState('attendance_api')
   const [branchId, setBranchId] = useState('')
   const [newToken, setNewToken] = useState(null)
   const [copied, setCopied] = useState(false)
@@ -43,6 +44,7 @@ export default function AttendanceApiKeysPanel() {
       const created = res?.data
       setNewToken(created?.token || null)
       setName('')
+      setType('attendance_api')
       setBranchId('')
       toast.success('API key created — copy it now; it won’t be shown again.')
       queryClient.invalidateQueries({ queryKey: ['attendance-api-keys'] })
@@ -71,6 +73,7 @@ export default function AttendanceApiKeysPanel() {
     }
     createMutation.mutate({
       name: name.trim(),
+      type,
       branch_id: branchId || null,
     })
   }
@@ -89,7 +92,7 @@ export default function AttendanceApiKeysPanel() {
 
   const formatDate = (value) => {
     if (!value) return '—'
-    return new Date(value).toLocaleString()
+    return new Date(value).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
   }
 
   return (
@@ -106,7 +109,7 @@ export default function AttendanceApiKeysPanel() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleCreate} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
+          <form onSubmit={handleCreate} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 items-end">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="api-key-name">Key name</Label>
               <Input
@@ -115,6 +118,18 @@ export default function AttendanceApiKeysPanel() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Payroll export, Punch machine"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="api-key-type">Key type</Label>
+              <select
+                id="api-key-type"
+                className="w-full h-10 px-3 border rounded-md bg-white text-sm"
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+              >
+                <option value="attendance_api">Attendance API</option>
+                <option value="webhook">Webhook (device punch ingest)</option>
+              </select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="api-key-branch">Branch scope (optional)</Label>
@@ -157,11 +172,16 @@ export default function AttendanceApiKeysPanel() {
           )}
 
           <div className="rounded-lg border bg-gray-50 p-3 text-xs text-gray-600 space-y-1">
-            <p className="font-medium text-gray-800">Allowed endpoints with API key</p>
+            <p className="font-medium text-gray-800">Allowed endpoints by key type</p>
+            <p className="pt-1 font-medium text-gray-700">Attendance API</p>
             <ul className="list-disc list-inside space-y-0.5">
               <li><code>GET /api/v1/attendance/today?branch_id=…</code></li>
               <li><code>GET /api/v1/attendance/monthly?branch_id=…&month=YYYY-MM</code></li>
               <li><code>POST /api/v1/attendance/punches</code> (machine ingest)</li>
+            </ul>
+            <p className="pt-1 font-medium text-gray-700">Webhook</p>
+            <ul className="list-disc list-inside space-y-0.5">
+              <li><code>POST /api/v1/attendance/punches/from-app</code> (device punch ingest)</li>
             </ul>
             <p className="pt-1">Keys do not expire. Revoke any time to disable access.</p>
           </div>
@@ -188,6 +208,7 @@ export default function AttendanceApiKeysPanel() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Key</TableHead>
                   <TableHead>Branch</TableHead>
                   <TableHead>Last used</TableHead>
@@ -199,6 +220,11 @@ export default function AttendanceApiKeysPanel() {
                 {keys.map((key) => (
                   <TableRow key={key.id}>
                     <TableCell className="font-medium">{key.name}</TableCell>
+                    <TableCell>
+                      <Badge variant={key.type === 'webhook' ? 'default' : 'secondary'}>
+                        {key.type === 'webhook' ? 'Webhook' : 'Attendance API'}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <code className="text-xs">{key.key_prefix}…</code>
                     </TableCell>

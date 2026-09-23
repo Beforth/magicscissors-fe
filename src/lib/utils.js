@@ -32,6 +32,7 @@ export function formatDate(date) {
   const d = new Date(date)
   if (Number.isNaN(d.getTime())) return '—'
   return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -43,9 +44,21 @@ export function formatDateTime(date) {
   const d = new Date(date)
   if (Number.isNaN(d.getTime())) return '—'
   return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d)
+}
+
+export function formatTime(date) {
+  if (date == null || date === '') return '—'
+  const d = new Date(date)
+  if (Number.isNaN(d.getTime())) return '—'
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
     hour: '2-digit',
     minute: '2-digit',
   }).format(d)

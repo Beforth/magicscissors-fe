@@ -274,6 +274,7 @@ function StaffPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Biometric ID</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Branch</TableHead>
@@ -297,6 +298,9 @@ function StaffPage() {
                           <p className="text-xs text-gray-500">@{staff.username}</p>
                         </div>
                       </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-sm text-gray-600">
+                      {staff.employee_details?.biometric_id || '—'}
                     </TableCell>
                     <TableCell>
                       <div>

@@ -12,13 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -167,19 +161,16 @@ function CustomerModal({ open, onOpenChange, customer = null, minimal = false, p
           {minimal ? (
             <div className="space-y-2">
               <Label>Gender</Label>
-              <Select
+              <SearchableSelect
+                options={[
+                  { value: 'male', label: 'Male' },
+                  { value: 'female', label: 'Female' },
+                  { value: 'other', label: 'Other' },
+                ]}
                 value={formData.gender}
-                onValueChange={(value) => handleChange('gender', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select gender" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(value) => handleChange('gender', value)}
+                placeholder="Select gender"
+              />
             </div>
           ) : (
             <>
@@ -199,37 +190,31 @@ function CustomerModal({ open, onOpenChange, customer = null, minimal = false, p
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Gender</Label>
-                  <Select
+                  <SearchableSelect
+                    options={[
+                      { value: 'male', label: 'Male' },
+                      { value: 'female', label: 'Female' },
+                      { value: 'other', label: 'Other' },
+                    ]}
                     value={formData.gender}
-                    onValueChange={(value) => handleChange('gender', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    onChange={(value) => handleChange('gender', value)}
+                    placeholder="Select gender"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Age Category</Label>
-                  <Select
+                  <SearchableSelect
+                    options={[
+                      { value: 'child', label: 'Child' },
+                      { value: 'teen', label: 'Teen' },
+                      { value: 'young', label: 'Young' },
+                      { value: 'middle', label: 'Middle' },
+                      { value: 'old', label: 'Senior' },
+                    ]}
                     value={formData.age_category}
-                    onValueChange={(value) => handleChange('age_category', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select age" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="child">Child</SelectItem>
-                      <SelectItem value="teen">Teen</SelectItem>
-                      <SelectItem value="young">Young</SelectItem>
-                      <SelectItem value="middle">Middle</SelectItem>
-                      <SelectItem value="old">Senior</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    onChange={(value) => handleChange('age_category', value)}
+                    placeholder="Select age"
+                  />
                 </div>
               </div>
 

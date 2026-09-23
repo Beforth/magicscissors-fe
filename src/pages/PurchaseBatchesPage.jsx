@@ -23,13 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { purchaseBatchService } from '@/services/purchaseBatch.service'
@@ -164,48 +158,33 @@ export default function PurchaseBatchesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs">Supplier</Label>
-              <Select
+              <SearchableSelect
+                options={[
+                  { value: 'all', label: 'All suppliers' },
+                  ...suppliers.map((s) => ({ value: s.supplier_id, label: s.name })),
+                ]}
                 value={selectedSupplier || 'all'}
-                onValueChange={(val) => {
+                onChange={(val) => {
                   setSelectedSupplier(val === 'all' ? '' : val)
                   setPage(1)
                 }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All suppliers" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All suppliers</SelectItem>
-                  {suppliers.map((s) => (
-                    <SelectItem key={s.supplier_id} value={s.supplier_id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="All suppliers"
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Destination branch</Label>
-              <Select
+              <SearchableSelect
+                options={[
+                  { value: 'all', label: 'All branches' },
+                  ...branches.map((b) => ({ value: b.branch_id, label: `${b.name}${b.is_warehouse ? ' (warehouse)' : ''}` })),
+                ]}
                 value={selectedBranch || 'all'}
-                onValueChange={(val) => {
+                onChange={(val) => {
                   setSelectedBranch(val === 'all' ? '' : val)
                   setPage(1)
                 }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All branches" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All branches</SelectItem>
-                  {branches.map((b) => (
-                    <SelectItem key={b.branch_id} value={b.branch_id}>
-                      {b.name}
-                      {b.is_warehouse ? ' (warehouse)' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="All branches"
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">From date</Label>

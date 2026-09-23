@@ -14,13 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -252,21 +246,12 @@ function ExpenseModal({ open, onOpenChange, expense = null }) {
           {isOwner ? (
             <div className="space-y-2">
               <Label>Branch *</Label>
-              <Select
+              <SearchableSelect
+                options={branches.map(b => ({ value: b.branch_id, label: b.name }))}
                 value={formData.branch_id}
-                onValueChange={(value) => handleChange('branch_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select branch..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((b) => (
-                    <SelectItem key={b.branch_id} value={b.branch_id}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(value) => handleChange('branch_id', value)}
+                placeholder="Select branch..."
+              />
             </div>
           ) : (
             <div className="space-y-2">
@@ -279,21 +264,12 @@ function ExpenseModal({ open, onOpenChange, expense = null }) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Category *</Label>
-              <Select
+              <SearchableSelect
+                options={categories.map(c => ({ value: c.id, label: c.name }))}
                 value={formData.category_id}
-                onValueChange={(value) => handleChange('category_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(value) => handleChange('category_id', value)}
+                placeholder="Select category..."
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="exp-amount">Amount *</Label>
@@ -345,21 +321,12 @@ function ExpenseModal({ open, onOpenChange, expense = null }) {
             </div>
             <div className="space-y-2">
               <Label>Payment Mode *</Label>
-              <Select
+              <SearchableSelect
+                options={PAYMENT_MODES}
                 value={formData.payment_mode}
-                onValueChange={(value) => handleChange('payment_mode', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select mode..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_MODES.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(value) => handleChange('payment_mode', value)}
+                placeholder="Select mode..."
+              />
             </div>
           </div>
 
@@ -381,21 +348,12 @@ function ExpenseModal({ open, onOpenChange, expense = null }) {
           {isUpi && (
             <div className="space-y-2">
               <Label>UPI Account *</Label>
-              <Select
+              <SearchableSelect
+                options={upiAccounts.map(acc => ({ value: acc.account_id, label: acc.name }))}
                 value={formData.upi_account_id}
-                onValueChange={(value) => handleChange('upi_account_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select UPI account..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {upiAccounts.map((acc) => (
-                    <SelectItem key={acc.account_id} value={acc.account_id}>
-                      {acc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(value) => handleChange('upi_account_id', value)}
+                placeholder="Select UPI account..."
+              />
             </div>
           )}
 
@@ -403,21 +361,12 @@ function ExpenseModal({ open, onOpenChange, expense = null }) {
           {isStaffRelated && (
             <div className="space-y-2">
               <Label>Employee</Label>
-              <Select
+              <SearchableSelect
+                options={employees.map(emp => ({ value: emp.employee_id, label: emp.full_name }))}
                 value={formData.employee_id}
-                onValueChange={(value) => handleChange('employee_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select employee..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {employees.map((emp) => (
-                    <SelectItem key={emp.employee_id} value={emp.employee_id}>
-                      {emp.full_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(value) => handleChange('employee_id', value)}
+                placeholder="Select employee..."
+              />
             </div>
           )}
 

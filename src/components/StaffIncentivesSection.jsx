@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency } from '@/lib/utils'
 import { branchService } from '@/services/branch.service'
 import { employeeIncentiveService } from '@/services/employeeIncentive.service'
@@ -28,7 +28,7 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => ({
 }))
 
 const YEARS = (() => {
-  const now = new Date().getUTCFullYear()
+  const now = new Date().getFullYear()
   const out = []
   for (let y = now - 1; y <= now + 1; y += 1) out.push(y)
   return out
@@ -71,8 +71,8 @@ export default function StaffIncentivesSection({
 }) {
   const queryClient = useQueryClient()
   const today = new Date()
-  const [internalYear, setInternalYear] = useState(today.getUTCFullYear())
-  const [internalMonth, setInternalMonth] = useState(today.getUTCMonth() + 1)
+  const [internalYear, setInternalYear] = useState(today.getFullYear())
+  const [internalMonth, setInternalMonth] = useState(today.getMonth() + 1)
   const [internalBranchId, setInternalBranchId] = useState('')
   const [expanded, setExpanded] = useState({})
 
@@ -192,40 +192,34 @@ export default function StaffIncentivesSection({
             <div className="flex items-center gap-3 flex-wrap">
               <div>
                 <Label className="text-xs">Year</Label>
-                <Select value={String(year)} onValueChange={(v) => setInternalYear(Number(v))}>
-                  <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {YEARS.map((y) => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={YEARS.map((y) => ({ value: String(y), label: String(y) }))}
+                  value={String(year)}
+                  onChange={(v) => setInternalYear(Number(v))}
+                  triggerClassName="w-[110px]"
+                />
               </div>
               <div>
                 <Label className="text-xs">Month</Label>
-                <Select value={String(month)} onValueChange={(v) => setInternalMonth(Number(v))}>
-                  <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {MONTHS.map((m) => (
-                      <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={MONTHS.map((m) => ({ value: String(m.value), label: m.label }))}
+                  value={String(month)}
+                  onChange={(v) => setInternalMonth(Number(v))}
+                  triggerClassName="w-[140px]"
+                />
               </div>
               {showBranchFilter && (
                 <div>
                   <Label className="text-xs">Branch</Label>
-                  <Select value={branchId || 'all'} onValueChange={(v) => setInternalBranchId(v === 'all' ? '' : v)}>
-                    <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All branches</SelectItem>
-                      {branches.map((b) => (
-                        <SelectItem key={b.branch_id || b.id} value={b.branch_id || b.id}>
-                          {b.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    options={[
+                      { value: 'all', label: 'All branches' },
+                      ...branches.map((b) => ({ value: b.branch_id || b.id, label: b.name })),
+                    ]}
+                    value={branchId || 'all'}
+                    onChange={(v) => setInternalBranchId(v === 'all' ? '' : v)}
+                    triggerClassName="w-[180px]"
+                  />
                 </div>
               )}
             </div>

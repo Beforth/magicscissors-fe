@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { savingsPotService } from '@/services/savingsPot.service'
 
 export default function SavingsPotModal({ open, onOpenChange, editPot }) {
@@ -132,16 +132,12 @@ export default function SavingsPotModal({ open, onOpenChange, editPot }) {
           )}
           <div>
             <Label>Person {!editPot && '*'}</Label>
-            <Select value={formData.person_id} onValueChange={(val) => setFormData({ ...formData, person_id: val })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select person" />
-              </SelectTrigger>
-              <SelectContent>
-                {persons.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}{p.branch_name ? ` (${p.branch_name})` : ''}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              options={persons.map(p => ({ value: p.id, label: p.name + (p.branch_name ? ` (${p.branch_name})` : '') }))}
+              value={formData.person_id}
+              onChange={(val) => setFormData({ ...formData, person_id: val })}
+              placeholder="Select person"
+            />
             {selectedPerson?.branch_name && (
               <p className="text-xs text-gray-500 mt-1">Branch: {selectedPerson.branch_name}</p>
             )}

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import {
   Dialog,
   DialogContent,
@@ -141,17 +141,11 @@ export default function MachinesPage() {
         <CardContent className="pt-6 flex gap-4 items-end">
           <div className="flex-1 max-w-sm">
             <Label className="text-xs mb-1 block">Branch</Label>
-            <Select value={filterBranch} onValueChange={setFilterBranch}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All branches</SelectItem>
-                {branches.map((b) => (
-                  <SelectItem key={b.branch_id} value={b.branch_id}>{b.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              options={[{ value: 'all', label: 'All branches' }, ...branches.map(b => ({ value: b.branch_id, label: b.name }))]}
+              value={filterBranch}
+              onChange={setFilterBranch}
+            />
           </div>
         </CardContent>
       </Card>
@@ -231,16 +225,12 @@ export default function MachinesPage() {
 
             <div className="space-y-2">
               <Label>Branch *</Label>
-              <Select value={form.branch_id} onValueChange={(v) => setForm({ ...form, branch_id: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((b) => (
-                    <SelectItem key={b.branch_id} value={b.branch_id}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={branches.map(b => ({ value: b.branch_id, label: b.name }))}
+                value={form.branch_id}
+                onChange={(v) => setForm({ ...form, branch_id: v })}
+                placeholder="Select branch"
+              />
             </div>
 
             <div className="space-y-2">

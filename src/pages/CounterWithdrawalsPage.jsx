@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { counterWithdrawalService } from '@/services/savingsPot.service'
 import { branchService } from '@/services/branch.service'
@@ -81,17 +81,13 @@ export default function CounterWithdrawalsPage() {
           <div className="flex flex-wrap gap-3 items-end">
             <div>
               <Label className="text-xs">Branch</Label>
-              <Select value={selectedBranch} onValueChange={(val) => { setSelectedBranch(val === 'all' ? '' : val); setPage(1) }}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="All branches" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Branches</SelectItem>
-                  {branches.map((b) => (
-                    <SelectItem key={b.branch_id} value={b.branch_id}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={[{ value: 'all', label: 'All Branches' }, ...branches.map(b => ({ value: b.branch_id, label: b.name }))]}
+                value={selectedBranch}
+                onChange={(val) => { setSelectedBranch(val === 'all' ? '' : val); setPage(1) }}
+                placeholder="All branches"
+                triggerClassName="w-[180px]"
+              />
             </div>
             <div>
               <Label className="text-xs">From</Label>

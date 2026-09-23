@@ -24,7 +24,11 @@ const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-const DialogContent = React.forwardRef(({ className, children, ...props }, ref) => (
+function isSearchableSelectDropdownTarget(target) {
+  return target instanceof Element && !!target.closest('[data-searchable-select-dropdown]')
+}
+
+const DialogContent = React.forwardRef(({ className, children, onPointerDownOutside, onInteractOutside, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -34,6 +38,18 @@ const DialogContent = React.forwardRef(({ className, children, ...props }, ref) 
         className
       )}
       {...props}
+      onPointerDownOutside={(event) => {
+        if (isSearchableSelectDropdownTarget(event.target)) {
+          event.preventDefault()
+        }
+        onPointerDownOutside?.(event)
+      }}
+      onInteractOutside={(event) => {
+        if (isSearchableSelectDropdownTarget(event.target)) {
+          event.preventDefault()
+        }
+        onInteractOutside?.(event)
+      }}
     >
       {children}
       <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-gray-950 focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-gray-100 data-[state=open]:text-gray-500">

@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
@@ -127,17 +127,12 @@ export default function JobsPage() {
         <CardContent className="pt-6 flex flex-wrap gap-4 items-end">
           <div className="flex-1 min-w-[200px]">
             <Label className="text-xs mb-1 block">Job</Label>
-            <Select value={jobName} onValueChange={(v) => { setJobName(v); setPage(1) }}>
-              <SelectTrigger>
-                <SelectValue placeholder="All jobs" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All jobs</SelectItem>
-                {names.map((n) => (
-                  <SelectItem key={n} value={n}>{n}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              options={[{ value: 'all', label: 'All jobs' }, ...names.map(n => ({ value: n, label: n }))]}
+              value={jobName}
+              onChange={(v) => { setJobName(v); setPage(1) }}
+              placeholder="All jobs"
+            />
           </div>
           <div>
             <Label className="text-xs mb-1 block">Status</Label>

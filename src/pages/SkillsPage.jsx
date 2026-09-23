@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { skillService } from '@/services/skill.service'
 import SkillModal from '@/components/modals/SkillModal'
+import ConfirmDialog from '@/components/modals/ConfirmDialog'
 import { cn } from '@/lib/utils'
 
 function SkillPill({ skill, onEdit, onDeactivate }) {
@@ -52,6 +53,7 @@ export default function SkillsPage() {
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editSkill, setEditSkill] = useState(null)
+  const [deactivateSkill, setDeactivateSkill] = useState(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['skills'],
@@ -82,12 +84,6 @@ export default function SkillsPage() {
   const handleEdit = (skill) => {
     setEditSkill(skill)
     setModalOpen(true)
-  }
-
-  const handleDeactivate = (skill) => {
-    if (window.confirm(`Deactivate "${skill.name}"?`)) {
-      deactivateMutation.mutate(skill.id)
-    }
   }
 
   return (
@@ -129,7 +125,7 @@ export default function SkillsPage() {
                         key={s.id}
                         skill={s}
                         onEdit={handleEdit}
-                        onDeactivate={handleDeactivate}
+                        onDeactivate={(skill) => setDeactivateSkill(skill)}
                       />
                     ))}
                   </div>
@@ -165,6 +161,15 @@ export default function SkillsPage() {
         open={modalOpen}
         onOpenChange={(open) => { setModalOpen(open); if (!open) setEditSkill(null) }}
         skill={editSkill}
+      />
+
+      <ConfirmDialog
+        open={!!deactivateSkill}
+        onOpenChange={(open) => { if (!open) setDeactivateSkill(null) }}
+        title="Deactivate Skill"
+        description={`Deactivate "${deactivateSkill?.name}"? Employees and services using this skill will be unaffected but it won't appear for new assignments.`}
+        confirmLabel="Deactivate"
+        onConfirm={() => { deactivateMutation.mutate(deactivateSkill.id); setDeactivateSkill(null) }}
       />
     </div>
   )

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { branchService } from '@/services/branch.service'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,13 +12,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import BranchModal from '@/components/modals/BranchModal'
 import { BranchColorDot } from '@/components/ui/branch-color-dot'
 import { Building2, Plus, Loader2, MapPin, Phone, Mail, Pencil } from 'lucide-react'
 
 function BranchesPage() {
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingBranch, setEditingBranch] = useState(null)
+  const navigate = useNavigate()
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['branches'],
@@ -27,31 +25,19 @@ function BranchesPage() {
 
   const branches = data?.data || []
 
-  const handleAddBranch = () => {
-    setEditingBranch(null)
-    setModalOpen(true)
-  }
-
-  const handleEditBranch = (branch) => {
-    setEditingBranch(branch)
-    setModalOpen(true)
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Branches</h1>
           <p className="text-gray-500">Manage your salon branches</p>
         </div>
-        <Button onClick={handleAddBranch}>
+        <Button onClick={() => navigate('/branches/new')}>
           <Plus className="h-4 w-4 mr-2" />
           Add Branch
         </Button>
       </div>
 
-      {/* Branches Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -75,7 +61,7 @@ function BranchesPage() {
             <div className="text-center py-10 text-gray-500">
               <Building2 className="h-12 w-12 mx-auto mb-3 opacity-20" />
               <p>No branches found.</p>
-              <Button className="mt-4" onClick={handleAddBranch}>
+              <Button className="mt-4" onClick={() => navigate('/branches/new')}>
                 Add Your First Branch
               </Button>
             </div>
@@ -157,7 +143,7 @@ function BranchesPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleEditBranch(branch)}
+                        onClick={() => navigate(`/branches/${branch.branch_id}/edit`)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -169,13 +155,6 @@ function BranchesPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Branch Modal */}
-      <BranchModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        branch={editingBranch}
-      />
     </div>
   )
 }

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { branchService } from '@/services/branch.service'
 import { incentiveConfigService } from '@/services/incentiveConfig.service'
 
@@ -156,18 +156,13 @@ export default function StaffIncentiveConfig() {
             </div>
             <div className="flex items-center gap-2">
               <Label className="text-sm">Branch</Label>
-              <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
-                <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((b) => (
-                    <SelectItem key={b.branch_id || b.id} value={b.branch_id || b.id}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                options={branches.map((b) => ({ value: b.branch_id || b.id, label: b.name }))}
+                value={selectedBranchId}
+                onChange={setSelectedBranchId}
+                placeholder="Select branch"
+                triggerClassName="w-[220px]"
+              />
             </div>
           </div>
         </CardHeader>

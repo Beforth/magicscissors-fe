@@ -18,6 +18,9 @@ export function SearchableSelect({
   disabled = false,
   className,
   compact = false,
+  triggerClassName,
+  formatOption,
+  portalTarget = document.body,
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -42,16 +45,35 @@ export function SearchableSelect({
     const upward = spaceBelow < DROPDOWN_MAX_HEIGHT + 48 && spaceAbove > spaceBelow
 
     const width = Math.max(rect.width, compact ? 220 : 240)
-    setMenuStyle({
-      position: 'fixed',
-      left: rect.left,
-      width,
-      zIndex: 9999,
-      ...(upward
-        ? { bottom: window.innerHeight - rect.top + DROPDOWN_GAP }
-        : { top: rect.bottom + DROPDOWN_GAP }),
-    })
-  }, [compact])
+
+    if (portalTarget === null) {
+      setMenuStyle({
+        position: 'absolute',
+        left: 0,
+        width,
+        minWidth: width,
+        zIndex: 9999,
+        pointerEvents: 'auto',
+        ...(upward
+          ? { bottom: `calc(100% + ${DROPDOWN_GAP}px)` }
+          : { top: `calc(100% + ${DROPDOWN_GAP}px)` }),
+      })
+    } else {
+      // pointerEvents: auto — Radix Dialog sets pointer-events:none on body;
+      // without this, a body-portaled menu is visible but not clickable.
+      setMenuStyle({
+        position: 'fixed',
+        left: rect.left,
+        width,
+        minWidth: width,
+        zIndex: 9999,
+        pointerEvents: 'auto',
+        ...(upward
+          ? { bottom: window.innerHeight - rect.top + DROPDOWN_GAP }
+          : { top: rect.bottom + DROPDOWN_GAP }),
+      })
+    }
+  }, [compact, portalTarget])
 
   useLayoutEffect(() => {
     if (!open) return
@@ -114,8 +136,11 @@ export function SearchableSelect({
   const dropdown = open && menuStyle && (
     <div
       ref={dropdownRef}
+      data-searchable-select-dropdown=""
       style={menuStyle}
-      className="rounded-md border border-input bg-background shadow-lg"
+      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      className="rounded-md border border-input bg-background shadow-lg pointer-events-auto"
     >
       <div className={cn('flex items-center border-b', compact ? 'px-2 py-1.5' : 'px-3 py-2')}>
         <Search className={cn(compact ? 'h-3 w-3' : 'h-4 w-4', 'text-muted-foreground mr-2 shrink-0')} />
@@ -154,9 +179,14 @@ export function SearchableSelect({
                 compact ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm',
                 option.value === value && 'bg-accent text-accent-foreground font-medium'
               )}
-              onClick={() => handleSelect(option.value)}
+              onMouseDown={(e) => {
+                // Select on mousedown so Radix Dialog focus/dismiss logic
+                // cannot swallow the later click when the menu is portaled.
+                e.preventDefault()
+                handleSelect(option.value)
+              }}
             >
-              {option.label}
+              {formatOption ? formatOption(option) : option.label}
             </button>
           ))
         )}
@@ -176,7 +206,8 @@ export function SearchableSelect({
             : 'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
           'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          !selectedOption && 'text-muted-foreground'
+          !selectedOption && 'text-muted-foreground',
+          triggerClassName
         )}
       >
         <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
@@ -194,9 +225,9 @@ export function SearchableSelect({
         </div>
       </button>
 
-      {typeof document !== 'undefined' && dropdown
-        ? createPortal(dropdown, document.body)
-        : null}
+      {typeof document !== 'undefined' && dropdown && portalTarget
+        ? createPortal(dropdown, portalTarget)
+        : dropdown}
     </div>
   )
 }

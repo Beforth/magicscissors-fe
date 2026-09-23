@@ -71,12 +71,16 @@ function buildTokenSlipHTML(token, qrDataUrl = null, packagesMap = {}) {
           body {
             font-family: 'Courier New', monospace;
             font-size: 13px;
+            font-weight: 700;
+            color: #000;
             margin: 0;
             padding: 8px 6px;
             width: 74mm;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           .center { text-align: center; }
-          .branch { font-size: 13px; }
+          .branch { font-size: 13px; font-weight: 700; }
           .number {
             font-size: 22px;
             font-weight: 800;
@@ -85,36 +89,40 @@ function buildTokenSlipHTML(token, qrDataUrl = null, packagesMap = {}) {
           }
           .not-for-payment {
             font-size: 13px;
-            font-weight: 700;
+            font-weight: 800;
             margin: 0 0 4px;
             text-transform: uppercase;
           }
-          .customer { font-size: 13px; margin: 4px 0 2px; }
-          .meta { font-size: 13px; color: #444; }
+          .customer { font-size: 13px; font-weight: 700; margin: 4px 0 2px; }
+          .meta { font-size: 13px; font-weight: 700; color: #000; }
           .services {
             margin-top: 8px;
-            border-top: 1px dashed #888;
+            border-top: 1px dashed #000;
             padding-top: 6px;
             text-align: left;
             font-size: 13px;
+            font-weight: 700;
           }
           .pkg-svc {
             font-size: 13px;
-            color: #555;
+            font-weight: 700;
+            color: #000;
           }
           .footer {
             margin-top: 10px;
             font-size: 13px;
-            border-top: 1px dashed #888;
+            font-weight: 700;
+            border-top: 1px dashed #000;
             padding-top: 4px;
           }
           .testing {
             margin-top: 8px;
             padding: 6px 4px;
-            border: 1px dashed #b45309;
-            background: #fffbeb;
-            color: #92400e;
+            border: 1px dashed #000;
+            background: transparent;
+            color: #000;
             font-size: 13px;
+            font-weight: 700;
             line-height: 1.35;
             text-align: center;
           }

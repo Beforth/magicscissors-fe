@@ -4,9 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { billService } from '@/services/bill.service'
 import { branchService } from '@/services/branch.service'
 import { serviceService } from '@/services/service.service'
+import { rotationQueueService } from '@/services/rotationQueue.service'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Separator } from '@/components/ui/separator'
 import {
   Table,
@@ -37,7 +39,6 @@ import {
   CreditCard,
   Loader2,
   Phone,
-  Mail,
   FileText,
   Banknote,
   Smartphone,
@@ -48,12 +49,16 @@ import {
   XCircle,
   Package,
   Settings2,
+  ChevronDown,
+  X,
+  Plus,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { printThermalReceipt } from '@/components/ThermalReceipt'
-import GstInvoice, { printGstInvoiceElement } from '@/components/invoices/GstInvoice'
 import CompleteBillModal from '@/components/modals/CompleteBillModal'
-import CompletePendingServiceModal from '@/components/modals/CompletePendingServiceModal'
+import StartServiceModal from '@/components/modals/StartServiceModal'
+import ConfirmDialog from '@/components/modals/ConfirmDialog'
+import EmployeeRotationPanel from '@/components/billing/EmployeeRotationPanel'
 
 const statusColors = {
   completed: 'success',
@@ -77,10 +82,10 @@ function BillDetailPage() {
   const returnTo = searchParams.get('returnTo')
   const goBack = () => navigate(returnTo || '/bills')
   const printRef = useRef(null)
-  const gstInvoiceRef = useRef(null)
-  const [gstInvoiceOpen, setGstInvoiceOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
-  const [editItemStatuses, setEditItemStatuses] = useState({})
+  const [editRemovedItemIds, setEditRemovedItemIds] = useState([])
+  const [editAddedServices, setEditAddedServices] = useState([])
+  const [editServiceSelect, setEditServiceSelect] = useState('')
   const [completeBillModalOpen, setCompleteBillModalOpen] = useState(false)
   const [completePendingItemModalOpen, setCompletePendingItemModalOpen] = useState(false)
   const [selectedPendingItemForComplete, setSelectedPendingItemForComplete] = useState(null)
@@ -91,6 +96,12 @@ function BillDetailPage() {
   const [reconfigPrice, setReconfigPrice] = useState('')
   const [editBookNumberOpen, setEditBookNumberOpen] = useState(false)
   const [editBookNumberValue, setEditBookNumberValue] = useState('')
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [completingItemId, setCompletingItemId] = useState(null)
+  const [assigningItemId, setAssigningItemId] = useState(null)
+  const [selectResetKey, setSelectResetKey] = useState(0)
+  const [queueOpen, setQueueOpen] = useState(false)
 
   const deleteBillMutation = useMutation({
     mutationFn: () => billService.cancelBill(id),
@@ -118,6 +129,25 @@ function BillDetailPage() {
   })
   const employees = employeesData?.data || []
 
+  // Fetch services catalog for add service in edit modal
+  const { data: servicesCatalogData } = useQuery({
+    queryKey: ['services', 'active'],
+    queryFn: () => serviceService.getServices({ is_active: 'true' }),
+    enabled: editModalOpen,
+  })
+  const servicesCatalog = servicesCatalogData?.data || []
+
+  // Fetch rotation queue for available employee dropdown
+  const { data: queueData } = useQuery({
+    queryKey: ['rotation-queue', branchId],
+    queryFn: () => rotationQueueService.getQueue({ branchId }),
+    enabled: !!branchId,
+  })
+  const availableEmployees = useMemo(
+    () => (queueData?.data?.queue || []).filter((e) => e.display_status === 'available'),
+    [queueData]
+  )
+
   // Fetch package details when reconfiguring
   const reconfigPkgId = reconfigPackage?.package_id
   const { data: reconfigPkgData } = useQuery({
@@ -140,16 +170,94 @@ function BillDetailPage() {
     },
   })
 
-  useEffect(() => {
-    if (bill?.items && editModalOpen) {
-      const statuses = {}
-      bill.items.forEach((item) => {
-        statuses[item.item_id] = item.status || 'completed'
+  const getItemEmployeeIds = (item) => {
+    const ids = []
+    if (item.employees?.length) {
+      for (const e of item.employees) {
+        if (e.employee_id) ids.push(e.employee_id)
+      }
+    } else if (item.employee?.employee_id || item.employee?.id) {
+      ids.push(item.employee?.employee_id || item.employee?.id)
+    } else if (item.employee_id) {
+      ids.push(item.employee_id)
+    }
+    return ids
+  }
+
+  const getDropdownOptions = (item) => {
+    const assignedIds = getItemEmployeeIds(item)
+    return availableEmployees.filter(e => !assignedIds.includes(e.employee_id))
+  }
+
+  const completeItemMutation = useMutation({
+    mutationFn: ({ itemId, employeeIds }) =>
+      billService.completeBillItem(id, itemId, { employee_ids: employeeIds }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['bill', id], (old) => {
+        if (!old?.data?.items) return old
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            items: old.data.items.map((item) =>
+              item.item_id === data?.data?.item_id
+                ? { ...item, status: 'completed' }
+                : item
+            ),
+          },
+        }
       })
-      setEditItemStatuses(statuses)
+      queryClient.invalidateQueries({ queryKey: ['bill', id] })
+      queryClient.invalidateQueries({ queryKey: ['rotation-queue'] })
+      queryClient.invalidateQueries({ queryKey: ['pending-services'] })
+      setCompletingItemId(null)
+      toast.success('Service completed')
+    },
+    onError: (err) => {
+      setCompletingItemId(null)
+      toast.error(err.response?.data?.error?.message || 'Failed to complete service')
+    },
+  })
+
+  const assignEmployeeMutation = useMutation({
+    mutationFn: ({ itemId, employeeId }) =>
+      billService.assignEmployeeFromQueue(id, itemId, employeeId ? { employee_id: employeeId } : {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bill', id] })
+      queryClient.invalidateQueries({ queryKey: ['rotation-queue'] })
+      setAssigningItemId(null)
+      setSelectResetKey(k => k + 1)
+      toast.success('Employee assigned')
+    },
+    onError: (err) => {
+      setAssigningItemId(null)
+      setSelectResetKey(k => k + 1)
+      toast.error(err.response?.data?.error?.message || 'No eligible employee in queue')
+    },
+  })
+
+  const unassignEmployeeMutation = useMutation({
+    mutationFn: ({ itemId, employeeId }) =>
+      billService.unassignEmployee(id, itemId, employeeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bill', id] })
+      queryClient.invalidateQueries({ queryKey: ['rotation-queue'] })
+      setSelectResetKey(k => k + 1)
+      toast.success('Employee removed')
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.error?.message || 'Failed to remove employee')
+    },
+  })
+
+  useEffect(() => {
+    if (editModalOpen) {
+      setEditRemovedItemIds([])
+      setEditAddedServices([])
+      setEditServiceSelect('')
       setRemovedPackageInstanceIds([])
     }
-  }, [bill?.items, editModalOpen])
+  }, [editModalOpen])
 
   // Group bill items for screen display (packages grouped, singles separate)
   const groupedBillItems = useMemo(() => {
@@ -316,56 +424,6 @@ function BillDetailPage() {
     return [...Object.values(packageGroups), ...standalone]
   }, [bill?.items, bill?.package_summary])
 
-  const handlePrint = () => {
-    const printContent = printRef.current
-
-    const printStyles = `
-      <style>
-        @media print {
-          body { font-family: 'Inter', sans-serif; padding: 20px; }
-          .no-print { display: none !important; }
-          .print-only { display: block !important; }
-          .print-header { text-align: center; margin-bottom: 20px; }
-          .print-header h1 { font-size: 24px; margin: 0; }
-          .print-header p { color: #666; margin: 5px 0; }
-          .bill-info { display: flex; justify-content: space-between; margin: 20px 0; }
-          .bill-info-section { flex: 1; }
-          .bill-info-section h3 { font-size: 14px; color: #666; margin-bottom: 8px; }
-          .bill-info-section p { margin: 4px 0; font-size: 14px; }
-          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-          th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
-          th { background: #f5f5f5; font-weight: 600; }
-          .text-right { text-align: right; }
-          .totals { margin-top: 20px; }
-          .totals-row { display: flex; justify-content: space-between; padding: 8px 0; }
-          .totals-row.total { font-weight: bold; font-size: 18px; border-top: 2px solid #333; padding-top: 12px; }
-          .payment-info { margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; }
-          .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #666; }
-        }
-      </style>
-    `
-
-    const printWindow = window.open('', '_blank')
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Bill ${bill?.bill_number}</title>
-          ${printStyles}
-        </head>
-        <body>
-          ${printContent.innerHTML}
-        </body>
-      </html>
-    `)
-    printWindow.document.close()
-    printWindow.focus()
-    setTimeout(() => {
-      printWindow.print()
-      printWindow.close()
-    }, 250)
-  }
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -377,10 +435,6 @@ function BillDetailPage() {
   if (error || !bill) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" onClick={() => goBack()}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Bills
-        </Button>
         <Card>
           <CardContent className="py-10 text-center text-red-500">
             {error?.response?.data?.error?.message || 'Bill not found'}
@@ -397,10 +451,13 @@ function BillDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => goBack()}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
+          <button
+            onClick={goBack}
+            className="p-2 rounded-md hover:bg-muted transition-colors"
+            title="Back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
               <Receipt className="h-6 w-6" />
@@ -410,6 +467,12 @@ function BillDetailPage() {
                   (No. {bill.book_number})
                 </span>
               )}
+              <Badge
+                variant={statusColors[bill.status] || 'secondary'}
+                className="text-sm"
+              >
+                {bill.status.toUpperCase()}
+              </Badge>
             </h1>
             <p className="text-gray-500">
               Created on {formatDateTime(bill.created_at)}
@@ -431,11 +494,7 @@ function BillDetailPage() {
               <Button
                 variant="outline"
                 className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                onClick={() => {
-                  if (window.confirm(`Cancel bill ${bill.bill_number}? This action cannot be undone.`)) {
-                    deleteBillMutation.mutate()
-                  }
-                }}
+                onClick={() => setCancelConfirmOpen(true)}
                 disabled={deleteBillMutation.isPending}
               >
                 <XCircle className="h-4 w-4 mr-2" />
@@ -443,48 +502,29 @@ function BillDetailPage() {
               </Button>
             </>
           )}
-          <Button variant="outline" onClick={() => printThermalReceipt(bill)}>
-            <Printer className="h-4 w-4 mr-2" />
-            Print Receipt
+          <Button variant="outline" onClick={() => printThermalReceipt(bill)} title="Print Receipt">
+            <Printer className="h-4 w-4" />
           </Button>
-          <Button variant="outline" onClick={() => setGstInvoiceOpen(true)}>
-            <FileText className="h-4 w-4 mr-2" />
-            GST Invoice
-          </Button>
-          <Button variant="outline" onClick={handlePrint}>
-            <Printer className="h-4 w-4 mr-2" />
-            Print A4
-          </Button>
-          {bill.status !== 'cancelled' && (
+          {bill.status !== 'cancelled' && bill.status !== 'completed' && (
             <Button
               variant="outline"
               onClick={() => setEditModalOpen(true)}
+              title="Edit"
             >
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit
+              <Pencil className="h-4 w-4" />
             </Button>
           )}
           {bill.status !== 'cancelled' && !isPending && (
             <Button
               variant="outline"
               className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-              onClick={() => {
-                if (window.confirm(`Delete bill ${bill.bill_number}? This will cancel the bill.`)) {
-                  deleteBillMutation.mutate()
-                }
-              }}
+              onClick={() => setDeleteConfirmOpen(true)}
               disabled={deleteBillMutation.isPending}
+              title="Delete"
             >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
+              <Trash2 className="h-4 w-4" />
             </Button>
           )}
-          <Badge
-            variant={statusColors[bill.status] || 'secondary'}
-            className="h-9 px-4 text-sm"
-          >
-            {bill.status.toUpperCase()}
-          </Badge>
         </div>
       </div>
 
@@ -519,26 +559,12 @@ function BillDetailPage() {
                   {bill.customer.phone_masked}
                 </p>
               )}
-              {bill.customer?.email && (
+              {bill.branch?.branch_name && (
                 <p className="text-gray-600 flex items-center gap-1">
-                  <Mail className="h-3 w-3" />
-                  {bill.customer.email}
+                  <Building2 className="h-3 w-3" />
+                  {bill.branch.branch_name}
                 </p>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Branch Info */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500 flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Branch
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="font-semibold text-lg">{bill.branch?.branch_name}</p>
-              <p className="text-gray-600">{bill.branch?.branch_code}</p>
             </CardContent>
           </Card>
 
@@ -587,6 +613,19 @@ function BillDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Check-in Queue */}
+          {bill.status !== 'completed' && (
+            <div className="relative z-10">
+              <EmployeeRotationPanel
+                branchId={bill?.branch?.branch_id}
+                accordion
+                accordionOpen={queueOpen}
+                onAccordionToggle={() => setQueueOpen((o) => !o)}
+                floatExpand
+              />
+            </div>
+          )}
         </div>
 
         {/* Bill Items - Screen version (shows all expanded items) */}
@@ -600,11 +639,11 @@ function BillDetailPage() {
                 <TableRow>
                   <TableHead className="w-[50px]">#</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Served By</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
                   <TableHead className="text-right">Unit Price</TableHead>
                   <TableHead className="text-right">Discount</TableHead>
                   <TableHead className="text-right">Total</TableHead>
+                  <TableHead>Served By</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -620,7 +659,7 @@ function BillDetailPage() {
                           {/* Package header row */}
                           <TableRow className="bg-blue-50/60">
                             <TableCell className="text-gray-500">{headerNum}</TableCell>
-                            <TableCell colSpan={2}>
+                            <TableCell>
                               <div className="flex items-center gap-2">
                                 <Package className="h-4 w-4 text-blue-600" />
                                 <span className="font-semibold text-blue-900">
@@ -644,6 +683,7 @@ function BillDetailPage() {
                             <TableCell className="text-right font-medium">
                               {formatCurrency(group.total)}
                             </TableCell>
+                            <TableCell></TableCell>
                             <TableCell className="text-center">
                               {group.items.some((i) => i.status === 'pending') ? (
                                 <Badge variant="warning" className="text-xs">Pending</Badge>
@@ -661,11 +701,6 @@ function BillDetailPage() {
                                   {item.item_name ?? item.service?.service_name ?? 'Service'}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-sm text-gray-600">
-                                {item.employees && item.employees.length > 0
-                                  ? item.employees.map(e => e.full_name).join(', ')
-                                  : item.employee?.full_name || '-'}
-                              </TableCell>
                               <TableCell className="text-right text-sm">{item.quantity}</TableCell>
                               <TableCell className="text-right text-sm">
                                 {formatCurrency(item.unit_price)}
@@ -678,38 +713,112 @@ function BillDetailPage() {
                               <TableCell className="text-right text-sm">
                                 {formatCurrency(item.total_price)}
                               </TableCell>
-                              <TableCell className="text-center">
-                                <div className="flex items-center justify-center gap-1">
-                                  <Badge
-                                    variant={item.status === 'pending' ? 'warning' : 'success'}
-                                    className="text-xs capitalize"
-                                  >
-                                    {item.status || 'completed'}
-                                  </Badge>
-                                  {item.status === 'pending' && bill.status === 'completed' && (
+                              <TableCell className="text-sm">
+                                {item.status === 'completed' ? (
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    {(item.employees?.length > 0 ? item.employees : item.employee ? [{ full_name: item.employee.full_name }] : []).map((emp, i) => (
+                                      <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium">
+                                        {emp.full_name}
+                                      </span>
+                                    )) || '-'}
+                                  </div>
+                                ) : (item.employees?.length > 0 || item.employee?.employee_id) ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-1 flex-wrap flex-1 min-w-0">
+                                    {(item.employees?.length > 0 ? item.employees : item.employee?.employee_id ? [{ employee_id: item.employee.employee_id, full_name: item.employee.full_name }] : []).map((emp) => (
+                                      <span key={emp.employee_id} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${emp.completed_at ? 'bg-green-100 text-green-800' : 'bg-primary text-primary-foreground'}`}>
+                                        {emp.full_name}
+                                        {!emp.completed_at && (
+                                          <button
+                                            type="button"
+                                            className="hover:text-primary-foreground/70"
+                                            onClick={() => unassignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: emp.employee_id })}
+                                            disabled={unassignEmployeeMutation.isPending}
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </button>
+                                        )}
+                                      </span>
+                                    ))}
+                                    </div>
+                                    {getDropdownOptions(item).length > 0 && (
+                                    <SearchableSelect
+                                      key={`${item.item_id}-${selectResetKey}`}
+                                      options={getDropdownOptions(item).map(emp => ({ value: emp.employee_id, label: emp.full_name }))}
+                                      value=""
+                                      onChange={(empId) => {
+                                        setAssigningItemId(item.item_id)
+                                        assignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: empId })
+                                      }}
+                                      disabled={assigningItemId === item.item_id}
+                                      placeholder="Select employee"
+                                      triggerClassName="h-7 w-auto min-w-[120px] px-2 gap-1"
+                                    />
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1">
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      className="h-6 px-2 text-xs"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setSelectedPendingItemForComplete({
-                                          item_id: item.item_id,
-                                          item_name: item.item_name || item.service?.service_name || 'Service',
-                                          service_id: item.service?.service_id || null,
-                                          total_price: item.total_price,
-                                          bill_id: bill.bill_id,
-                                          bill_number: bill.bill_number,
-                                          bill_date: bill.bill_date,
-                                          customer_name: bill.customer?.customer_name,
-                                          branch_id: bill.branch?.branch_id,
-                                        })
-                                        setCompletePendingItemModalOpen(true)
+                                      className="h-7 text-xs"
+                                      onClick={() => {
+                                        setAssigningItemId(item.item_id)
+                                        assignEmployeeMutation.mutate({ itemId: item.item_id })
                                       }}
+                                      disabled={assigningItemId === item.item_id}
                                     >
-                                      Complete
+                                      {assigningItemId === item.item_id
+                                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                                        : 'From Queue'}
                                     </Button>
-                                  )}
+                                    <SearchableSelect
+                                      key={selectResetKey}
+                                      options={getDropdownOptions(item).map(emp => ({ value: emp.employee_id, label: emp.full_name }))}
+                                      onChange={(empId) => {
+                                        setAssigningItemId(item.item_id)
+                                        assignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: empId })
+                                      }}
+                                      disabled={assigningItemId === item.item_id}
+                                      placeholder="Select employee"
+                                      triggerClassName="h-7 w-auto min-w-[160px] px-2 gap-1"
+                                    />
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  {(() => {
+                                    const itemEmployeeCount = getItemEmployeeIds(item).length
+                                    const showStarted = itemEmployeeCount > 0 && (item.status === 'in_progress' || item.status === 'pending')
+                                    return showStarted ? (
+                                      <Badge
+                                        variant="default"
+                                        className={`text-xs capitalize ${completingItemId === item.item_id ? 'opacity-50' : 'cursor-pointer hover:bg-primary/80'}`}
+                                        onClick={() => {
+                                          if (completingItemId) return
+                                          const employeeIds = getItemEmployeeIds(item)
+                                          if (!employeeIds.length) {
+                                            toast.error('No employee assigned to this service')
+                                            return
+                                          }
+                                          setCompletingItemId(item.item_id)
+                                          completeItemMutation.mutate({ itemId: item.item_id, employeeIds })
+                                        }}
+                                      >
+                                        {completingItemId === item.item_id ? (
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : 'Started'}
+                                      </Badge>
+                                    ) : (
+                                      <Badge
+                                        variant={itemEmployeeCount > 0 && item.status !== 'pending' ? 'success' : 'warning'}
+                                        className="text-xs capitalize"
+                                      >
+                                        {itemEmployeeCount > 0 ? (item.status || 'completed') : 'pending'}
+                                      </Badge>
+                                    )
+                                  })()}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -740,11 +849,6 @@ function BillDetailPage() {
                             {item.item_type}
                           </div>
                         </TableCell>
-                        <TableCell>
-                          {item.employees && item.employees.length > 0
-                            ? item.employees.map(e => e.full_name).join(', ')
-                            : item.employee?.full_name || '-'}
-                        </TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(item.unit_price)}
@@ -757,38 +861,112 @@ function BillDetailPage() {
                         <TableCell className="text-right font-medium">
                           {formatCurrency(item.total_price)}
                         </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <Badge
-                              variant={item.status === 'pending' ? 'warning' : 'success'}
-                              className="text-xs capitalize"
-                            >
-                              {item.status || 'completed'}
-                            </Badge>
-                            {item.status === 'pending' && bill.status === 'completed' && (
+                        <TableCell className="text-sm">
+                          {item.status === 'completed' ? (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {(item.employees?.length > 0 ? item.employees : item.employee ? [{ full_name: item.employee.full_name }] : []).map((emp, i) => (
+                                <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium">
+                                  {emp.full_name}
+                                </span>
+                              )) || '-'}
+                            </div>
+                          ) : (item.employees?.length > 0 || item.employee?.employee_id) ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1 flex-wrap flex-1 min-w-0">
+                              {(item.employees?.length > 0 ? item.employees : item.employee?.employee_id ? [{ employee_id: item.employee.employee_id, full_name: item.employee.full_name }] : []).map((emp) => (
+                                <span key={emp.employee_id} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${emp.completed_at ? 'bg-green-100 text-green-800' : 'bg-primary text-primary-foreground'}`}>
+                                  {emp.full_name}
+                                  {!emp.completed_at && (
+                                    <button
+                                      type="button"
+                                      className="hover:text-primary-foreground/70"
+                                      onClick={() => unassignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: emp.employee_id })}
+                                      disabled={unassignEmployeeMutation.isPending}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </span>
+                              ))}
+                              </div>
+                              {getDropdownOptions(item).length > 0 && (
+                              <SearchableSelect
+                                key={`${item.item_id}-${selectResetKey}`}
+                                options={getDropdownOptions(item).map(emp => ({ value: emp.employee_id, label: emp.full_name }))}
+                                value=""
+                                onChange={(empId) => {
+                                  setAssigningItemId(item.item_id)
+                                  assignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: empId })
+                                }}
+                                disabled={assigningItemId === item.item_id}
+                                placeholder="Select employee"
+                                triggerClassName="h-7 w-auto min-w-[120px] px-2 gap-1"
+                              />
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-6 px-2 text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setSelectedPendingItemForComplete({
-                                    item_id: item.item_id,
-                                    item_name: item.item_name || item.service?.service_name || 'Service',
-                                    service_id: item.service?.service_id || null,
-                                    total_price: item.total_price,
-                                    bill_id: bill.bill_id,
-                                    bill_number: bill.bill_number,
-                                    bill_date: bill.bill_date,
-                                    customer_name: bill.customer?.customer_name,
-                                    branch_id: bill.branch?.branch_id,
-                                  })
-                                  setCompletePendingItemModalOpen(true)
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  setAssigningItemId(item.item_id)
+                                  assignEmployeeMutation.mutate({ itemId: item.item_id })
                                 }}
+                                disabled={assigningItemId === item.item_id}
                               >
-                                Complete
+                                {assigningItemId === item.item_id
+                                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                                  : 'From Queue'}
                               </Button>
-                            )}
+                              <SearchableSelect
+                                key={selectResetKey}
+                                options={getDropdownOptions(item).map(emp => ({ value: emp.employee_id, label: emp.full_name }))}
+                                onChange={(empId) => {
+                                  setAssigningItemId(item.item_id)
+                                  assignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: empId })
+                                }}
+                                disabled={assigningItemId === item.item_id}
+                                placeholder="Select employee"
+                                triggerClassName="h-7 w-auto min-w-[160px] px-2 gap-1"
+                              />
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {(() => {
+                              const itemEmployeeCount = getItemEmployeeIds(item).length
+                              const showStarted = itemEmployeeCount > 0 && (item.status === 'in_progress' || item.status === 'pending')
+                              return showStarted ? (
+                                <Badge
+                                  variant="default"
+                                  className={`text-xs capitalize ${completingItemId === item.item_id ? 'opacity-50' : 'cursor-pointer hover:bg-primary/80'}`}
+                                  onClick={() => {
+                                    if (completingItemId) return
+                                    const employeeIds = getItemEmployeeIds(item)
+                                    if (!employeeIds.length) {
+                                      toast.error('No employee assigned to this service')
+                                      return
+                                    }
+                                    setCompletingItemId(item.item_id)
+                                    completeItemMutation.mutate({ itemId: item.item_id, employeeIds })
+                                  }}
+                                >
+                                  {completingItemId === item.item_id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : 'Started'}
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant={itemEmployeeCount > 0 && item.status !== 'pending' ? 'success' : 'warning'}
+                                  className="text-xs capitalize"
+                                >
+                                  {itemEmployeeCount > 0 ? (item.status || 'completed') : 'pending'}
+                                </Badge>
+                              )
+                            })()}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1024,7 +1202,7 @@ function BillDetailPage() {
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-gray-500">
-            Update item statuses, remove or reconfigure packages.
+            Add or remove services from this bill.
           </p>
           <div className="space-y-3 max-h-[400px] overflow-y-auto">
             {groupedBillItems.map((group, gIdx) => {
@@ -1055,7 +1233,6 @@ function BillDetailPage() {
                                 package_id: group.package_id,
                                 package_name: group.package_name,
                               })
-                              // Initialize with current service/employee assignments
                               setReconfigServices(
                                 group.items.map((item) => ({
                                   service_id: item.service_id || item.service?.service_id,
@@ -1082,6 +1259,11 @@ function BillDetailPage() {
                                   prev.filter((id) => id !== group.package_instance_id)
                                 )
                               } else {
+                                const hasInProgress = group.items?.some((i) => i.status === 'in_progress')
+                                if (hasInProgress) {
+                                  toast.error('This package contains started services. Complete them first.')
+                                  return
+                                }
                                 setRemovedPackageInstanceIds((prev) => [
                                   ...prev,
                                   group.package_instance_id,
@@ -1102,21 +1284,9 @@ function BillDetailPage() {
                         <span className="truncate flex-1 text-gray-700">
                           {item.item_name ?? item.service?.service_name ?? 'Service'}
                         </span>
-                        <select
-                          className="ml-2 h-7 px-2 text-xs border rounded-md min-w-[100px]"
-                          value={editItemStatuses[item.item_id] || item.status || 'completed'}
-                          onChange={(e) =>
-                            setEditItemStatuses((prev) => ({
-                              ...prev,
-                              [item.item_id]: e.target.value,
-                            }))
-                          }
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="in_progress">In progress</option>
-                          <option value="completed">Completed</option>
-                          <option value="rejected">Rejected</option>
-                        </select>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          {formatCurrency(item.unit_price || item.total_price)}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -1125,40 +1295,111 @@ function BillDetailPage() {
 
               // Single item
               const item = group.item
+              const isItemRemoved = editRemovedItemIds.includes(item.item_id)
               return (
                 <div
                   key={item.item_id}
-                  className="flex items-center justify-between p-2 rounded border bg-gray-50"
+                  className={`flex items-center justify-between p-2 rounded border ${isItemRemoved ? 'opacity-50 bg-red-50' : 'bg-gray-50'}`}
                 >
-                  <span className="text-sm font-medium truncate flex-1">
-                    {item.item_name ??
-                      item.service?.service_name ??
-                      item.service?.serviceName ??
-                      item.package?.package_name ??
-                      item.package?.packageName ??
-                      item.product?.product_name ??
-                      item.product?.productName ??
-                      item.notes ??
-                      'Unknown'}
-                  </span>
-                  <select
-                    className="ml-2 h-8 px-2 text-sm border rounded-md min-w-[100px]"
-                    value={editItemStatuses[item.item_id] || item.status || 'completed'}
-                    onChange={(e) =>
-                      setEditItemStatuses((prev) => ({
-                        ...prev,
-                        [item.item_id]: e.target.value,
-                      }))
-                    }
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="text-sm font-medium truncate">
+                      {item.item_name ??
+                        item.service?.service_name ??
+                        item.service?.serviceName ??
+                        item.package?.package_name ??
+                        item.package?.packageName ??
+                        item.product?.product_name ??
+                        item.product?.productName ??
+                        item.notes ??
+                        'Unknown'}
+                    </span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {formatCurrency(item.unit_price || item.total_price)}
+                    </span>
+                  </div>
+                  <Button
+                    variant={isItemRemoved ? 'outline' : 'ghost'}
+                    size="sm"
+                    className={`h-7 w-7 p-0 ml-2 shrink-0 ${isItemRemoved ? 'text-green-600' : 'text-red-500 hover:text-red-700'}`}
+                    onClick={() => {
+                      if (isItemRemoved) {
+                        setEditRemovedItemIds((prev) => prev.filter((id) => id !== item.item_id))
+                      } else {
+                        if (item.status === 'in_progress') {
+                          toast.error('Started services cannot be removed. Complete the service first.')
+                          return
+                        }
+                        setEditRemovedItemIds((prev) => [...prev, item.item_id])
+                      }
+                    }}
                   >
-                    <option value="pending">Pending</option>
-                    <option value="in_progress">In progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="rejected">Rejected</option>
-                  </select>
+                    {isItemRemoved ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                  </Button>
                 </div>
               )
             })}
+
+            {/* Added services */}
+            {editAddedServices.map((svc, idx) => (
+              <div
+                key={`added-${idx}`}
+                className="flex items-center justify-between p-2 rounded border bg-green-50"
+              >
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="text-sm font-medium truncate">{svc.service_name}</span>
+                  <Badge variant="outline" className="text-[10px]">Pending</Badge>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {formatCurrency(svc.price)}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 ml-2 shrink-0 text-red-500 hover:text-red-700"
+                  onClick={() => setEditAddedServices((prev) => prev.filter((_, i) => i !== idx))}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+
+            {/* Add Service */}
+            <div className="border border-dashed rounded-lg p-3 space-y-2">
+              <p className="text-xs text-muted-foreground font-medium">Add Service</p>
+              <div className="flex gap-2">
+                <SearchableSelect
+                  value={editServiceSelect}
+                  onChange={setEditServiceSelect}
+                  placeholder="Select a service…"
+                  options={servicesCatalog.map(svc => ({ value: svc.service_id, label: `${svc.service_name} — ${formatCurrency(svc.price)}` }))}
+                  formatOption={(opt) => `${opt.label}`}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!editServiceSelect}
+                  onClick={() => {
+                    const svc = servicesCatalog.find((s) => s.service_id === editServiceSelect)
+                    if (!svc) return
+                    if (editAddedServices.some((s) => s.service_id === svc.service_id)) {
+                      toast.warning('Service already added')
+                      return
+                    }
+                    setEditAddedServices((prev) => [
+                      ...prev,
+                      {
+                        service_id: svc.service_id,
+                        service_name: svc.service_name,
+                        price: parseFloat(svc.price) || 0,
+                      },
+                    ])
+                    setEditServiceSelect('')
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -1170,25 +1411,42 @@ function BillDetailPage() {
             </Button>
             <Button
               onClick={() => {
-                // Build items payload (status changes, excluding removed packages)
-                const removedItemIds = new Set()
+                const payload = {}
+
+                // Collect removed item IDs (individual + package instances)
+                const allRemovedIds = [...editRemovedItemIds]
                 if (removedPackageInstanceIds.length > 0) {
                   bill.items.forEach((i) => {
                     if (i.package_instance_id && removedPackageInstanceIds.includes(i.package_instance_id)) {
-                      removedItemIds.add(i.item_id)
+                      allRemovedIds.push(i.item_id)
                     }
                   })
                 }
-                const items = bill.items
-                  .filter((i) => !removedItemIds.has(i.item_id))
-                  .map((i) => ({
-                    item_id: i.item_id,
-                    status: editItemStatuses[i.item_id] ?? i.status ?? 'completed',
-                  }))
+                if (allRemovedIds.length > 0) {
+                  payload.remove_item_ids = [...new Set(allRemovedIds)]
+                }
 
-                const payload = { items }
+                // Package instance removals
                 if (removedPackageInstanceIds.length > 0) {
                   payload.remove_package_instance_ids = removedPackageInstanceIds
+                }
+
+                // Add new services
+                if (editAddedServices.length > 0) {
+                  payload.add_items = editAddedServices.map((svc) => ({
+                    item_type: 'service',
+                    service_id: svc.service_id,
+                    quantity: 1,
+                    unit_price: svc.price,
+                    discount_amount: 0,
+                    discount_percentage: 0,
+                    status: 'pending',
+                  }))
+                }
+
+                if (Object.keys(payload).length === 0) {
+                  toast.info('No changes to save')
+                  return
                 }
 
                 updateBillMutation.mutate(payload)
@@ -1378,10 +1636,6 @@ function BillDetailPage() {
                   })
 
                 const payload = {
-                  items: bill.items.map((i) => ({
-                    item_id: i.item_id,
-                    status: editItemStatuses[i.item_id] ?? i.status ?? 'completed',
-                  })),
                   update_package_services: {
                     package_instance_id: reconfigPackage.package_instance_id,
                     package_price: parseFloat(reconfigPrice) || 0,
@@ -1403,34 +1657,32 @@ function BillDetailPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={gstInvoiceOpen} onOpenChange={setGstInvoiceOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>GST Tax Invoice — {bill.bill_number}</DialogTitle>
-          </DialogHeader>
-          <GstInvoice ref={gstInvoiceRef} bill={bill} />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setGstInvoiceOpen(false)}>
-              Close
-            </Button>
-            <Button onClick={() => printGstInvoiceElement(gstInvoiceRef.current)}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print GST Invoice
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Complete Bill Modal */}
       <CompleteBillModal
         open={completeBillModalOpen}
         onOpenChange={setCompleteBillModalOpen}
         bill={bill}
       />
-      <CompletePendingServiceModal
+      <StartServiceModal
         open={completePendingItemModalOpen}
         onOpenChange={setCompletePendingItemModalOpen}
         item={selectedPendingItemForComplete}
+      />
+      <ConfirmDialog
+        open={cancelConfirmOpen}
+        onOpenChange={setCancelConfirmOpen}
+        title="Cancel Bill"
+        description={`Cancel bill ${bill?.bill_number}? This action cannot be undone.`}
+        confirmLabel="Cancel Bill"
+        onConfirm={() => { setCancelConfirmOpen(false); deleteBillMutation.mutate() }}
+      />
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Delete Bill"
+        description={`Delete bill ${bill?.bill_number}? This will cancel the bill and cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => { setDeleteConfirmOpen(false); deleteBillMutation.mutate() }}
       />
     </div>
   )

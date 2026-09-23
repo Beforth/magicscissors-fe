@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { upiAccountService } from '@/services/upiAccount.service'
 import { branchService } from '@/services/branch.service'
@@ -133,17 +133,13 @@ export default function UpiAccountsPage() {
               </div>
               <div>
                 <Label className="text-xs">Branch</Label>
-                <Select value={collectionBranch} onValueChange={(val) => setCollectionBranch(val === 'all' ? '' : val)}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="All branches" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Branches</SelectItem>
-                    {branches.map((b) => (
-                      <SelectItem key={b.branch_id} value={b.branch_id}>{b.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={[{ value: 'all', label: 'All Branches' }, ...branches.map(b => ({ value: b.branch_id, label: b.name }))]}
+                  value={collectionBranch}
+                  onChange={(val) => setCollectionBranch(val === 'all' ? '' : val)}
+                  placeholder="All branches"
+                  triggerClassName="w-[160px]"
+                />
               </div>
             </div>
           </div>

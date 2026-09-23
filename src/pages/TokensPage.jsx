@@ -15,6 +15,7 @@ import { tokenService } from '@/services/token.service'
 import { branchService } from '@/services/branch.service'
 import { printTokenSlip } from '@/components/TokenSlip'
 import TokenQrCode from '@/components/TokenQrCode'
+import ConfirmDialog from '@/components/modals/ConfirmDialog'
 import CreateTokenModal from '@/components/modals/CreateTokenModal'
 
 const STATUS_FILTERS = [
@@ -47,6 +48,7 @@ export default function TokensPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [selectedBranch, setSelectedBranch] = useState(userBranchId)
   const [qrToken, setQrToken] = useState(null)
+  const [cancelToken, setCancelToken] = useState(null)
 
   // Owners/developers may not have a fixed branch — let them pick one.
   const { data: branchesData } = useQuery({
@@ -188,9 +190,7 @@ export default function TokensPage() {
                         variant="ghost"
                         size="sm"
                         className="text-rose-600"
-                        onClick={() => {
-                          if (window.confirm(`Cancel token ${t.token_number}?`)) cancelMutation.mutate(t.id)
-                        }}
+                        onClick={() => setCancelToken(t)}
                         disabled={cancelMutation.isPending}
                         title="Cancel"
                       >
@@ -214,6 +214,15 @@ export default function TokensPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         branchId={selectedBranch}
+      />
+
+      <ConfirmDialog
+        open={!!cancelToken}
+        onOpenChange={(open) => { if (!open) setCancelToken(null) }}
+        title="Cancel Token"
+        description={`Cancel token ${cancelToken?.token_number}? This action cannot be undone.`}
+        confirmLabel="Cancel Token"
+        onConfirm={() => { cancelMutation.mutate(cancelToken.id); setCancelToken(null) }}
       />
 
       <Dialog open={!!qrToken} onOpenChange={(open) => { if (!open) setQrToken(null) }}>

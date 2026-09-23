@@ -39,6 +39,7 @@ function EmployeeDashboard() {
     if (!dateStr) return ''
     const d = new Date(dateStr)
     return d.toLocaleDateString('en-IN', {
+      timeZone: 'Asia/Kolkata',
       day: 'numeric',
       month: 'short',
       year: 'numeric',

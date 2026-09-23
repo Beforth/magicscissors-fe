@@ -10,6 +10,10 @@ export const savingsPotService = {
   deposit: (data) => api.post('/savings-pots/deposit', data),
   withdraw: (id, data) => api.post(`/savings-pots/${id}/withdraw`, data),
   getHistory: (id, params) => api.get(`/savings-pots/${id}/history`, { params }),
+  updateDeposit: (id, data) => api.put(`/savings-pots/deposits/${id}`, data),
+  deleteDeposit: (id) => api.delete(`/savings-pots/deposits/${id}`),
+  updateWithdrawal: (id, data) => api.put(`/savings-pots/withdrawals/${id}`, data),
+  deleteWithdrawal: (id) => api.delete(`/savings-pots/withdrawals/${id}`),
   // Person methods
   getPersons: (params) => api.get('/savings-pots/persons', { params }),
   createPerson: (data) => api.post('/savings-pots/persons', data),

@@ -166,7 +166,7 @@ export function exportToPDF(data, filename, options = {}) {
     columns,
     headers,
     summaryCards = [],
-    dateGenerated = new Date().toLocaleDateString('en-IN'),
+    dateGenerated = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }),
   } = options
 
   // Get column keys for table data
