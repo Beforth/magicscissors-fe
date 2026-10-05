@@ -7,6 +7,7 @@ import App from './App'
 import AuthInitializer from './components/auth/AuthInitializer'
 import { store } from './store/store'
 import { Toaster } from './components/ui/sonner'
+import PwaUpdatePrompt from './components/PwaUpdatePrompt'
 import './styles/globals.css'
 
 const queryClient = new QueryClient({
@@ -27,6 +28,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <App />
           </AuthInitializer>
           <Toaster />
+          <PwaUpdatePrompt />
         </BrowserRouter>
       </QueryClientProvider>
     </Provider>
