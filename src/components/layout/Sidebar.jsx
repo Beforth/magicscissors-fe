@@ -41,6 +41,7 @@ import {
   X,
   UserCheck,
   Clock,
+  MapPin,
 } from 'lucide-react'
 
 const getNavItemsByRole = (role) => {
@@ -184,6 +185,12 @@ const getNavItemsByRole = (role) => {
       href: '/attendance',
       icon: CalendarCheck,
       roles: ['owner', 'developer', 'manager', 'cashier'],
+    },
+    {
+      title: 'My Attendance',
+      href: '/my-attendance',
+      icon: MapPin,
+      roles: ['employee', 'manager', 'cashier'],
     },
     {
       title: 'Staff Performance',
