@@ -332,7 +332,10 @@ function SettingsPage() {
   }
 
   const handleSave = () => {
-    updateMutation.mutate(formData)
+    // The selfie switch is owner-managed via the Geofences tab only
+    const payload = { ...formData }
+    delete payload.attendance_require_selfie
+    updateMutation.mutate(payload)
   }
 
   const handleReset = () => {

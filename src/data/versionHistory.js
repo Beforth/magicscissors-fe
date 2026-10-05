@@ -19,14 +19,14 @@ export const versionHistory = [
           'App shell architecture — instant load and fast navigation',
           'Install prompt on compatible browsers (mobile and desktop)',
           'Update notification when new version is available',
-          'Works offline with cached app resources',
+          'App shell loads from cache; check-in needs a connection',
         ],
       },
       {
         section: 'Geofenced Attendance',
         items: [
-          'Mobile app geofence check-in/out — employee punches from app when within branch geofence',
-          'Distance calculation — stores distance from geofence center in check_in_meta / check_out_meta',
+          'Mobile app geofence check-in/out — employee punches from app when within branch geofence (one check-in and one check-out per day)',
+          'Distance from the branch location is recorded with every app punch',
           'Any-fence match logic — employee can check in/out from any configured geofence boundary',
           'Gate validation re-checked at punch submit to prevent spoofing',
         ],
@@ -34,9 +34,9 @@ export const versionHistory = [
       {
         section: 'Selfie Capture',
         items: [
-          'Optional selfie during punch — controlled by owner-managed switch per branch',
-          'Selfie stored at /uploads/selfies/2026/10/<uuid>.jpg and served via baseURL',
-          'Low-bandwidth thumbnail via lazy loading in manager view',
+          'Optional selfie during punch — controlled by one owner-managed switch for all branches',
+          'Selfies are saved securely and only when the selfie switch is on',
+          'Selfies appear as small thumbnails in the manager view so pages stay fast',
         ],
       },
       {

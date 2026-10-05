@@ -55,7 +55,10 @@ export default function MyAttendancePage() {
       toast.success('Attendance recorded')
       queryClient.invalidateQueries({ queryKey: ['self-config'] })
     },
-    onError: (err) => toast.error(err.response?.data?.error?.message || 'Punch failed'),
+    onError: (err) => {
+      toast.error(err.response?.data?.error?.message || 'Punch failed')
+      queryClient.invalidateQueries({ queryKey: ['self-config'] })
+    },
   })
 
   useEffect(() => {
@@ -70,7 +73,7 @@ export default function MyAttendancePage() {
   const gate = getPunchGate({ geo, config, busy: mutation.isPending })
   const status = config?.today?.current_status || 'not_arrived'
   const isOut = status === 'on_floor'
-  const canPunchState = status === 'not_arrived' || status === 'checked_out' || status === 'on_floor'
+  const canPunchState = status === 'not_arrived' || status === 'on_floor'
   const punchType = isOut ? 'out' : 'in'
 
   const submit = (selfieBlob) => {
@@ -116,7 +119,7 @@ export default function MyAttendancePage() {
     )
   }
 
-  if (isError || !config) {
+  if ((isError && !data) || !config) {
     return <p className="p-4 text-sm text-destructive">Could not load attendance settings. Please try again.</p>
   }
 
@@ -154,7 +157,11 @@ export default function MyAttendancePage() {
         {gate.reason && <p className="text-center text-sm text-muted-foreground">{gate.reason}</p>}
         {!canPunchState && (
           <p className="text-center text-sm text-muted-foreground">
-            {status === 'on_break' ? 'Finish your break before checking out' : 'You are on leave today'}
+            {status === 'on_break'
+              ? 'Finish your break before checking out'
+              : status === 'checked_out'
+                ? 'You have checked out for today'
+                : 'You are on leave today'}
           </p>
         )}
         {geo.position && (

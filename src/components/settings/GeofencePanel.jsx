@@ -80,6 +80,7 @@ export default function GeofencePanel() {
     onSuccess: () => {
       toast.success('Setting saved')
       invalidate()
+      queryClient.invalidateQueries({ queryKey: ['settings'] })
     },
     onError: onError('Failed to update setting'),
   })
