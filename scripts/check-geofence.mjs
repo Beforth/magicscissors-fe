@@ -14,4 +14,12 @@ assert.equal(getPunchGate({ geo: { status: 'denied', position: null }, config, b
 assert.equal(getPunchGate({ geo: ready(19.884765, 73.978462), config: { ...config, geofences: [] }, busy: false }).allowed, false)
 assert.equal(getPunchGate({ geo: ready(19.884765, 73.978462), config, busy: true }).allowed, false)
 assert.equal(getPunchGate({ geo: ready(19.884765, 73.978462), config: null, busy: false }).allowed, false)
+// Overlapping fences: small fence (nearer centre) does not contain point, large fence does
+{
+  const small = { id: 's', name: 'Small', latitude: 19.884765, longitude: 73.978462, radius_m: 30 }
+  const big = { id: 'b', name: 'Big', latitude: 19.884765 + 0.00135, longitude: 73.978462, radius_m: 300 } // ~150 m north
+  const pointLat = 19.884765 + 0.00054 // ~60 m from small, ~90 m from big
+  const gate = getPunchGate({ geo: ready(pointLat, 73.978462), config: { geofences: [small, big], max_accuracy_m: 50 }, busy: false })
+  assert.equal(gate.allowed, true)
+}
 console.log('geofence checks passed')

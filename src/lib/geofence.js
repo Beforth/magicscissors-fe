@@ -11,10 +11,13 @@ export function distanceMeters(a, b) {
 }
 
 export function nearestFence(position, geofences) {
+  // If inside any fence, prefer the containing fence; otherwise the nearest by centre.
   let best = null
   for (const g of geofences) {
     const d = Math.round(distanceMeters(position, g))
-    if (!best || d < best.distanceM) best = { ...g, distanceM: d, within: d <= g.radius_m }
+    const within = d <= g.radius_m
+    const cand = { ...g, distanceM: d, within }
+    if (!best || (within && !best.within) || (within === best.within && d < best.distanceM)) best = cand
   }
   return best
 }

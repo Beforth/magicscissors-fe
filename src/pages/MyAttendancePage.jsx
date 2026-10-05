@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Loader2, MapPin, Download } from 'lucide-react'
@@ -36,6 +36,7 @@ export default function MyAttendancePage() {
   const geo = useGeolocation()
   const [selfieOpen, setSelfieOpen] = useState(false)
   const [installEvent, setInstallEvent] = useState(null)
+  const inFlight = useRef(false)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['self-config'],
@@ -47,6 +48,9 @@ export default function MyAttendancePage() {
 
   const mutation = useMutation({
     mutationFn: (formData) => attendanceService.selfPunch(formData),
+    onSettled: () => {
+      inFlight.current = false
+    },
     onSuccess: () => {
       toast.success('Attendance recorded')
       queryClient.invalidateQueries({ queryKey: ['self-config'] })
@@ -70,8 +74,15 @@ export default function MyAttendancePage() {
   const punchType = isOut ? 'out' : 'in'
 
   const submit = (selfieBlob) => {
+    if (inFlight.current) return
+    // Re-check the gate with the latest geo/config at submit time
+    const latest = getPunchGate({ geo, config, busy: false })
     const pos = geo.position
-    if (!pos) return
+    if (!latest.allowed || !pos) {
+      toast.error(latest.reason || 'Cannot get your location')
+      return
+    }
+    inFlight.current = true
     const fd = new FormData()
     fd.append('punch_type', punchType)
     fd.append('latitude', String(pos.latitude))
