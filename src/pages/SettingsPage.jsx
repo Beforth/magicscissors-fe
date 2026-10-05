@@ -38,11 +38,13 @@ import {
   Info,
   ArrowRight,
   Key,
+  MapPin,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import IncentiveConfigModal from '@/components/modals/IncentiveConfigModal'
 import StaffIncentiveConfig from '@/components/StaffIncentiveConfig'
 import AttendanceApiKeysPanel from '@/components/settings/AttendanceApiKeysPanel'
+import GeofencePanel from '@/components/settings/GeofencePanel'
 
 function SetupChecklist({ status, navigate, setActiveTab }) {
   const items = [
@@ -244,6 +246,7 @@ function SettingsPage() {
   const navigate = useNavigate()
   const { user } = useSelector((state) => state.auth)
   const isOwner = user?.role === 'owner' || user?.role === 'developer'
+  const isStrictOwner = user?.role === 'owner'
 
   const [formData, setFormData] = useState({})
   const [hasChanges, setHasChanges] = useState(false)
@@ -403,7 +406,7 @@ function SettingsPage() {
 
       {/* Settings Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-5 lg:grid-cols-9 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-5 lg:grid-cols-10 lg:w-auto lg:inline-grid">
           <TabsTrigger value="setup" className="flex items-center gap-2">
             <ListChecks className="h-4 w-4" />
             <span className="hidden sm:inline">Setup</span>
@@ -440,6 +443,12 @@ function SettingsPage() {
             <TabsTrigger value="attendance-api" className="flex items-center gap-2">
               <Key className="h-4 w-4" />
               <span className="hidden sm:inline">Attendance API</span>
+            </TabsTrigger>
+          )}
+          {isStrictOwner && (
+            <TabsTrigger value="geofence" className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              <span className="hidden sm:inline">Geofence</span>
             </TabsTrigger>
           )}
         </TabsList>
@@ -946,6 +955,12 @@ function SettingsPage() {
         {isOwner && (
           <TabsContent value="attendance-api">
             <AttendanceApiKeysPanel />
+          </TabsContent>
+        )}
+
+        {isStrictOwner && (
+          <TabsContent value="geofence">
+            <GeofencePanel />
           </TabsContent>
         )}
       </Tabs>

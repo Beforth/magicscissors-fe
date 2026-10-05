@@ -108,5 +108,5 @@ api.interceptors.response.use(
   }
 )
 
-export { clearAuthStorage, getStoredToken, refreshAccessToken, redirectToLogin }
+export { baseURL, clearAuthStorage, getStoredToken, refreshAccessToken, redirectToLogin }
 export default api
