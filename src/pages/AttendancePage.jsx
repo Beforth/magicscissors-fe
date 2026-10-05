@@ -17,6 +17,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import PunchMeta from '@/components/attendance/PunchMeta'
 import { attendanceService } from '@/services/attendance.service'
 import { branchService } from '@/services/branch.service'
 import { machineService } from '@/services/machine.service'
@@ -645,8 +646,14 @@ export default function AttendancePage() {
                               <Icon className="h-3 w-3 mr-1 inline" />{meta.label}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-mono text-xs">{formatTimeStored(emp.check_in)}</TableCell>
-                          <TableCell className="font-mono text-xs">{formatTimeStored(emp.check_out)}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {formatTimeStored(emp.check_in)}
+                            <PunchMeta meta={emp.check_in_meta} />
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {formatTimeStored(emp.check_out)}
+                            <PunchMeta meta={emp.check_out_meta} />
+                          </TableCell>
                           <TableCell>{emp.total_break_minutes}m</TableCell>
                           <TableCell>{emp.working_hours != null ? `${emp.working_hours}h` : '—'}</TableCell>
                           <TableCell>

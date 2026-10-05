@@ -1,6 +1,62 @@
-export const CURRENT_VERSION = 'v2.10.0'
+export const CURRENT_VERSION = 'v2.11.0'
 
 export const versionHistory = [
+  {
+    version: 'v2.11.0',
+    date: 'Oct 2026',
+    title: 'Mobile App & Geofenced Attendance',
+    highlights: [
+      'Installable PWA with app shell and update prompts',
+      'Geofenced employee self check-in/out from mobile app',
+      'Optional selfie capture during punch, controlled by owner switch',
+      'Owner-only geofence management dashboard',
+      'Manager view shows app punch source, distance, and selfie thumbnail on attendance page',
+    ],
+    details: [
+      {
+        section: 'Progressive Web App',
+        items: [
+          'App shell architecture — instant load and fast navigation',
+          'Install prompt on compatible browsers (mobile and desktop)',
+          'Update notification when new version is available',
+          'Works offline with cached app resources',
+        ],
+      },
+      {
+        section: 'Geofenced Attendance',
+        items: [
+          'Mobile app geofence check-in/out — employee punches from app when within branch geofence',
+          'Distance calculation — stores distance from geofence center in check_in_meta / check_out_meta',
+          'Any-fence match logic — employee can check in/out from any configured geofence boundary',
+          'Gate validation re-checked at punch submit to prevent spoofing',
+        ],
+      },
+      {
+        section: 'Selfie Capture',
+        items: [
+          'Optional selfie during punch — controlled by owner-managed switch per branch',
+          'Selfie stored at /uploads/selfies/2026/10/<uuid>.jpg and served via baseURL',
+          'Low-bandwidth thumbnail via lazy loading in manager view',
+        ],
+      },
+      {
+        section: 'Geofence Management',
+        items: [
+          'New Settings → Geofences tab (owner-only)',
+          'Create, edit, deactivate branch geofences with center coordinates and radius',
+          'Geofence list view with status and edit controls',
+        ],
+      },
+      {
+        section: 'Manager Review',
+        items: [
+          'PunchMeta component — renders app badge, distance, and selfie thumbnail for manager review',
+          'Attendance page shows app punch metadata only for app-sourced punches',
+          'Selfie link opens full image in new tab',
+        ],
+      },
+    ],
+  },
   {
     version: 'v2.10.0',
     date: 'May 2026',
