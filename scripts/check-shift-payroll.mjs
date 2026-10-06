@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { buildRulesPayload } from '../src/lib/shiftRules.js'
+import { payrollTotals, reportCsvRows, formatMoney } from '../src/lib/payroll.js'
 
 const ok = (r) => { assert.equal(r.ok, true, r.error); return r.value }
 const bad = (r) => { assert.equal(r.ok, false); return r.error }
@@ -24,3 +25,19 @@ assert.match(bad(buildRulesPayload({ grace: 5, tiers: [], halfDayLateAfterMin: '
 assert.match(bad(buildRulesPayload({ grace: 5, tiers: [], halfDayLateAfterMin: '1.5', halfDayMinHours: '' })), /whole/i)
 
 console.log('shift rule checks passed')
+
+const rows = [
+  { employee_id: 'a', full_name: 'A', employee_code: 'E1', pay_type: 'daily', wage_amount: 500, days_worked: 2, half_days: 1, hours_worked: 12, late_deduction_hours: 1, gross: 600, late_deduction_amount: 50, net_pay: 550, warnings: [] },
+  { employee_id: 'b', full_name: 'B', employee_code: 'E2', pay_type: null, wage_amount: null, days_worked: 1, half_days: 0, hours_worked: 8, late_deduction_hours: 0, gross: 0, late_deduction_amount: 0, net_pay: 0, warnings: ['No wage set'] },
+]
+assert.deepEqual(payrollTotals(rows), { days_worked: 3, half_days: 1, hours_worked: 20, late_deduction_hours: 1, gross: 600, late_deduction_amount: 50, net_pay: 550 })
+assert.deepEqual(payrollTotals([]), { days_worked: 0, half_days: 0, hours_worked: 0, late_deduction_hours: 0, gross: 0, late_deduction_amount: 0, net_pay: 0 })
+const csv = reportCsvRows(rows)
+assert.equal(csv.length, 2)
+assert.equal(csv[0].pay_type, 'Daily')
+assert.equal(csv[1].pay_type, '—')
+assert.equal(csv[1].warnings, 'No wage set')
+assert.equal(formatMoney(1234.5), '₹1,234.50')
+assert.equal(formatMoney(0), '₹0.00')
+assert.equal(formatMoney(null), '—')
+console.log('payroll helper checks passed')

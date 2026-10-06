@@ -6,6 +6,7 @@ import { useSidebar } from '@/contexts/SidebarContext'
 import { CURRENT_VERSION } from '@/data/versionHistory'
 import {
   LayoutDashboard,
+  IndianRupee,
   Users,
   Receipt,
   Scissors,
@@ -197,6 +198,12 @@ const getNavItemsByRole = (role) => {
       href: '/staff-performance',
       icon: TrendingUp,
       roles: ['owner', 'developer', 'manager', 'cashier'],
+    },
+    {
+      title: 'Payroll',
+      href: '/payroll',
+      icon: IndianRupee,
+      roles: ['owner'],
     },
     {
       title: 'Branches',

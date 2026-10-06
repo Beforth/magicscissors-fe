@@ -1,6 +1,37 @@
-export const CURRENT_VERSION = 'v2.11.0'
+export const CURRENT_VERSION = 'v2.12.0'
 
 export const versionHistory = [
+  {
+    version: 'v2.12.0',
+    date: 'Oct 2026',
+    title: 'Shift Rules & Payroll',
+    highlights: [
+      'Per-shift late fine tiers and half-day rules are applied automatically to attendance',
+      'Daily or monthly wage can be set for each employee',
+      'Owner-only Payroll report for a branch and month, with CSV export',
+      'Staff without an assigned shift keep the old rule',
+      'Rule changes apply to new punches, not to past days',
+    ],
+    details: [
+      {
+        section: 'Shift Rules',
+        items: [
+          'Each shift can define late fine tiers and half-day rules',
+          'Rules are applied automatically to new punches; past days are not recalculated',
+          'Staff without an assigned shift keep the old rule',
+        ],
+      },
+      {
+        section: 'Payroll',
+        items: [
+          'Daily or monthly wage per employee, edited by the owner',
+          'Monthly rate divisor can be days in the month or a fixed number of days',
+          'Monthly report per branch with totals, warnings and CSV export',
+          'Payroll page is visible to the owner only',
+        ],
+      },
+    ],
+  },
   {
     version: 'v2.11.0',
     date: 'Oct 2026',
