@@ -366,7 +366,10 @@ function SettingsTab() {
 export default function PayrollPage() {
   const { user } = useSelector((s) => s.auth)
   const [selectedBranchId, setSelectedBranchId] = useState('')
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
+  const [month, setMonth] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })
 
   const { data: branchesData } = useQuery({
     queryKey: ['branches', 'active'],
