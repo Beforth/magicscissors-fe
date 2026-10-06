@@ -6,6 +6,7 @@ import { useSidebar } from '@/contexts/SidebarContext'
 import { CURRENT_VERSION } from '@/data/versionHistory'
 import {
   LayoutDashboard,
+  IndianRupee,
   Users,
   Receipt,
   Scissors,
@@ -41,6 +42,7 @@ import {
   X,
   UserCheck,
   Clock,
+  MapPin,
 } from 'lucide-react'
 
 const getNavItemsByRole = (role) => {
@@ -186,10 +188,22 @@ const getNavItemsByRole = (role) => {
       roles: ['owner', 'developer', 'manager', 'cashier'],
     },
     {
+      title: 'My Attendance',
+      href: '/my-attendance',
+      icon: MapPin,
+      roles: ['employee', 'manager', 'cashier'],
+    },
+    {
       title: 'Staff Performance',
       href: '/staff-performance',
       icon: TrendingUp,
       roles: ['owner', 'developer', 'manager', 'cashier'],
+    },
+    {
+      title: 'Payroll',
+      href: '/payroll',
+      icon: IndianRupee,
+      roles: ['owner'],
     },
     {
       title: 'Branches',

@@ -31,6 +31,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Clock, Loader2, Plus, Pencil, Power, PowerOff, Calendar, ChevronLeft, ChevronRight, Trash2, Search } from 'lucide-react'
 import { toast } from 'sonner'
+import { buildRulesPayload } from '@/lib/shiftRules'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -40,6 +41,8 @@ const initialShiftForm = {
   end_time: '',
   color_code: '#6366f1',
   grace_period: '5',
+  half_day_late_after_min: '',
+  half_day_min_hours: '',
 }
 
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -61,7 +64,10 @@ function formatGraceUntil(startTime, graceMinutes) {
 function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
   const isEditing = !!shift
   const [form, setForm] = useState(initialShiftForm)
+  const [tiers, setTiers] = useState([])
   const [saving, setSaving] = useState(false)
+  const { user } = useSelector((s) => s.auth)
+  const canEditRules = user?.role === 'owner'
 
   useEffect(() => {
     if (shift) {
@@ -71,9 +77,13 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
         end_time: shift.end_time || '',
         color_code: shift.color_code || '#6366f1',
         grace_period: String(shift.grace_period ?? 5),
+        half_day_late_after_min: shift.half_day_late_after_min == null ? '' : String(shift.half_day_late_after_min),
+        half_day_min_hours: shift.half_day_min_hours == null ? '' : String(shift.half_day_min_hours),
       })
+      setTiers((shift.late_tiers || []).map((t) => ({ after_min: String(t.after_min), deduct_hours: String(t.deduct_hours) })))
     } else {
       setForm(initialShiftForm)
+      setTiers([])
     }
   }, [shift, open])
 
@@ -92,10 +102,19 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
       return
     }
 
-    const payload = {
-      ...form,
-      grace_period: grace,
+    let rules = {}
+    if (canEditRules) {
+      const built = buildRulesPayload({
+        grace,
+        tiers,
+        halfDayLateAfterMin: form.half_day_late_after_min,
+        halfDayMinHours: form.half_day_min_hours,
+      })
+      if (!built.ok) { toast.error(built.error); return }
+      rules = built.value
     }
+    const base = Object.fromEntries(Object.entries(form).filter(([k]) => !k.startsWith('half_day')))
+    const payload = { ...base, grace_period: grace, ...rules }
 
     setSaving(true)
     try {
@@ -117,7 +136,7 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[420px]">
+      <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Shift' : 'Add Shift'}</DialogTitle>
         </DialogHeader>
@@ -191,6 +210,88 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
               />
             </div>
           </div>
+          {canEditRules ? (
+            <>
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">Late fine rules</h4>
+                {tiers.map((t, i) => (
+                  <div key={i} className="flex items-end gap-2">
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor={`tier_after_${i}`} className="text-xs">Late by (min) ≥</Label>
+                      <Input
+                        id={`tier_after_${i}`}
+                        type="number"
+                        min="1"
+                        value={t.after_min}
+                        onChange={(e) => setTiers((rows) => rows.map((r, j) => (j === i ? { ...r, after_min: e.target.value } : r)))}
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor={`tier_deduct_${i}`} className="text-xs">Deduct (hours)</Label>
+                      <Input
+                        id={`tier_deduct_${i}`}
+                        type="number"
+                        min="0"
+                        step="0.25"
+                        value={t.deduct_hours}
+                        onChange={(e) => setTiers((rows) => rows.map((r, j) => (j === i ? { ...r, deduct_hours: e.target.value } : r)))}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-10 w-10 p-0 text-red-400 hover:text-red-600"
+                      onClick={() => setTiers((rows) => rows.filter((_, j) => j !== i))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTiers((rows) => [...rows, { after_min: '', deduct_hours: '' }])}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add tier
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Applies after the grace period. Leave empty for no late fine.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">Half day</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="half_day_late_after_min" className="text-xs">Half day if late by more than (min)</Label>
+                    <Input
+                      id="half_day_late_after_min"
+                      type="number"
+                      min="0"
+                      value={form.half_day_late_after_min}
+                      onChange={(e) => setForm((f) => ({ ...f, half_day_late_after_min: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="half_day_min_hours" className="text-xs">Half day if worked less than (hours)</Label>
+                    <Input
+                      id="half_day_min_hours"
+                      type="number"
+                      min="0"
+                      step="0.25"
+                      value={form.half_day_min_hours}
+                      onChange={(e) => setForm((f) => ({ ...f, half_day_min_hours: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">Leave blank to turn a rule off</p>
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">Late and half-day rules can be changed by the owner</p>
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancel
@@ -215,6 +316,7 @@ function ShiftPage() {
 
   const { user } = useSelector((state) => state.auth)
   const isOwnerDev = ['owner', 'developer'].includes(user?.role)
+  const isOwner = user?.role === 'owner'
   const userBranchId = user?.branchId || user?.branch_id || user?.branch?.branch_id || user?.branch?.id || ''
   const [selectedBranchId, setSelectedBranchId] = useState(userBranchId)
   const [selectedMonth, setSelectedMonth] = useState(toYearMonth(new Date()))
@@ -375,10 +477,12 @@ function ShiftPage() {
                 <Clock className="h-5 w-5" />
                 Shift Definitions
               </CardTitle>
-              <Button size="sm" onClick={openAddModal}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add Shift
-              </Button>
+              {isOwner && (
+                <Button size="sm" onClick={openAddModal}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Shift
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {shiftsLoading ? (
@@ -426,17 +530,21 @@ function ShiftPage() {
                           <TableCell>{shift.employee_count ?? 0}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => openEditModal(shift)}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => toggleMutation.mutate(shift.id)}
-                                disabled={toggleMutation.isPending}
-                              >
-                                {shift.is_active ? <PowerOff className="h-4 w-4 text-gray-400" /> : <Power className="h-4 w-4 text-green-600" />}
-                              </Button>
+                              {isOwner && (
+                                <>
+                                  <Button variant="ghost" size="sm" onClick={() => openEditModal(shift)}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => toggleMutation.mutate(shift.id)}
+                                    disabled={toggleMutation.isPending}
+                                  >
+                                    {shift.is_active ? <PowerOff className="h-4 w-4 text-gray-400" /> : <Power className="h-4 w-4 text-green-600" />}
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>

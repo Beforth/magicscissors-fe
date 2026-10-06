@@ -133,3 +133,13 @@ export function fuzzyScore(text, query) {
   if (consecutive > 1) score += consecutive * 2
   return i === q.length ? score : 0
 }
+
+/** Decimal hours (e.g. 1.5) -> "1h 30m". Null/undefined -> null. */
+export function formatWorkedHours(hours) {
+  if (hours == null || Number.isNaN(Number(hours))) return null
+  const totalMin = Math.round(Number(hours) * 60)
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  if (h === 0) return `${m}m`
+  return m === 0 ? `${h}h` : `${h}h ${m}m`
+}

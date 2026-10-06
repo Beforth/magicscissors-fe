@@ -1,6 +1,93 @@
-export const CURRENT_VERSION = 'v2.10.0'
+export const CURRENT_VERSION = 'v2.12.0'
 
 export const versionHistory = [
+  {
+    version: 'v2.12.0',
+    date: 'Oct 2026',
+    title: 'Shift Rules & Payroll',
+    highlights: [
+      'Per-shift late fine tiers and half-day rules are applied automatically to attendance',
+      'Daily or monthly wage can be set for each employee',
+      'Owner-only Payroll report for a branch and month, with CSV export',
+      'Staff without an assigned shift keep the old rule',
+      'Rule changes apply to new punches, not to past days',
+    ],
+    details: [
+      {
+        section: 'Shift Rules',
+        items: [
+          'Each shift can define late fine tiers and half-day rules',
+          'Rules are applied automatically to new punches; past days are not recalculated',
+          'Staff without an assigned shift keep the old rule',
+        ],
+      },
+      {
+        section: 'Payroll',
+        items: [
+          'Daily or monthly wage per employee, edited by the owner',
+          'Monthly rate divisor can be days in the month or a fixed number of days',
+          'Monthly report per branch with totals, warnings and CSV export',
+          'Payroll page is visible to the owner only',
+        ],
+      },
+    ],
+  },
+  {
+    version: 'v2.11.0',
+    date: 'Oct 2026',
+    title: 'Mobile App & Geofenced Attendance',
+    highlights: [
+      'Installable PWA with app shell and update prompts',
+      'Geofenced employee self check-in/out from mobile app',
+      'Optional selfie capture during punch, controlled by owner switch',
+      'Owner-only geofence management dashboard',
+      'Manager view shows app punch source, distance, and selfie thumbnail on attendance page',
+    ],
+    details: [
+      {
+        section: 'Progressive Web App',
+        items: [
+          'App shell architecture — instant load and fast navigation',
+          'Install prompt on compatible browsers (mobile and desktop)',
+          'Update notification when new version is available',
+          'App shell loads from cache; check-in needs a connection',
+        ],
+      },
+      {
+        section: 'Geofenced Attendance',
+        items: [
+          'Mobile app geofence check-in/out — employee punches from app when within branch geofence (one check-in and one check-out per day)',
+          'Distance from the branch location is recorded with every app punch',
+          'Any-fence match logic — employee can check in/out from any configured geofence boundary',
+          'Gate validation re-checked at punch submit to prevent spoofing',
+        ],
+      },
+      {
+        section: 'Selfie Capture',
+        items: [
+          'Optional selfie during punch — controlled by one owner-managed switch for all branches',
+          'Selfies are saved securely and only when the selfie switch is on',
+          'Selfies appear as small thumbnails in the manager view so pages stay fast',
+        ],
+      },
+      {
+        section: 'Geofence Management',
+        items: [
+          'New Settings → Geofences tab (owner-only)',
+          'Create, edit, deactivate branch geofences with center coordinates and radius',
+          'Geofence list view with status and edit controls',
+        ],
+      },
+      {
+        section: 'Manager Review',
+        items: [
+          'PunchMeta component — renders app badge, distance, and selfie thumbnail for manager review',
+          'Attendance page shows app punch metadata only for app-sourced punches',
+          'Selfie link opens full image in new tab',
+        ],
+      },
+    ],
+  },
   {
     version: 'v2.10.0',
     date: 'May 2026',

@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import LoginPage from './pages/LoginPage'
+import MyAttendancePage from './pages/MyAttendancePage'
 import DashboardLayout from './components/layout/DashboardLayout'
 import OwnerDashboard from './pages/dashboards/OwnerDashboard'
 import ManagerDashboard from './pages/dashboards/ManagerDashboard'
@@ -24,6 +25,7 @@ import BranchFormPage from './pages/BranchFormPage'
 import StaffPage from './pages/StaffPage'
 import StaffFormPage from './pages/StaffFormPage'
 import StaffPerformancePage from './pages/StaffPerformancePage'
+import PayrollPage from './pages/PayrollPage'
 import SettingsPage from './pages/SettingsPage'
 import CashReconciliationPage from './pages/CashReconciliationPage'
 import ExpensesPage from './pages/ExpensesPage'
@@ -132,6 +134,7 @@ function App() {
         <Route path="staff/new" element={<StaffFormPage />} />
         <Route path="staff/:id/edit" element={<StaffFormPage />} />
         <Route path="staff-performance" element={<StaffPerformancePage />} />
+        <Route path="payroll" element={<PayrollPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="cash-reconciliation" element={<CashReconciliationPage />} />
         <Route path="expenses" element={<ExpensesPage />} />
@@ -147,6 +150,7 @@ function App() {
         <Route path="jobs" element={<JobsPage />} />
         <Route path="machines" element={<MachinesPage />} />
         <Route path="attendance" element={<AttendancePage />} />
+        <Route path="my-attendance" element={<MyAttendancePage />} />
         <Route path="skills" element={<SkillsPage />} />
         <Route path="tokens" element={<TokensPage />} />
         <Route path="skus" element={<SkusPage />} />
