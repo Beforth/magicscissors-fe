@@ -9,7 +9,7 @@ export default function PunchMeta({ meta }) {
   return (
     <div className="mt-1 flex items-center gap-1.5 font-sans">
       {isApp && <Badge variant="secondary">App</Badge>}
-      {meta.distance_m != null && <span className="text-muted-foreground">{Math.round(meta.distance_m)} m</span>}
+      {meta.distance_m != null && <span className="text-muted-foreground" title="Distance from the salon location at punch time">{Math.round(meta.distance_m)} m away</span>}
       {src && (
         <a href={src} target="_blank" rel="noreferrer" title="View selfie">
           <img src={src} alt="Selfie" className="h-6 w-6 rounded object-cover border" loading="lazy" />

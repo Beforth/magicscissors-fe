@@ -8,6 +8,7 @@ import { attendanceService } from '@/services/attendance.service'
 import { useGeolocation } from '@/hooks/useGeolocation'
 import { getPunchGate } from '@/lib/geofence'
 import SelfieCapture from '@/components/attendance/SelfieCapture'
+import { formatWorkedHours } from '@/lib/utils'
 
 const STATUS_LABELS = {
   not_arrived: 'Not checked in',
@@ -140,7 +141,14 @@ export default function MyAttendancePage() {
               <div className="text-muted-foreground">Check out</div>
               <div className="font-mono">{formatTimeStored(config.today?.check_out)}</div>
             </div>
+            <div>
+              <div className="text-muted-foreground">Worked</div>
+              <div className="font-mono">{formatWorkedHours(config.today?.working_hours) ?? '—'}</div>
+            </div>
           </div>
+          {config.today?.total_break_minutes > 0 && (
+            <div className="text-sm text-muted-foreground">Break: {config.today.total_break_minutes}m</div>
+          )}
         </CardContent>
       </Card>
 

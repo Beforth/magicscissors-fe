@@ -21,6 +21,7 @@ import PunchMeta from '@/components/attendance/PunchMeta'
 import { attendanceService } from '@/services/attendance.service'
 import { branchService } from '@/services/branch.service'
 import { machineService } from '@/services/machine.service'
+import { formatWorkedHours } from '@/lib/utils'
 
 const STATUS_META = {
   on_floor:     { label: 'On floor',     badge: 'success',     icon: CheckCircle2 },
@@ -655,7 +656,7 @@ export default function AttendancePage() {
                             <PunchMeta meta={emp.check_out_meta} />
                           </TableCell>
                           <TableCell>{emp.total_break_minutes}m</TableCell>
-                          <TableCell>{emp.working_hours != null ? `${emp.working_hours}h` : '—'}</TableCell>
+                          <TableCell>{formatWorkedHours(emp.working_hours) ?? '—'}</TableCell>
                           <TableCell>
                             {getLateLabel(emp)
                               ? <span className="text-destructive font-medium">{getLateLabel(emp)}</span>
