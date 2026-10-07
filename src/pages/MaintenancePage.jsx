@@ -101,111 +101,135 @@ export default function MaintenancePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Maintenance Tracker</h1>
-          <p className="text-sm text-gray-500 mt-1">Track items sent for repair or servicing</p>
+      {/* Header Banner */}
+      <div className="glass-panel rounded-3xl p-6 sm:p-7 relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center rounded-full bg-white/80 backdrop-blur-md px-3 py-1 mb-2.5 ring-1 ring-white/80 shadow-2xs">
+              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                Equipment & Facilities
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
+              Maintenance Tracker
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+              Track salon equipment, chairs, and machines sent for servicing or repair
+            </p>
+          </div>
+
+          {canManage && (
+            <Button
+              onClick={() => { setEditRecord(null); setModalOpen(true) }}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-md shadow-blue-500/20 font-bold self-start sm:self-center"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Record
+            </Button>
+          )}
         </div>
-        {canManage && (
-          <Button onClick={() => { setEditRecord(null); setModalOpen(true) }}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Record
-          </Button>
-        )}
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <div className="flex flex-wrap gap-3 items-end">
-            {isOwner && (
-              <div>
-                <Label className="text-xs">Branch</Label>
-                <SearchableSelect
-                  options={[{ value: 'all', label: 'All Branches' }, ...branches.map(b => ({ value: b.branch_id, label: b.name }))]}
-                  value={filterBranch}
-                  onChange={(val) => { setFilterBranch(val === 'all' ? '' : val); setPage(1) }}
-                  placeholder="All branches"
-                  triggerClassName="w-[160px]"
-                />
-              </div>
-            )}
+      {/* Filters Card */}
+      <div className="glass-card rounded-3xl p-4 sm:p-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+          {isOwner && (
             <div>
-              <Label className="text-xs">Status</Label>
-                <SearchableSelect
-                  options={[{ value: 'all', label: 'All Statuses' }, ...STATUS_OPTIONS]}
-                  value={filterStatus}
-                  onChange={(val) => { setFilterStatus(val === 'all' ? '' : val); setPage(1) }}
-                  placeholder="All statuses"
-                  triggerClassName="w-[150px]"
-                />
-            </div>
-            <div>
-              <Label className="text-xs">Start Date</Label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => { setStartDate(e.target.value); setPage(1) }}
-                className="w-[150px]"
+              <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Branch</Label>
+              <SearchableSelect
+                options={[{ value: 'all', label: 'All Branches' }, ...branches.map(b => ({ value: b.branch_id, label: b.name }))]}
+                value={filterBranch}
+                onChange={(val) => { setFilterBranch(val === 'all' ? '' : val); setPage(1) }}
+                placeholder="All branches"
+                triggerClassName="w-full"
               />
             </div>
-            <div>
-              <Label className="text-xs">End Date</Label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => { setEndDate(e.target.value); setPage(1) }}
-                className="w-[150px]"
-              />
-            </div>
+          )}
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Status</Label>
+            <SearchableSelect
+              options={[{ value: 'all', label: 'All Statuses' }, ...STATUS_OPTIONS]}
+              value={filterStatus}
+              onChange={(val) => { setFilterStatus(val === 'all' ? '' : val); setPage(1) }}
+              placeholder="All statuses"
+              triggerClassName="w-full"
+            />
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">Start Date</Label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => { setStartDate(e.target.value); setPage(1) }}
+              className="w-full bg-white/80"
+            />
+          </div>
+          <div>
+            <Label className="text-xs font-semibold text-slate-600 mb-1.5 block">End Date</Label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => { setEndDate(e.target.value); setPage(1) }}
+              className="w-full bg-white/80"
+            />
+          </div>
+        </div>
+      </div>
 
-      {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+      {/* Records Table Card */}
+      <div className="glass-card rounded-3xl p-4 sm:p-6 space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-white/80">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-slate-800">Maintenance Records</h2>
+            <Badge variant="secondary" className="font-bold text-xs bg-blue-50 text-blue-700 border border-blue-100">
+              {records.length} items
+            </Badge>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+          </div>
+        ) : records.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center mx-auto mb-3">
+              <Wrench className="h-6 w-6 text-slate-400" />
             </div>
-          ) : records.length === 0 ? (
-            <div className="text-center py-12">
-              <Wrench className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">No maintenance records found</p>
-              <p className="text-sm text-gray-400 mt-1">Add a record to start tracking items sent for repair</p>
-            </div>
-          ) : (
-            <Table>
+            <p className="text-base font-bold text-slate-700">No maintenance records found</p>
+            <p className="text-xs text-slate-400 mt-1">Add a record to start tracking items sent for repair</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <Table className="min-w-[720px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Item Name</TableHead>
-                  <TableHead>Item Type</TableHead>
-                  <TableHead>Vendor Name</TableHead>
-                  <TableHead>Vendor Phone</TableHead>
-                  <TableHead>Sent Date</TableHead>
-                  <TableHead>Expected Return</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Est. Cost</TableHead>
-                  {canManage && <TableHead className="text-right">Actions</TableHead>}
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Item Name</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Item Type</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Vendor</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Phone</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Sent Date</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Expected Return</TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider text-slate-500">Status</TableHead>
+                  <TableHead className="text-right font-bold text-xs uppercase tracking-wider text-slate-500">Est. Cost</TableHead>
+                  {canManage && <TableHead className="text-right font-bold text-xs uppercase tracking-wider text-slate-500">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {records.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell className="font-medium">{record.item_name}</TableCell>
-                    <TableCell>{ITEM_TYPE_LABEL[record.item_type] || record.item_type}</TableCell>
-                    <TableCell>{record.vendor_name}</TableCell>
-                    <TableCell>{record.vendor_phone || '—'}</TableCell>
-                    <TableCell>{formatDate(record.sent_date)}</TableCell>
-                    <TableCell>{formatDate(record.expected_return_date)}</TableCell>
+                  <TableRow key={record.id} className="hover:bg-white/60">
+                    <TableCell className="font-bold text-slate-800">{record.item_name}</TableCell>
+                    <TableCell className="text-slate-600 text-xs font-medium">{ITEM_TYPE_LABEL[record.item_type] || record.item_type}</TableCell>
+                    <TableCell className="text-slate-700 font-medium">{record.vendor_name}</TableCell>
+                    <TableCell className="text-slate-500 text-xs">{record.vendor_phone || '—'}</TableCell>
+                    <TableCell className="text-slate-600 text-xs">{formatDate(record.sent_date)}</TableCell>
+                    <TableCell className="text-slate-600 text-xs">{formatDate(record.expected_return_date)}</TableCell>
                     <TableCell>
-                      <Badge variant={STATUS_BADGE[record.status] || 'secondary'}>
+                      <Badge variant={STATUS_BADGE[record.status] || 'secondary'} className="capitalize font-semibold text-xs">
                         {STATUS_LABEL[record.status] || record.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right font-bold text-slate-800 tabular-nums">
                       {record.estimated_cost != null ? formatCurrency(record.estimated_cost) : '—'}
                     </TableCell>
                     {canManage && (
@@ -214,18 +238,19 @@ export default function MaintenancePage() {
                           <Button
                             size="sm"
                             variant="ghost"
+                            className="h-8 w-8 p-0 rounded-xl hover:bg-blue-50 hover:text-blue-600"
                             onClick={() => { setEditRecord(record); setModalOpen(true) }}
                           >
-                            <Pencil className="h-3 w-3" />
+                            <Pencil className="h-3.5 w-3.5" />
                           </Button>
                           {isOwner && (
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="text-red-600"
+                              className="h-8 w-8 p-0 rounded-xl hover:bg-rose-50 text-rose-600 hover:text-rose-700"
                               onClick={() => handleDelete(record)}
                             >
-                              <Trash2 className="h-3 w-3" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           )}
                         </div>
@@ -235,9 +260,9 @@ export default function MaintenancePage() {
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        )}
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (

@@ -22,8 +22,7 @@ export default function WarehousesPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Warehouse className="h-6 w-6" />
+          <h1 className="text-2xl font-bold text-gray-900">
             Warehouses
           </h1>
           <p className="text-sm text-gray-500 mt-1 max-w-2xl">
@@ -32,7 +31,6 @@ export default function WarehousesPage() {
         </div>
         <Button asChild>
           <Link to="/warehouses/new">
-            <Plus className="h-4 w-4 mr-2" />
             Add Warehouse
           </Link>
         </Button>
@@ -66,8 +64,7 @@ export default function WarehousesPage() {
               <TableBody>
                 {warehouses.map((b) => (
                   <TableRow key={b.branch_id}>
-                    <TableCell className="font-medium flex items-center gap-2">
-                      <Warehouse className="h-4 w-4 text-violet-600" />
+                    <TableCell className="font-medium">
                       {b.name}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-gray-600">{b.code}</TableCell>
@@ -80,12 +77,7 @@ export default function WarehousesPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-gray-600">
-                      {b.city ? (
-                        <span className="inline-flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {b.city}{b.state ? `, ${b.state}` : ''}
-                        </span>
-                      ) : '—'}
+                      {b.city ? `${b.city}${b.state ? `, ${b.state}` : ''}` : '—'}
                     </TableCell>
                     <TableCell className="text-center">
                       {b.is_active ? (
@@ -96,7 +88,7 @@ export default function WarehousesPage() {
                     </TableCell>
                     <TableCell>
                       <Button size="sm" variant="ghost" onClick={() => { setEditBranch(b); setModalOpen(true) }}>
-                        <Pencil className="h-3 w-3" />
+                        Edit
                       </Button>
                     </TableCell>
                   </TableRow>

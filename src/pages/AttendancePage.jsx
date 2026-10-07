@@ -7,7 +7,7 @@ import {
   RefreshCw, Calendar, ChevronLeft, ChevronRight, List, Search
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -531,11 +531,12 @@ export default function AttendancePage() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Attendance Management</h1>
-          <p className="text-sm text-muted-foreground font-medium">
+          <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
+          <p className="text-gray-500">
             {activeTab === 'today' && roster?.branch?.name ? `${roster.branch.name} · ` : ''}
             {activeTab === 'today' && roster?.shop_date ? `Shop date ${new Date(roster.shop_date).toLocaleDateString('en-CA')}` : 'Track shifts, floor status, and calendars'}
           </p>
@@ -552,7 +553,7 @@ export default function AttendancePage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-80 grid-cols-2">
+        <TabsList className="grid w-full max-w-sm grid-cols-2">
           <TabsTrigger value="today" className="flex items-center gap-2">
             <List className="h-4 w-4" />
             Today's Roster
@@ -564,10 +565,11 @@ export default function AttendancePage() {
         </TabsList>
 
         <TabsContent value="today" className="space-y-6">
+          {/* Filters */}
           <Card>
-            <CardContent className="pt-6 flex flex-wrap gap-4 items-end">
+            <CardContent className="p-4 flex flex-wrap gap-4 items-end">
               <div className="flex-1 min-w-[200px] max-w-sm">
-                <Label className="text-xs mb-1 block">Branch</Label>
+                <Label className="text-xs font-medium text-gray-700 mb-1.5 block">Branch</Label>
                 <SearchableSelect
                   options={branches.map((b) => ({ value: b.branch_id, label: b.name }))}
                   value={branchId}
@@ -576,7 +578,7 @@ export default function AttendancePage() {
                 />
               </div>
               <div className="flex-1 min-w-[200px] max-w-sm">
-                <Label className="text-xs mb-1 block">Search</Label>
+                <Label className="text-xs font-medium text-gray-700 mb-1.5 block">Search</Label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -599,8 +601,19 @@ export default function AttendancePage() {
             </CardContent>
           </Card>
 
+          {/* Today's Roster Table */}
           <Card>
-            <CardContent className="pt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                Today's Roster
+                {filteredRosterEmployees && (
+                  <Badge variant="secondary" className="ml-2">
+                    {filteredRosterEmployees.length} staff
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -614,7 +627,8 @@ export default function AttendancePage() {
                   No employees match "{rosterSearch}".
                 </p>
               ) : (
-                <Table>
+                <div className="max-w-full overflow-x-auto">
+                <Table className="min-w-[680px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Employee</TableHead>
@@ -737,6 +751,7 @@ export default function AttendancePage() {
                     })}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -744,7 +759,7 @@ export default function AttendancePage() {
 
         <TabsContent value="calendar" className="space-y-6">
           <Card>
-            <CardContent className="pt-6 flex flex-wrap gap-4 items-center justify-between">
+            <CardContent className="p-4 flex flex-wrap gap-4 items-center justify-between">
               <div className="flex flex-wrap gap-4 items-end">
                 <div className="min-w-[200px]">
                   <Label className="text-xs mb-1 block">Branch</Label>
@@ -825,10 +840,10 @@ export default function AttendancePage() {
             <>
               {calendarSubTab === 'grid' ? (
                 <Card>
-                  <CardContent className="pt-6">
-                    <div className="grid grid-cols-7 gap-2">
+                  <CardContent className="p-4">
+                    <div className="grid grid-cols-7 gap-1 sm:gap-2">
                       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                        <div key={day} className="text-center font-semibold text-sm text-muted-foreground pb-2">
+                        <div key={day} className="pb-1 text-center text-[10px] font-semibold text-muted-foreground sm:pb-2 sm:text-sm">
                           {day}
                         </div>
                       ))}
@@ -856,7 +871,7 @@ export default function AttendancePage() {
                               setDetailDate(cell.dateStr)
                               setShowDetailModal(true)
                             }}
-                            className={`min-h-[100px] border rounded-lg p-2 transition-all flex flex-col justify-between cursor-pointer ${
+                            className={`min-h-[68px] overflow-hidden border rounded-lg p-1 transition-all flex flex-col justify-between cursor-pointer sm:min-h-[100px] sm:p-2 ${
                               cell.isCurrentMonth
                                 ? 'bg-background hover:bg-slate-50 hover:shadow border-slate-100 hover:border-slate-300'
                                 : 'bg-slate-50/40 opacity-40 border-slate-100/50 cursor-default'
@@ -894,7 +909,7 @@ export default function AttendancePage() {
                 </Card>
               ) : (
                 <Card>
-                  <CardContent className="pt-6 overflow-hidden">
+                  <CardContent className="p-4 overflow-hidden">
                     <div className="overflow-x-auto border rounded-lg max-w-full">
                       <table className="min-w-max w-full text-sm border-collapse">
                         <thead>
@@ -1095,7 +1110,8 @@ export default function AttendancePage() {
               No roster records found for this day.
             </p>
           ) : (
-            <Table>
+            <div className="max-w-full overflow-x-auto">
+            <Table className="min-w-[680px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Employee</TableHead>
@@ -1212,6 +1228,7 @@ export default function AttendancePage() {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
           <DialogFooter>
             <Button onClick={() => setShowDetailModal(false)}>Close</Button>

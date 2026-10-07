@@ -9,6 +9,9 @@ import {
   Receipt,
   TrendingUp,
   Building2,
+  Plus,
+  UserPlus,
+  BarChart3,
   ArrowUpRight,
   ArrowDownRight,
   Loader2,
@@ -27,6 +30,13 @@ function OwnerDashboard() {
   const [cashStatus, setCashStatus] = useState(null)
 
   useEffect(() => {
+    if (user && !['owner', 'developer'].includes(user.role)) {
+      if (user.role === 'employee') navigate('/dashboard/employee', { replace: true })
+      else if (user.role === 'manager') navigate('/dashboard/manager', { replace: true })
+      else if (user.role === 'cashier') navigate('/dashboard/cashier', { replace: true })
+      return
+    }
+
     const fetchDashboardStats = async () => {
       try {
         setLoading(true)
@@ -157,50 +167,71 @@ function OwnerDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Welcome section */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Welcome back, {user?.fullName || 'Owner'}
-        </h1>
-        <p className="text-gray-500">
-          Here's what's happening across your salons today.
-        </p>
+    <div className="w-full space-y-5 sm:space-y-6">
+      {/* ── Hero Banner ─────────────────────────────────────────────────── */}
+      <div className="glass-panel rounded-3xl p-6 sm:p-8 relative overflow-hidden">
+        <div className="relative">
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/80 backdrop-blur-md px-3 py-1 mb-3 ring-1 ring-white/80 shadow-2xs">
+            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Owner Overview</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-800 leading-tight tracking-tight">
+            Welcome back,<br />
+            <span className="text-blue-700">
+              {user?.fullName?.split(' ')[0] || 'Owner'}
+            </span>
+          </h1>
+          <p className="mt-1.5 text-sm text-slate-500 font-medium">Here's what's happening across your salons today.</p>
+        </div>
       </div>
+
+      {/* Quick actions */}
+      <section aria-label="Quick actions">
+        <div className="mb-3">
+          <h2 className="text-sm font-bold text-slate-800">Quick actions</h2>
+          <p className="text-xs text-slate-400">Jump straight into your daily work</p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[
+            { title: 'Create a bill', detail: 'Start a new transaction', path: '/bills/new' },
+            { title: 'Customers', detail: 'Find or add a customer', path: '/customers' },
+            { title: 'Reports', detail: 'Review business insights', path: '/reports' },
+          ].map(({ title, detail, path }) => (
+            <button
+              key={title}
+              type="button"
+              onClick={() => navigate(path)}
+              className="group flex min-h-[64px] items-center justify-between rounded-3xl glass-card px-5 py-4 text-left transition-all hover:bg-white hover:scale-[1.01] hover:shadow-lg hover:shadow-indigo-500/10 active:scale-[0.99]"
+            >
+              <div className="min-w-0 flex-1">
+                <span className="block font-bold text-slate-800 text-sm">{title}</span>
+                <span className="block truncate text-xs text-slate-400 font-medium">{detail}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
 
       {/* Stats grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
-          <Card key={stat.name}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                {stat.name}
-              </CardTitle>
-              <stat.icon className="h-4 w-4 text-gray-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <div className="flex items-center text-xs text-gray-500">
-                <span
-                  className={`flex items-center ${
-                    stat.changeType === 'positive'
-                      ? 'text-green-600'
-                      : stat.changeType === 'negative'
-                      ? 'text-red-600'
-                      : 'text-gray-600'
-                  }`}
-                >
-                  {stat.changeType === 'positive' ? (
-                    <ArrowUpRight className="h-3 w-3 mr-1" />
-                  ) : stat.changeType === 'negative' ? (
-                    <ArrowDownRight className="h-3 w-3 mr-1" />
-                  ) : null}
-                  {stat.change}
-                </span>
-                <span className="ml-2">{stat.description}</span>
-              </div>
-            </CardContent>
-          </Card>
+          <div key={stat.name} className="rounded-3xl glass-card p-5 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-slate-700">{stat.name}</span>
+              <span className="text-xs font-bold text-slate-500 bg-white/80 px-2.5 py-1 rounded-full border border-white/80 shadow-2xs">Monthly</span>
+            </div>
+            <div>
+              <p className="text-2xl font-extrabold text-slate-800 tabular-nums leading-none">{stat.value}</p>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-semibold">
+              <span className={`flex items-center ${
+                stat.changeType === 'positive' ? 'text-emerald-600' :
+                stat.changeType === 'negative' ? 'text-rose-600' : 'text-slate-500'
+              }`}>
+                {stat.change}
+              </span>
+              <span className="text-slate-400">{stat.description}</span>
+            </div>
+          </div>
         ))}
       </div>
 
@@ -214,7 +245,6 @@ function OwnerDashboard() {
                 Revenue comparison across all branches
               </CardDescription>
             </div>
-            <Building2 className="h-5 w-5 text-gray-400" />
           </div>
         </CardHeader>
         <CardContent>
@@ -225,10 +255,7 @@ function OwnerDashboard() {
                   key={branch.id}
                   className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                      <Building2 className="h-6 w-6 text-primary" />
-                    </div>
+                  <div className="flex items-center gap-3">
                     <div>
                       <p className="font-medium text-gray-900 flex items-center gap-1.5">
                         <BranchColorDot color={branch.color_code} />
@@ -390,53 +417,6 @@ function OwnerDashboard() {
       {/* Low Stock Alerts */}
       <LowStockAlertsCard maxItems={4} />
 
-      {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card
-          className="cursor-pointer hover:bg-gray-50 transition-colors"
-          onClick={() => navigate('/bills')}
-        >
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Receipt className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900">View All Bills</p>
-              <p className="text-sm text-gray-500">Browse billing history</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="cursor-pointer hover:bg-gray-50 transition-colors"
-          onClick={() => navigate('/customers')}
-        >
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <Users className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900">Manage Customers</p>
-              <p className="text-sm text-gray-500">View customer database</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="cursor-pointer hover:bg-gray-50 transition-colors"
-          onClick={() => navigate('/reports')}
-        >
-          <CardContent className="p-6 flex items-center gap-4">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <TrendingUp className="h-6 w-6 text-purple-600" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900">View Reports</p>
-              <p className="text-sm text-gray-500">Analytics & insights</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   )
 }

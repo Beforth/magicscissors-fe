@@ -137,14 +137,12 @@ function ChairManagementPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Armchair className="h-6 w-6" />
+          <h1 className="text-2xl font-bold text-gray-900">
             Salon Floor
           </h1>
           <p className="text-gray-500">Manage chairs and track occupancy</p>
         </div>
         <Button onClick={handleAdd} disabled={!activeBranchId}>
-          <Plus className="h-4 w-4 mr-2" />
           Add Chair
         </Button>
       </div>
@@ -256,7 +254,6 @@ function ChairManagementPage() {
                         className="flex-1 text-xs"
                         onClick={() => navigate(`/bills/${chair.current_bill.bill_id}`)}
                       >
-                        <Eye className="h-3 w-3 mr-1" />
                         View Bill
                       </Button>
                     )}
@@ -269,7 +266,6 @@ function ChairManagementPage() {
                         onClick={() => handleStatusChange(chair.chair_id, 'available')}
                         disabled={statusUpdateMutation.isPending}
                       >
-                        <Power className="h-3 w-3 mr-1" />
                         Activate
                       </Button>
                     )}
@@ -281,7 +277,6 @@ function ChairManagementPage() {
                         className="text-xs"
                         onClick={() => handleEdit(chair)}
                       >
-                        <Pencil className="h-3 w-3 mr-1" />
                         Edit
                       </Button>
                     )}
@@ -289,27 +284,24 @@ function ChairManagementPage() {
                     {/* More actions dropdown */}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-xs font-semibold">
+                          •••
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         {chair.status === 'available' && (
                           <>
                             <DropdownMenuItem onClick={() => handleEdit(chair)}>
-                              <Pencil className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleStatusChange(chair.chair_id, 'maintenance')}
                             >
-                              <Wrench className="h-4 w-4 mr-2" />
                               Set Maintenance
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleStatusChange(chair.chair_id, 'inactive')}
                             >
-                              <PowerOff className="h-4 w-4 mr-2" />
                               Deactivate
                             </DropdownMenuItem>
                           </>
@@ -320,7 +312,6 @@ function ChairManagementPage() {
                               <DropdownMenuItem
                                 onClick={() => navigate(`/bills/${chair.current_bill.bill_id}`)}
                               >
-                                <Eye className="h-4 w-4 mr-2" />
                                 View Bill
                               </DropdownMenuItem>
                             )}
@@ -332,7 +323,6 @@ function ChairManagementPage() {
                                 }
                               }}
                             >
-                              <Unlock className="h-4 w-4 mr-2" />
                               Release Chair
                             </DropdownMenuItem>
                           </>

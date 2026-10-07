@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { IndianRupee, Download, Loader2 } from 'lucide-react'
+import { Download, Loader2 } from 'lucide-react'
 
 const CSV_COLUMNS = [
   'employee_code', 'full_name', 'pay_type', 'wage_amount', 'days_worked', 'half_days',
@@ -384,38 +384,43 @@ export default function PayrollPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <IndianRupee className="h-6 w-6" />
-          Payroll
-        </h1>
-        <p className="text-sm text-gray-500">Wages, late deductions and monthly pay per employee.</p>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Payroll</h1>
+          <p className="text-gray-500">Wages, late deductions and monthly pay per employee</p>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-4">
-        <div className="space-y-2 w-full sm:w-64">
-          <Label htmlFor="payroll-branch">Branch</Label>
-          <select
-            id="payroll-branch"
-            className="w-full h-10 px-3 border rounded-md bg-white text-sm"
-            value={branchId}
-            onChange={(e) => setSelectedBranchId(e.target.value)}
-          >
-            {branches.map((b) => (
-              <option key={b.branch_id} value={b.branch_id}>{b.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-2 w-full sm:w-48">
-          <Label htmlFor="payroll-month">Month</Label>
-          <Input
-            id="payroll-month"
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-          />
-        </div>
-      </div>
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1.5 w-full sm:w-64">
+              <Label htmlFor="payroll-branch" className="text-xs font-medium text-gray-700">Branch</Label>
+              <select
+                id="payroll-branch"
+                className="w-full h-10 px-3 border border-input rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                value={branchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+              >
+                {branches.map((b) => (
+                  <option key={b.branch_id} value={b.branch_id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5 w-full sm:w-48">
+              <Label htmlFor="payroll-month" className="text-xs font-medium text-gray-700">Month</Label>
+              <Input
+                id="payroll-month"
+                type="month"
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="report">
         <TabsList>

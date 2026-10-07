@@ -41,4 +41,10 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  server: {
+    allowedHosts: [
+      'unavailable-winner-owns-remote.trycloudflare.com',
+      '.trycloudflare.com',
+    ],
+  },
 })

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import LoginPage from './pages/LoginPage'
 import MyAttendancePage from './pages/MyAttendancePage'
+import ProfilePage from './pages/ProfilePage'
 import DashboardLayout from './components/layout/DashboardLayout'
 import OwnerDashboard from './pages/dashboards/OwnerDashboard'
 import ManagerDashboard from './pages/dashboards/ManagerDashboard'
@@ -158,6 +159,7 @@ function App() {
         <Route path="warehouses" element={<WarehousesPage />} />
         <Route path="warehouses/new" element={<WarehouseCreatePage />} />
         <Route path="docs" element={<DocsPage />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

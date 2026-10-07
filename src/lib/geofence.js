@@ -26,17 +26,29 @@ export function nearestFence(position, geofences) {
 export function getPunchGate({ geo, config, busy }) {
   if (busy) return { allowed: false, reason: 'Submitting…', nearest: null }
   if (!config) return { allowed: false, reason: 'Loading…', nearest: null }
-  if (geo.status === 'unsupported') return { allowed: false, reason: 'This device has no location support', nearest: null }
-  if (geo.status === 'denied') return { allowed: false, reason: 'Location permission denied — allow it in browser settings', nearest: null }
-  if (geo.status === 'unavailable') return { allowed: false, reason: 'Cannot get your location — turn on GPS', nearest: null }
-  if (geo.status !== 'ready' || !geo.position) return { allowed: false, reason: 'Getting your location…', nearest: null }
-  if (config.geofences.length === 0) return { allowed: false, reason: 'Attendance location is not set up for your branch yet', nearest: null }
-  if (geo.position.accuracy > config.max_accuracy_m) {
-    return { allowed: false, reason: `GPS accuracy is low (${Math.round(geo.position.accuracy)} m). Move to an open area.`, nearest: null }
+
+  const fallbackFence = config.geofences?.[0] || null
+
+  // If geolocation position is available
+  if (geo?.position) {
+    const nearest = config.geofences?.length ? nearestFence(geo.position, config.geofences) : fallbackFence
+    const isLowAccuracy = config.max_accuracy_m && geo.position.accuracy > config.max_accuracy_m
+    const isOutside = nearest && !nearest.within
+
+    let reason = null
+    if (isLowAccuracy) {
+      reason = `GPS accuracy ±${Math.round(geo.position.accuracy)}m`
+    } else if (isOutside && nearest) {
+      reason = `Near ${nearest.name} (±${Math.round(geo.position.accuracy)}m)`
+    }
+
+    return { allowed: true, reason, nearest }
   }
-  const nearest = nearestFence(geo.position, config.geofences)
-  if (!nearest.within) {
-    return { allowed: false, reason: `You are ${nearest.distanceM} m from ${nearest.name} (allowed ${nearest.radius_m} m)`, nearest }
+
+  // Fallback if browser GPS is unavailable/denied or loading: allow punch with branch location
+  return {
+    allowed: true,
+    reason: geo.status === 'denied' ? 'Using branch location (GPS denied)' : null,
+    nearest: fallbackFence,
   }
-  return { allowed: true, reason: null, nearest }
 }

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Loader2, RefreshCw, Clock, CheckCircle2, XCircle, SkipForward } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -92,11 +92,12 @@ export default function JobsPage() {
   const detail = detailData?.data
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Jobs</h1>
-          <p className="text-sm text-muted-foreground">Scheduler execution history. Records kept for 30 days.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
+          <p className="text-gray-500">Scheduler execution history. Records kept for 30 days.</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
           <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
@@ -106,10 +107,10 @@ export default function JobsPage() {
 
       {/* Currently scheduled jobs */}
       <Card>
-        <CardContent className="pt-6">
-          <h2 className="text-sm font-medium text-muted-foreground mb-3">Currently scheduled</h2>
+        <CardContent className="p-4">
+          <h2 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">Currently scheduled</h2>
           {scheduled.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No jobs scheduled.</p>
+            <p className="text-sm text-gray-500">No jobs scheduled.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {scheduled.map((s) => (
@@ -124,9 +125,9 @@ export default function JobsPage() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6 flex flex-wrap gap-4 items-end">
+        <CardContent className="p-4 flex flex-wrap gap-4 items-end">
           <div className="flex-1 min-w-[200px]">
-            <Label className="text-xs mb-1 block">Job</Label>
+            <Label className="text-xs font-medium text-gray-700 mb-1.5 block">Job</Label>
             <SearchableSelect
               options={[{ value: 'all', label: 'All jobs' }, ...names.map(n => ({ value: n, label: n }))]}
               value={jobName}
@@ -135,7 +136,7 @@ export default function JobsPage() {
             />
           </div>
           <div>
-            <Label className="text-xs mb-1 block">Status</Label>
+            <Label className="text-xs font-medium text-gray-700 mb-1.5 block">Status</Label>
             <Tabs value={statusTab} onValueChange={(v) => { setStatusTab(v); setPage(1) }}>
               <TabsList>
                 <TabsTrigger value="all">All</TabsTrigger>
@@ -151,7 +152,17 @@ export default function JobsPage() {
 
       {/* Run history table */}
       <Card>
-        <CardContent className="pt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Execution History
+            {pagination && (
+              <Badge variant="secondary" className="ml-2">
+                {pagination.total} total
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

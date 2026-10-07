@@ -115,81 +115,82 @@ export default function DocsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Docs</h1>
-          <p className="text-sm text-gray-500 mt-1">Guides and tutorials on how to use the system.</p>
+      {/* Header Banner */}
+      <div className="glass-panel rounded-3xl p-6 sm:p-7 relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center rounded-full bg-white/80 backdrop-blur-md px-3 py-1 mb-2.5 ring-1 ring-white/80 shadow-2xs">
+              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                Knowledge Base & Help
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
+              Docs & Guides
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+              Tutorials and documentation on how to use the Magic Scissor system
+            </p>
+          </div>
+
+          {isOwner && (
+            <Button
+              onClick={openCreate}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-md shadow-blue-500/20 font-bold self-start sm:self-center"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Doc
+            </Button>
+          )}
         </div>
-        {isOwner && (
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Doc
-          </Button>
-        )}
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
         </div>
       ) : docs.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-gray-500">
-            <FileText className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-            <p>No docs yet.</p>
-            {isOwner && (
-              <Button variant="outline" className="mt-4" onClick={openCreate}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add the first doc
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+        <div className="glass-card rounded-3xl p-12 text-center text-slate-500">
+          <div className="h-12 w-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3">
+            <FileText className="h-6 w-6" />
+          </div>
+          <p className="text-base font-bold text-slate-700">No documentation guides yet</p>
+          <p className="text-xs text-slate-400 mt-1">Add video guides or tutorials to help your staff</p>
+          {isOwner && (
+            <Button
+              className="mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold"
+              onClick={openCreate}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add the first doc
+            </Button>
+          )}
+        </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
           {docs.map((doc) => (
-            <Card key={doc.doc_id}>
-              <CardContent className="py-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">{doc.title}</h3>
-                    {doc.description && (
-                      <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{doc.description}</p>
-                    )}
-                    {doc.youtube_link && (() => {
-                      const embedUrl = getYoutubeEmbedUrl(doc.youtube_link)
-                      return embedUrl ? (
-                        <div className="mt-2 aspect-video">
-                          <iframe
-                            src={embedUrl}
-                            className="w-full h-full rounded-md"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                            title={doc.title}
-                          />
-                        </div>
-                      ) : (
-                        <a
-                          href={doc.youtube_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 mt-2"
-                        >
-                          <Youtube className="h-4 w-4" />
-                          Watch on YouTube
-                        </a>
-                      )
-                    })()}
+            <div key={doc.doc_id} className="glass-card rounded-3xl p-5 sm:p-6 space-y-4 hover:shadow-lg transition-all flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="h-9 w-9 shrink-0 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <FileText className="h-4.5 w-4.5" />
+                    </div>
+                    <h3 className="font-bold text-base text-slate-800 truncate">{doc.title}</h3>
                   </div>
                   {isOwner && (
                     <div className="flex items-center gap-1 shrink-0">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(doc)}>
-                        <Pencil className="h-4 w-4" />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 rounded-xl hover:bg-blue-50 hover:text-blue-600"
+                        onClick={() => openEdit(doc)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button
-                        variant="ghost"
                         size="sm"
-                        className="text-rose-600"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 rounded-xl hover:bg-rose-50 text-rose-600 hover:text-rose-700"
                         onClick={() => {
                           if (window.confirm(`Delete "${doc.title}"?`)) {
                             deleteMutation.mutate(doc.doc_id)
@@ -197,13 +198,44 @@ export default function DocsPage() {
                         }}
                         disabled={deleteMutation.isPending}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+
+                {doc.description && (
+                  <p className="text-xs sm:text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">
+                    {doc.description}
+                  </p>
+                )}
+
+                {doc.youtube_link && (() => {
+                  const embedUrl = getYoutubeEmbedUrl(doc.youtube_link)
+                  return embedUrl ? (
+                    <div className="aspect-video w-full rounded-2xl overflow-hidden border border-slate-200/80 shadow-2xs mt-2 bg-slate-900">
+                      <iframe
+                        src={embedUrl}
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        title={doc.title}
+                      />
+                    </div>
+                  ) : (
+                    <a
+                      href={doc.youtube_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl bg-red-50 border border-red-100 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100 transition-colors mt-2"
+                    >
+                      <Youtube className="h-4 w-4 text-red-600" />
+                      Watch Tutorial on YouTube
+                    </a>
+                  )
+                })()}
+              </div>
+            </div>
           ))}
         </div>
       )}

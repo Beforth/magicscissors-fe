@@ -113,12 +113,9 @@ function EmployeeStatusPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <UserCheck className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Employee Status</h1>
-            <p className="text-sm text-gray-500">Today's service assignments — click Started to mark complete</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Employee Status</h1>
+          <p className="text-sm text-gray-500">Today's service assignments — click Started to mark complete</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -127,7 +124,6 @@ function EmployeeStatusPage() {
             onClick={() => refetch()}
             disabled={isFetching}
           >
-            <RefreshCw className={`h-4 w-4 mr-1.5 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           {isOwner && branches.length > 0 && (
@@ -147,12 +143,10 @@ function EmployeeStatusPage() {
         <CardContent className="p-4">
           <div className="flex gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by employee, customer, service or bill..."
-                className="pl-10"
               />
             </div>
           </div>
@@ -167,7 +161,6 @@ function EmployeeStatusPage() {
       ) : filteredEmployees.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center text-muted-foreground">
-            <UserCheck className="h-10 w-10 mx-auto mb-3 opacity-20" />
             <p className="font-medium">No services in progress or completed today</p>
             <p className="text-sm mt-1">Services assigned to employees will appear here</p>
           </CardContent>

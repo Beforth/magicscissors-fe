@@ -63,20 +63,14 @@ function LowStockAlertsCard({ maxItems = 5, showViewAll = true }) {
     return (
       <Card className="border-green-200 bg-green-50/30">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-green-700">
-            <Package className="h-5 w-5" />
+          <CardTitle className="text-green-700">
             Stock Status
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-3 text-green-600">
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-              <Package className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="font-medium">All products in stock</p>
-              <p className="text-sm text-green-500">No items below reorder level</p>
-            </div>
+          <div className="text-green-600">
+            <p className="font-medium">All products in stock</p>
+            <p className="text-sm text-green-500">No items below reorder level</p>
           </div>
         </CardContent>
       </Card>

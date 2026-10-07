@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, Loader2, Cpu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -118,40 +118,50 @@ export default function MachinesPage() {
   const isBusy = createMutation.isPending || updateMutation.isPending
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <Cpu className="h-6 w-6" />
-            Punch Machines
-          </h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl font-bold text-gray-900">Punch Machines</h1>
+          <p className="text-gray-500">
             Register attendance machines. Each machine is tied to one branch; punches from it attribute to that branch.
           </p>
         </div>
         {isOwner && (
           <Button onClick={openCreate}>
             <Plus className="h-4 w-4 mr-2" />
-            Register machine
+            Register Machine
           </Button>
         )}
       </div>
 
+      {/* Filters */}
       <Card>
-        <CardContent className="pt-6 flex gap-4 items-end">
-          <div className="flex-1 max-w-sm">
-            <Label className="text-xs mb-1 block">Branch</Label>
-            <SearchableSelect
-              options={[{ value: 'all', label: 'All branches' }, ...branches.map(b => ({ value: b.branch_id, label: b.name }))]}
-              value={filterBranch}
-              onChange={setFilterBranch}
-            />
+        <CardContent className="p-4">
+          <div className="flex gap-4">
+            <div className="flex-1 max-w-sm">
+              <Label className="text-xs font-medium text-gray-700 mb-1.5 block">Branch</Label>
+              <SearchableSelect
+                options={[{ value: 'all', label: 'All branches' }, ...branches.map(b => ({ value: b.branch_id, label: b.name }))]}
+                value={filterBranch}
+                onChange={setFilterBranch}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Machines Table */}
       <Card>
-        <CardContent className="pt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Machine List
+            <Badge variant="secondary" className="ml-2">
+              {machines.length} total
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -183,15 +193,16 @@ export default function MachinesPage() {
                     {isOwner && (
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" onClick={() => openEdit(m)}>
-                          <Pencil className="h-4 w-4" />
+                          Edit
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="text-destructive hover:text-destructive"
                           onClick={() => handleDelete(m)}
                           disabled={deleteMutation.isPending}
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          Delete
                         </Button>
                       </TableCell>
                     )}
