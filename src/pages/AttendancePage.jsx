@@ -17,6 +17,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import MonthReport from '@/components/attendance/MonthReport'
+import { Kbd } from '@/components/ui/kbd'
+import { formatDeduction, formatLate as formatLateMin } from '@/lib/attendanceDay'
 import PunchMeta from '@/components/attendance/PunchMeta'
 import { attendanceService } from '@/services/attendance.service'
 import { branchService } from '@/services/branch.service'
@@ -101,11 +104,14 @@ export default function AttendancePage() {
   // Calendar states
   const [activeTab, setActiveTab] = useState('today')
   const [selectedMonth, setSelectedMonth] = useState(toYearMonth(new Date())) // YYYY-MM
-  const [calendarSubTab, setCalendarSubTab] = useState('grid')
+  const [calendarSubTab, setCalendarSubTab] = useState('sheet')
   const [detailDate, setDetailDate] = useState(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
   const [rosterSearch, setRosterSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [rowCursor, setRowCursor] = useState(0)
+  const rosterRef = useRef(null)
 
   const { data: branchesData } = useQuery({
     queryKey: ['branches', 'active', 'salon'],
@@ -182,7 +188,7 @@ export default function AttendancePage() {
     }
   }, [rosterData?.data, user?.id, user?.role])
 
-  const filteredRosterEmployees = useMemo(() => {
+  const searchedRosterEmployees = useMemo(() => {
     const list = roster?.employees || []
     const q = rosterSearch.trim().toLowerCase()
     if (!q) return list
@@ -190,6 +196,21 @@ export default function AttendancePage() {
       emp.full_name?.toLowerCase().includes(q) || emp.employee_code?.toLowerCase().includes(q)
     )
   }, [roster?.employees, rosterSearch])
+
+  const statusCounts = useMemo(() => {
+    const counts = { all: searchedRosterEmployees.length, not_arrived: 0, on_floor: 0, on_break: 0, checked_out: 0, on_leave: 0, late: 0 }
+    searchedRosterEmployees.forEach((e) => {
+      counts[e.current_status] = (counts[e.current_status] || 0) + 1
+      if (Number(e.late_penalty_hours) > 0 || Number(e.late_penalty_amount) > 0) counts.late += 1
+    })
+    return counts
+  }, [searchedRosterEmployees])
+
+  const filteredRosterEmployees = useMemo(() => {
+    if (statusFilter === 'all') return searchedRosterEmployees
+    if (statusFilter === 'late') return searchedRosterEmployees.filter((e) => Number(e.late_penalty_hours) > 0 || Number(e.late_penalty_amount) > 0)
+    return searchedRosterEmployees.filter((e) => e.current_status === statusFilter)
+  }, [searchedRosterEmployees, statusFilter])
 
   // Monthly attendance query
   const { data: monthlyDataResponse, isLoading: monthlyLoading, refetch: refetchMonthly } = useQuery({
@@ -513,6 +534,42 @@ export default function AttendancePage() {
     return detailDate === todayStr
   }, [detailDate])
 
+  // Row hotkeys for the Today roster: j/k or arrows move, then one key acts on the highlighted person.
+  const onRosterKey = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return
+    const list = filteredRosterEmployees
+    if (!list.length) return
+    const emp = list[Math.min(rowCursor, list.length - 1)]
+    const k = e.key
+    const status = emp.current_status
+    const run = (fn) => { e.preventDefault(); fn() }
+    if (k === 'ArrowDown' || k === 'j') run(() => setRowCursor((i) => Math.min(i + 1, list.length - 1)))
+    else if (k === 'ArrowUp' || k === 'k') run(() => setRowCursor((i) => Math.max(i - 1, 0)))
+    else if (k === 'Home') run(() => setRowCursor(0))
+    else if (k === 'End') run(() => setRowCursor(list.length - 1))
+    else if (!canAct) return
+    else if (k === 'i' && status === 'not_arrived') run(() => handlePunch(emp, 'in'))
+    else if (k === 'o' && status === 'on_floor') run(() => handlePunch(emp, 'out'))
+    else if (k === 'b' && status === 'on_floor') run(() => handleBreak(emp, 'start'))
+    else if (k === 'b' && status === 'on_break') run(() => handleBreak(emp, 'end'))
+    else if (k === 'l' && status === 'not_arrived') run(() => openLeaveModal(emp))
+    else if (k === 'e' && ['on_floor', 'on_break', 'checked_out'].includes(status)) run(() => openEditTimesModal(emp))
+  }
+
+  const lateCell = (emp) => {
+    if (emp.shift && emp.check_in) {
+      const pen = Number(emp.late_penalty_hours) || 0
+      const fine = Number(emp.late_penalty_amount) || 0
+      if (pen > 0 || fine > 0) {
+        return <span className="font-medium text-destructive">{formatLateMin(emp.late_minutes)} late<span className="block text-[11px]">−{formatDeduction(pen, fine)} pay</span></span>
+      }
+      if (emp.late_minutes > 0) return <span className="text-xs text-muted-foreground">{formatLateMin(emp.late_minutes)} (grace)</span>
+      return <span className="text-xs text-success">On time</span>
+    }
+    const legacy = getLateLabel(emp)
+    return legacy ? <span className="text-destructive font-medium">{legacy}</span> : '—'
+  }
+
   const getCompactStatusBadge = (status) => {
     switch (status) {
       case 'present':
@@ -589,6 +646,27 @@ export default function AttendancePage() {
                   />
                 </div>
               </div>
+              <div className="w-full">
+                <Label className="mb-1.5 block text-xs font-medium text-gray-700">Show</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    ['all', 'Everyone'], ['not_arrived', 'Not in'], ['on_floor', 'On floor'], ['on_break', 'On break'],
+                    ['checked_out', 'Done'], ['on_leave', 'Leave'], ['late', 'Late / penalty'],
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => { setStatusFilter(key); setRowCursor(0) }}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                        statusFilter === key ? 'border-primary bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-secondary'
+                      }`}
+                    >
+                      {label}
+                      <span className={`rounded-full px-1.5 text-[10px] ${statusFilter === key ? 'bg-primary-foreground/20' : 'bg-secondary'}`}>{statusCounts[key] ?? 0}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               {!defaultMachineNo && branchId && (
                 <p className="text-xs text-amber-600">
                   {ensureMachineMutation.isPending
@@ -627,7 +705,13 @@ export default function AttendancePage() {
                   No employees match "{rosterSearch}".
                 </p>
               ) : (
-                <div className="max-w-full overflow-x-auto">
+                <div
+                  ref={rosterRef}
+                  tabIndex={0}
+                  onKeyDown={onRosterKey}
+                  aria-label="Today's roster. Up and down to choose a person, then i check in, o check out, b break, l leave, e edit times."
+                  className="max-w-full overflow-x-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                >
                 <Table className="min-w-[680px]">
                   <TableHeader>
                     <TableRow>
@@ -642,17 +726,26 @@ export default function AttendancePage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredRosterEmployees.map((emp) => {
+                    {filteredRosterEmployees.map((emp, rowIndex) => {
                       const meta = STATUS_META[emp.current_status] || STATUS_META.not_arrived
                       const Icon = meta.icon
+                      const active = rowIndex === Math.min(rowCursor, filteredRosterEmployees.length - 1)
                       return (
-                        <TableRow key={emp.id}>
+                        <TableRow
+                          key={emp.id}
+                          aria-selected={active}
+                          data-state={active ? 'selected' : undefined}
+                          onClick={() => { setRowCursor(rowIndex); rosterRef.current?.focus() }}
+                          className={active ? 'outline outline-2 -outline-offset-2 outline-primary' : undefined}
+                        >
                           <TableCell>
                             <div className="font-medium">{emp.full_name}</div>
                             <div className="text-xs text-muted-foreground font-mono">
                               {emp.employee_code}
-                              {emp.shift_start && emp.shift_end && !emp.has_flexible_timing && (
-                                <span className="ml-2">shift {emp.shift_start}–{emp.shift_end}</span>
+                              {emp.shift ? (
+                                <span className="ml-2">{emp.shift.name} {emp.shift.start_time}–{emp.shift.end_time}</span>
+                              ) : (
+                                <span className="ml-2 text-warning">no shift today</span>
                               )}
                             </div>
                           </TableCell>
@@ -672,9 +765,7 @@ export default function AttendancePage() {
                           <TableCell>{emp.total_break_minutes}m</TableCell>
                           <TableCell>{formatWorkedHours(emp.working_hours) ?? '—'}</TableCell>
                           <TableCell>
-                            {getLateLabel(emp)
-                              ? <span className="text-destructive font-medium">{getLateLabel(emp)}</span>
-                              : '—'}
+                            {lateCell(emp)}
                           </TableCell>
                           {canAct && (
                             <TableCell className="text-right whitespace-nowrap space-x-2">
@@ -685,13 +776,13 @@ export default function AttendancePage() {
                                     onClick={() => handlePunch(emp, 'in')}
                                     disabled={punchMutation.isPending}
                                   >
-                                    Check in
+                                    Check in {active && <Kbd className="ml-1">i</Kbd>}
                                   </Button>
                                   <Button
                                     variant="ghost" size="sm"
                                     onClick={() => openLeaveModal(emp)}
                                   >
-                                    Mark leave
+                                    Mark leave {active && <Kbd className="ml-1">l</Kbd>}
                                   </Button>
                                 </>
                               )}
@@ -702,20 +793,20 @@ export default function AttendancePage() {
                                     onClick={() => handleBreak(emp, 'start')}
                                     disabled={breakStartMutation.isPending}
                                   >
-                                    Start break
+                                    Start break {active && <Kbd className="ml-1">b</Kbd>}
                                   </Button>
                                   <Button
                                     variant="outline" size="sm"
                                     onClick={() => handlePunch(emp, 'out')}
                                     disabled={punchMutation.isPending}
                                   >
-                                    Check out
+                                    Check out {active && <Kbd className="ml-1">o</Kbd>}
                                   </Button>
                                   <Button
                                     variant="ghost" size="sm"
                                     onClick={() => openEditTimesModal(emp)}
                                   >
-                                    Edit Times
+                                    Edit Times {active && <Kbd className="ml-1">e</Kbd>}
                                   </Button>
                                 </>
                               )}
@@ -726,13 +817,13 @@ export default function AttendancePage() {
                                     onClick={() => handleBreak(emp, 'end')}
                                     disabled={breakEndMutation.isPending}
                                   >
-                                    End break
+                                    End break {active && <Kbd className="ml-1">b</Kbd>}
                                   </Button>
                                   <Button
                                     variant="ghost" size="sm"
                                     onClick={() => openEditTimesModal(emp)}
                                   >
-                                    Edit Times
+                                    Edit Times {active && <Kbd className="ml-1">e</Kbd>}
                                   </Button>
                                 </>
                               )}
@@ -741,7 +832,7 @@ export default function AttendancePage() {
                                   variant="outline" size="sm"
                                   onClick={() => openEditTimesModal(emp)}
                                 >
-                                  Edit Times
+                                  Edit Times {active && <Kbd className="ml-1">e</Kbd>}
                                 </Button>
                               )}
                             </TableCell>
@@ -771,7 +862,19 @@ export default function AttendancePage() {
                   />
                 </div>
 
-                {branchId && employeesList.length > 0 && (
+                {calendarSubTab === 'sheet' && (
+                  <div className="min-w-[200px]">
+                    <Label className="text-xs mb-1 block">Find employee</Label>
+                    <Input
+                      value={rosterSearch}
+                      onChange={(e) => setRosterSearch(e.target.value)}
+                      placeholder="Search name or code…  (/)"
+                      className="h-10"
+                    />
+                  </div>
+                )}
+
+                {calendarSubTab === 'grid' && branchId && employeesList.length > 0 && (
                   <div className="min-w-[200px]">
                     <Label className="text-xs mb-1 block">Employee</Label>
                     <SearchableSelect
@@ -808,7 +911,7 @@ export default function AttendancePage() {
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  Calendar Grid
+                  One-Employee Calendar
                 </button>
                 <button
                   onClick={() => setCalendarSubTab('sheet')}
@@ -818,7 +921,7 @@ export default function AttendancePage() {
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  Monthly Sheet
+                  Monthly Report (all staff)
                 </button>
               </div>
             </CardContent>
@@ -908,68 +1011,13 @@ export default function AttendancePage() {
                   </CardContent>
                 </Card>
               ) : (
-                <Card>
-                  <CardContent className="p-4 overflow-hidden">
-                    <div className="overflow-x-auto border rounded-lg max-w-full">
-                      <table className="min-w-max w-full text-sm border-collapse">
-                        <thead>
-                          <tr className="bg-slate-50 border-b">
-                            <th className="sticky left-0 bg-slate-50 z-20 px-4 py-3 text-left font-semibold border-r min-w-[150px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                              Employee
-                            </th>
-                            {daysInMonth.map((day) => (
-                              <th key={day} className="px-2 py-3 text-center font-semibold border-r w-10">
-                                {day}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredEmployees.length === 0 ? (
-                            <tr>
-                              <td colSpan={daysInMonth.length + 1} className="py-8 text-center text-muted-foreground">
-                                No employees found.
-                              </td>
-                            </tr>
-                          ) : (
-                            filteredEmployees.map((emp) => (
-                              <tr key={emp.id} className="border-b hover:bg-slate-50/50">
-                                <td className="sticky left-0 bg-background z-10 px-4 py-2 border-r font-medium min-w-[150px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] border-b">
-                                  <div>
-                                    <div className="font-semibold">{emp.full_name}</div>
-                                    <div className="text-[10px] text-muted-foreground font-mono">{emp.employee_code}</div>
-                                  </div>
-                                </td>
-                                {daysInMonth.map((day) => {
-                                  const [year, monthNum] = selectedMonth.split('-')
-                                  const dateStr = `${year}-${monthNum}-${String(day).padStart(2, '0')}`
-                                  const record = (monthlyData?.attendance || []).find(
-                                    (a) => a.employee_id === emp.employee_details_id && a.date === dateStr
-                                  )
-
-                                  return (
-                                    <td
-                                      key={day}
-                                      onClick={() => {
-                                        setDetailDate(dateStr)
-                                        setShowDetailModal(true)
-                                      }}
-                                      className="px-1 py-2 text-center border-r cursor-pointer hover:bg-slate-100/50 transition-colors"
-                                    >
-                                      <div className="flex justify-center">
-                                        {record ? getCompactStatusBadge(record.status) : <span className="text-gray-300">—</span>}
-                                      </div>
-                                    </td>
-                                  )
-                                })}
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
+                <MonthReport
+                  month={selectedMonth}
+                  employees={employeesList}
+                  attendance={monthlyData?.attendance || []}
+                  search={rosterSearch}
+                  onOpenDay={(date) => { setDetailDate(date); setShowDetailModal(true) }}
+                />
               )}
             </>
           )}

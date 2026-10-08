@@ -86,6 +86,13 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
+    // Offline/customer build: a missing, expired or foreign licence blocks the API with LICENSE_* codes.
+    const code = error.response?.data?.error?.code
+    if (error.response?.status === 403 && typeof code === 'string' && code.startsWith('LICENSE_')) {
+      if (!window.location.pathname.startsWith('/license')) window.location.href = '/license'
+      return Promise.reject(error)
+    }
+
     const isAuthEndpoint =
       originalRequest.url?.includes('/auth/login') ||
       originalRequest.url?.includes('/auth/refresh') ||

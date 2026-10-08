@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import LoginPage from './pages/LoginPage'
+import LicensePage from './pages/LicensePage'
 import MyAttendancePage from './pages/MyAttendancePage'
 import ProfilePage from './pages/ProfilePage'
 import DashboardLayout from './components/layout/DashboardLayout'
@@ -82,6 +83,8 @@ function App() {
         path="/login"
         element={isAuthenticated ? <Navigate to={getDashboardByRole()} replace /> : <LoginPage />}
       />
+
+      <Route path="/license" element={<LicensePage />} />
 
       <Route
         path="/version-history"

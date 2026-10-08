@@ -40,6 +40,9 @@ export default {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        info: "hsl(var(--info))",
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
@@ -50,9 +53,10 @@ export default {
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        xl: "calc(var(--radius) + 6px)",
+        lg: "calc(var(--radius) + 2px)",
+        md: "var(--radius)",
+        sm: "calc(var(--radius) - 2px)",
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
@@ -66,8 +70,18 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: 0 },
         },
+        pop: {
+          from: { opacity: 0, transform: "scale(0.97) translateY(2px)" },
+          to: { opacity: 1, transform: "none" },
+        },
+        "slide-right": {
+          from: { transform: "translateX(100%)" },
+          to: { transform: "none" },
+        },
       },
       animation: {
+        pop: "pop 0.15s ease-out",
+        "slide-right": "slide-right 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },

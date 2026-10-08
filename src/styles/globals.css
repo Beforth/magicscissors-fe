@@ -3,77 +3,72 @@
 @tailwind utilities;
 
 @layer base {
+  /* befui palette (https://befui.vercel.app), as HSL triples for Tailwind 3 */
   :root {
-    /* ── 3x Lighter Sky Blue Palette (#E8F8FE) ── */
-    --background: 197 85% 95%;          /* #E8F8FE */
-    --foreground: 215 35% 20%;          /* #1E293B deep slate navy */
-
-    /* ── Card & surfaces: Frosted white with clean subtle translucency ── */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 215 35% 20%;
-
-    /* ── Popover ── */
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 215 35% 20%;
-
-    /* ── Primary: Vibrant sky/ocean blue ── */
-    --primary: 204 90% 48%;             /* #0E86D4 */
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 83% 53%;
     --primary-foreground: 0 0% 100%;
-
-    /* ── Secondary: Soft airy sky tint ── */
-    --secondary: 197 70% 95%;           /* #EEF9FE */
-    --secondary-foreground: 204 90% 32%;
-
-    /* ── Muted ── */
-    --muted: 198 45% 96%;               /* #F0F9FE */
-    --muted-foreground: 215 20% 48%;    /* #5B6E85 */
-
-    /* ── Accent ── */
-    --accent: 197 75% 95%;              /* #ECF8FE */
-    --accent-foreground: 204 90% 35%;
-
-    /* ── Destructive ── */
-    --destructive: 0 84% 60%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 98%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 214 100% 97%;
+    --accent-foreground: 224 76% 48%;
+    --destructive: 347 77% 50%;
     --destructive-foreground: 0 0% 100%;
+    --success: 161 94% 30%;
+    --warning: 32 95% 44%;
+    --info: 221 83% 53%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 91% 60%;
+    --radius: 0.5rem;
 
-    /* ── Borders & Inputs ── */
-    --border: 197 45% 90%;              /* #D5EEFA */
-    --input: 197 45% 90%;
-    --ring: 204 90% 48%;
-
-    /* ── Border Radius ── */
-    --radius: 1rem;
-
-    /* ── Sidebar specific ── */
-    --sidebar-bg: 197 80% 97%;
-    --sidebar-border: 197 45% 90%;
-    --sidebar-text: 215 30% 28%;
-    --sidebar-muted: 215 20% 52%;
-    --sidebar-active-bg: 204 90% 48%;
+    --sidebar-bg: 210 40% 98%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-text: 222 30% 25%;
+    --sidebar-muted: 215 16% 47%;
+    --sidebar-active-bg: 221 83% 53%;
     --sidebar-active-text: 0 0% 100%;
-    --sidebar-hover-bg: 197 50% 94%;
+    --sidebar-hover-bg: 210 40% 94%;
   }
 
   .dark {
-    --background: 200 45% 10%;
-    --foreground: 197 80% 96%;
-    --card: 200 40% 13%;
-    --card-foreground: 197 80% 96%;
-    --popover: 200 40% 13%;
-    --popover-foreground: 197 80% 96%;
-    --primary: 197 90% 55%;
+    --background: 220 23% 5%;
+    --foreground: 220 22% 92%;
+    --card: 220 23% 8%;
+    --card-foreground: 220 22% 92%;
+    --popover: 220 23% 8%;
+    --popover-foreground: 220 22% 92%;
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 200 30% 20%;
-    --secondary-foreground: 197 80% 96%;
-    --muted: 200 30% 18%;
-    --muted-foreground: 197 30% 65%;
-    --accent: 200 30% 22%;
-    --accent-foreground: 197 90% 65%;
-    --destructive: 0 62% 40%;
+    --secondary: 220 21% 11%;
+    --secondary-foreground: 220 22% 92%;
+    --muted: 222 23% 9%;
+    --muted-foreground: 219 13% 60%;
+    --accent: 221 51% 16%;
+    --accent-foreground: 212 96% 78%;
+    --destructive: 350 89% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 200 30% 22%;
-    --input: 200 30% 22%;
-    --ring: 197 90% 55%;
+    --success: 160 84% 39%;
+    --warning: 38 92% 50%;
+    --info: 213 94% 68%;
+    --border: 222 22% 15%;
+    --input: 221 20% 19%;
+    --ring: 217 91% 60%;
+
+    --sidebar-bg: 222 23% 7%;
+    --sidebar-border: 222 22% 15%;
+    --sidebar-text: 220 22% 85%;
+    --sidebar-muted: 219 13% 60%;
+    --sidebar-active-bg: 217 91% 60%;
+    --sidebar-active-text: 0 0% 100%;
+    --sidebar-hover-bg: 220 21% 12%;
   }
 }
 
@@ -84,8 +79,7 @@
   body {
     @apply text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
-    background-color: #E8F8FE;
-    background-attachment: fixed;
+    @apply bg-background;
     min-height: 100vh;
   }
 }
@@ -99,11 +93,11 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(14, 134, 212, 0.25);
+  background: hsl(var(--border));
   border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(14, 134, 212, 0.5);
+  background: hsl(var(--muted-foreground) / 0.5);
 }
 .sidebar-scroll::-webkit-scrollbar {
   width: 3px;
@@ -120,25 +114,17 @@
   }
 }
 
-/* ── Frosted Glass Utilities (Tailored to #E8F8FE) ── */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 10px 30px -5px rgba(14, 134, 212, 0.08), 0 4px 12px -2px rgba(185, 233, 252, 0.18);
-}
-
+/* ── Surfaces (kept under the old class names; now flat befui cards) ── */
+.glass-panel,
 .glass-card {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.98);
-  box-shadow: 0 6px 20px -2px rgba(14, 134, 212, 0.06), 0 2px 6px rgba(0, 0, 0, 0.02);
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
 }
 
 .aurora-header {
-  background: rgba(255, 255, 255, 0.95);
+  background: hsl(var(--background) / 0.92);
+  backdrop-filter: blur(8px);
 }
 
 /* ── Shimmer skeleton ───────────────────────────────────────────────────── */
@@ -148,6 +134,6 @@
   100% { opacity: 0.5; }
 }
 .shimmer {
-  background: rgba(255, 255, 255, 0.7);
+  background: hsl(var(--muted));
   animation: shimmer 1.5s ease-in-out infinite;
 }

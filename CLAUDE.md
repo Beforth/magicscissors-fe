@@ -46,6 +46,8 @@ The API is at `http://localhost:5001/api/v1`. Backend `.env` `DATABASE_URL` must
 - **Auth**: tokens and `user` live in `localStorage`; `store/slices/authSlice.js` is the only Redux slice. `api.js` adds the bearer token and does a single shared refresh on 401.
 - **Server state**: TanStack Query in pages/components; Redux is only for auth.
 - **UI**: shadcn primitives in `components/ui/` (no checkbox component — use native inputs); feature components under `components/{attendance,billing,settings,...}`; domain helpers in `lib/`.
+- **Design system**: tokens and primitives follow befui (https://befui.vercel.app/llms-full.txt) but are ported to JSX + Tailwind 3 (befui itself targets TSX/Tailwind 4/React 19, so don't run its CLI here). Colors are HSL-triple CSS variables in `styles/globals.css`; use semantic classes (`bg-primary`, `text-muted-foreground`, `success`/`warning`/`info`) rather than `gray-*`/`blue-*`. `components/ui/command.jsx` and `kbd.jsx` come from befui.
+- **Keyboard layer** (`components/layout/CommandCenter.jsx`, mounted in `DashboardLayout`): Ctrl/Cmd+K palette built from `getNavItemsByRole`, `/` focuses the page search, `g`+letter go-to, `n` new item, `[` sidebar, `?` help, Ctrl+Enter submits the focused form. New pages added to the Sidebar appear in the palette automatically; add `GO_KEYS`/`NEW_ROUTES` entries there for shortcuts.
 - **Version history**: `src/data/versionHistory.js` (`CURRENT_VERSION` + changelog). New user-facing releases add an entry; `VersionHistoryPage` requires each entry to have `details`.
 
 ## Attendance, shifts and payroll (cross-cutting)

@@ -20,6 +20,12 @@ assert.match(bad(buildRulesPayload({ grace: 10, tiers: [{ after_min: '10', deduc
 assert.match(bad(buildRulesPayload({ grace: 5, tiers: [{ after_min: '30', deduct_hours: '1' }, { after_min: '15', deduct_hours: '1' }], halfDayLateAfterMin: '', halfDayMinHours: '' })), /increasing/i)
 assert.match(bad(buildRulesPayload({ grace: 5, tiers: [{ after_min: '20', deduct_hours: '0' }], halfDayLateAfterMin: '', halfDayMinHours: '' })), /deduct/i)
 assert.match(bad(buildRulesPayload({ grace: 5, tiers: [{ after_min: '20', deduct_hours: '' }], halfDayLateAfterMin: '', halfDayMinHours: '' })), /both/i)
+// ₹ amount tiers
+assert.deepEqual(
+  ok(buildRulesPayload({ grace: 5, tiers: [{ after_min: '15', deduct_hours: '', deduct_amount: '100' }, { after_min: '60', deduct_hours: '1', deduct_amount: '250' }], halfDayLateAfterMin: '', halfDayMinHours: '' })).late_tiers,
+  [{ after_min: 15, deduct_amount: 100 }, { after_min: 60, deduct_hours: 1, deduct_amount: 250 }]
+)
+assert.match(bad(buildRulesPayload({ grace: 5, tiers: [{ after_min: '20', deduct_amount: '0' }], halfDayLateAfterMin: '', halfDayMinHours: '' })), /amount/i)
 assert.match(bad(buildRulesPayload({ grace: 5, tiers: [], halfDayLateAfterMin: '1500', halfDayMinHours: '' })), /half/i)
 assert.match(bad(buildRulesPayload({ grace: 5, tiers: [], halfDayLateAfterMin: '', halfDayMinHours: '30' })), /hours/i)
 assert.match(bad(buildRulesPayload({ grace: 5, tiers: [], halfDayLateAfterMin: '1.5', halfDayMinHours: '' })), /whole/i)
@@ -27,11 +33,11 @@ assert.match(bad(buildRulesPayload({ grace: 5, tiers: [], halfDayLateAfterMin: '
 console.log('shift rule checks passed')
 
 const rows = [
-  { employee_id: 'a', full_name: 'A', employee_code: 'E1', pay_type: 'daily', wage_amount: 500, days_worked: 2, half_days: 1, hours_worked: 12, late_deduction_hours: 1, gross: 600, late_deduction_amount: 50, net_pay: 550, warnings: [] },
+  { employee_id: 'a', full_name: 'A', employee_code: 'E1', pay_type: 'daily', wage_amount: 500, days_worked: 2, half_days: 1, hours_worked: 12, late_deduction_hours: 1, gross: 600, late_deduction_amount: 50, late_fine_amount: 100, net_pay: 450, warnings: [] },
   { employee_id: 'b', full_name: 'B', employee_code: 'E2', pay_type: null, wage_amount: null, days_worked: 1, half_days: 0, hours_worked: 8, late_deduction_hours: 0, gross: 0, late_deduction_amount: 0, net_pay: 0, warnings: ['No wage set'] },
 ]
-assert.deepEqual(payrollTotals(rows), { days_worked: 3, half_days: 1, hours_worked: 20, late_deduction_hours: 1, gross: 600, late_deduction_amount: 50, net_pay: 550 })
-assert.deepEqual(payrollTotals([]), { days_worked: 0, half_days: 0, hours_worked: 0, late_deduction_hours: 0, gross: 0, late_deduction_amount: 0, net_pay: 0 })
+assert.deepEqual(payrollTotals(rows), { days_worked: 3, half_days: 1, hours_worked: 20, late_deduction_hours: 1, gross: 600, late_deduction_amount: 50, late_fine_amount: 100, net_pay: 450 })
+assert.deepEqual(payrollTotals([]), { days_worked: 0, half_days: 0, hours_worked: 0, late_deduction_hours: 0, gross: 0, late_deduction_amount: 0, late_fine_amount: 0, net_pay: 0 })
 const csv = reportCsvRows(rows)
 assert.equal(csv.length, 2)
 assert.equal(csv[0].pay_type, 'Daily')

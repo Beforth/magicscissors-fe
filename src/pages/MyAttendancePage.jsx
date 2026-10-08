@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSelector } from 'react-redux'
 import { toast } from 'sonner'
 import { Loader2, ChevronLeft, ChevronRight, Download, Calendar, Clock, BarChart2, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -7,6 +8,8 @@ import { attendanceService } from '@/services/attendance.service'
 import { useGeolocation } from '@/hooks/useGeolocation'
 import { getPunchGate } from '@/lib/geofence'
 import SelfieCapture from '@/components/attendance/SelfieCapture'
+import DayVerdict from '@/components/attendance/DayVerdict'
+import { formatDeduction, summarizeMonth } from '@/lib/attendanceDay'
 import { formatWorkedHours } from '@/lib/utils'
 
 const STATUS_LABELS = {
@@ -64,6 +67,7 @@ function shiftMonth(month, offset) {
 
 export default function MyAttendancePage() {
   const queryClient = useQueryClient()
+  const user = useSelector((state) => state.auth.user)
   const geo = useGeolocation()
   const [selfieOpen, setSelfieOpen] = useState(false)
   const [installEvent, setInstallEvent] = useState(null)
@@ -88,7 +92,8 @@ export default function MyAttendancePage() {
   const selectedRecord = monthAttendance.find((record) => record.date === selectedDate)
 
   // Compute monthly stats
-  const presentDays = monthAttendance.filter((a) => ['present', 'late'].includes(a.status)).length
+  const presentDays = monthAttendance.filter((a) => ['present', 'late', 'half_day'].includes(a.status)).length
+  const monthStats = summarizeMonth(monthAttendance)
   const totalHours = monthAttendance.reduce((s, a) => s + (a.working_hours ? parseFloat(a.working_hours) : 0), 0)
   const onLeaveDays = monthAttendance.filter((a) => a.status === 'on_leave').length
   const absentDays = monthAttendance.filter((a) => a.status === 'absent').length
@@ -224,7 +229,8 @@ export default function MyAttendancePage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: Today's Shift & Punch Actions */}
         <div className="lg:col-span-5 space-y-5">
-          {/* Today Card */}
+          {/* Today Card — employees punch from Home, so it only shows for other roles */}
+          {user?.role !== 'employee' && (
           <div className="glass-card rounded-3xl p-6 space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-white/70">
               <div>
@@ -297,6 +303,8 @@ export default function MyAttendancePage() {
             </div>
           </div>
 
+          )}
+
           {/* Month Overview Mini-Card */}
           <div className="glass-card rounded-3xl p-5 sm:p-6 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-white/60">
@@ -343,6 +351,26 @@ export default function MyAttendancePage() {
                 </div>
               </div>
             </div>
+
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="rounded-lg border bg-warning/10 border-warning/25 p-3">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Late Penalty</span>
+                <span className="mt-1 block text-lg font-bold leading-none text-warning">{formatDeduction(monthStats.penaltyHours, monthStats.penaltyAmount) || '0'}</span>
+              </div>
+              <div className="rounded-lg border bg-secondary/60 p-3">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Late Days</span>
+                <span className="mt-1 block text-lg font-bold leading-none text-foreground">{monthStats.lateDays}</span>
+              </div>
+              <div className="rounded-lg border bg-secondary/60 p-3">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Half Days</span>
+                <span className="mt-1 block text-lg font-bold leading-none text-foreground">{monthStats.halfDays}</span>
+              </div>
+            </div>
+            {monthStats.noShiftDays > 0 && (
+              <p className="text-[11px] text-muted-foreground">
+                {monthStats.noShiftDays} day(s) had no shift assigned, so no late penalty was calculated. Ask your manager to assign shifts.
+              </p>
+            )}
 
             {/* Attendance Rate Pill Bar */}
             <div className="p-3 rounded-2xl bg-white/70 border border-white/80 flex items-center justify-between text-xs">
@@ -516,6 +544,8 @@ export default function MyAttendancePage() {
                       </span>
                     </div>
                   </div>
+
+                  <DayVerdict record={selectedRecord} />
                 </div>
               ) : (
                 <div className="flex items-center justify-between gap-3 py-1 px-1">

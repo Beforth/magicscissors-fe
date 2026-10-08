@@ -24,11 +24,11 @@ import { Download, Loader2 } from 'lucide-react'
 
 const CSV_COLUMNS = [
   'employee_code', 'full_name', 'pay_type', 'wage_amount', 'days_worked', 'half_days',
-  'hours_worked', 'late_deduction_hours', 'gross', 'late_deduction_amount', 'net_pay', 'warnings',
+  'hours_worked', 'late_deduction_hours', 'gross', 'late_deduction_amount', 'late_fine_amount', 'net_pay', 'warnings',
 ]
 const CSV_HEADERS = [
   'Code', 'Employee', 'Pay type', 'Wage', 'Days worked', 'Half days',
-  'Hours worked', 'Late deducted (hours)', 'Gross', 'Late deduction', 'Net pay', 'Warnings',
+  'Hours worked', 'Late deducted (hours)', 'Gross', 'Late deduction', 'Late fine (₹)', 'Net pay', 'Warnings',
 ]
 const PAY_TYPE_LABEL = { daily: 'Daily', monthly: 'Monthly' }
 const errMsg = (err, fallback) => err?.response?.data?.error?.message || err?.message || fallback
@@ -101,6 +101,7 @@ function ReportTab({ branchId, month }) {
                 <TableHead className="text-right">Late deducted (hrs)</TableHead>
                 <TableHead className="text-right">Gross</TableHead>
                 <TableHead className="text-right">Late deduction</TableHead>
+                <TableHead className="text-right">Late fine (₹)</TableHead>
                 <TableHead className="text-right">Net pay</TableHead>
               </TableRow>
             </TableHeader>
@@ -122,6 +123,7 @@ function ReportTab({ branchId, month }) {
                   <TableCell className="text-right">{r.late_deduction_hours}</TableCell>
                   <TableCell className="text-right">{formatMoney(r.gross)}</TableCell>
                   <TableCell className="text-right">{formatMoney(r.late_deduction_amount)}</TableCell>
+                  <TableCell className="text-right">{formatMoney(r.late_fine_amount ?? 0)}</TableCell>
                   <TableCell className="text-right font-medium">{formatMoney(r.net_pay)}</TableCell>
                 </TableRow>
               ))}
@@ -135,6 +137,7 @@ function ReportTab({ branchId, month }) {
                 <TableCell className="text-right">{totals.late_deduction_hours}</TableCell>
                 <TableCell className="text-right">{formatMoney(totals.gross)}</TableCell>
                 <TableCell className="text-right">{formatMoney(totals.late_deduction_amount)}</TableCell>
+                <TableCell className="text-right">{formatMoney(totals.late_fine_amount)}</TableCell>
                 <TableCell className="text-right">{formatMoney(totals.net_pay)}</TableCell>
               </TableRow>
             </TableBody>

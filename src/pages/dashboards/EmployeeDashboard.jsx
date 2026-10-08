@@ -22,6 +22,8 @@ import {
   Sparkles,
   MapPin,
   Coffee,
+  Leaf,
+  ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -31,6 +33,7 @@ import { useGeolocation } from '@/hooks/useGeolocation'
 import { getPunchGate } from '@/lib/geofence'
 import { formatWorkedHours } from '@/lib/utils'
 import SelfieCapture from '@/components/attendance/SelfieCapture'
+import DayVerdict from '@/components/attendance/DayVerdict'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -82,11 +85,21 @@ const WEEK_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 const STATUS_META = {
   not_arrived:  { label: 'Not checked in', color: 'text-amber-600', bg: 'bg-amber-50', dot: 'bg-amber-400', ring: 'ring-amber-200' },
-  on_floor:     { label: 'On floor',        color: 'text-blue-600', bg: 'bg-blue-50', dot: 'bg-blue-500', ring: 'ring-blue-200' },
+  on_floor:     { label: 'On floor',        color: 'text-primary', bg: 'bg-blue-50', dot: 'bg-blue-500', ring: 'ring-blue-200' },
   on_break:     { label: 'On break',        color: 'text-sky-600', bg: 'bg-sky-50', dot: 'bg-sky-500', ring: 'ring-sky-200' },
-  checked_out:  { label: 'Checked out',     color: 'text-slate-500', bg: 'bg-slate-100', dot: 'bg-slate-400', ring: 'ring-slate-200' },
+  checked_out:  { label: 'Checked out',     color: 'text-muted-foreground', bg: 'bg-slate-100', dot: 'bg-slate-400', ring: 'ring-slate-200' },
   on_leave:     { label: 'On leave',        color: 'text-rose-600', bg: 'bg-rose-50', dot: 'bg-rose-500', ring: 'ring-rose-200' },
 }
+
+const QUOTES = [
+  'A calm start makes for a steady day.',
+  'Small steps today, big results tomorrow.',
+  'Every client leaves happier because of you.',
+  'Precision and patience make the best work.',
+  'Great service is a habit, not an act.',
+  'Take pride in the little details.',
+  'Finish strong, rest well.',
+]
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -99,9 +112,8 @@ function getGreeting() {
 
 function LiveClock() {
   const now = useLiveClock()
-  const hh = String(now.getHours()).padStart(2, '0')
+  const h12 = now.getHours() % 12 || 12
   const mm = String(now.getMinutes()).padStart(2, '0')
-  const ss = String(now.getSeconds()).padStart(2, '0')
   const ampm = now.getHours() >= 12 ? 'PM' : 'AM'
   const day = now.toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' })
   const date = now.toLocaleDateString('en-IN', {
@@ -111,13 +123,17 @@ function LiveClock() {
     timeZone: 'Asia/Kolkata',
   })
   return (
-    <div className="text-right">
-      <div className="flex items-end justify-end gap-1 leading-none">
-        <span className="text-3xl sm:text-4xl font-extrabold tabular-nums text-slate-800 tracking-tight">{hh}:{mm}</span>
-        <span className="text-base sm:text-lg font-bold text-slate-400 mb-0.5">{ss}</span>
-        <span className="text-xs sm:text-sm font-semibold text-blue-600 mb-1 ml-0.5">{ampm}</span>
+    <div className="flex items-center gap-3 min-w-0">
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-primary">
+        <Clock className="h-5 w-5" />
+      </span>
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-1.5 leading-none">
+          <span className="text-3xl sm:text-4xl font-bold tabular-nums tracking-tight text-foreground">{h12}:{mm}</span>
+          <span className="text-sm font-semibold text-primary">{ampm}</span>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">{day}, {date}</p>
       </div>
-      <p className="text-xs text-slate-500 mt-1 font-medium">{day}, {date}</p>
     </div>
   )
 }
@@ -134,11 +150,17 @@ function StatusPill({ status }) {
 
 // ─── PunchPanel (Recomposed Attendance Console) ──────────────────────────────
 
+const formatMeters = (m) => {
+  const n = Math.round(m)
+  return n >= 1000 ? `${(n / 1000).toFixed(1)} km` : `${n} m`
+}
+
 function PunchPanel({ config, isLoadingConfig }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const geo = useGeolocation()
   const [selfieOpen, setSelfieOpen] = useState(false)
+  const [locationOpen, setLocationOpen] = useState(false)
   const inFlight = useRef(false)
 
   const mutation = useMutation({
@@ -199,171 +221,127 @@ function PunchPanel({ config, isLoadingConfig }) {
     else submit(null)
   }
 
+  const statusLabel = isOnFloor ? 'You are checked in' : status === 'checked_out' ? "You've checked out for today" : (STATUS_META[status]?.label || 'Not checked in')
+  const statusHint = isOnFloor
+    ? `Clocked in and active on floor${checkIn !== '—' ? ` since ${checkIn}` : ''}.`
+    : status === 'checked_out'
+      ? 'Shift completed for today. See you tomorrow.'
+      : status === 'not_arrived'
+        ? 'Ready to start your shift. Punch in to mark your attendance.'
+        : STATUS_META[status]?.label
+  const tone = isOnFloor || status === 'checked_out'
+    ? { box: 'bg-success/10 border-success/20', icon: 'bg-success text-white' }
+    : { box: 'bg-secondary/60', icon: 'bg-background text-muted-foreground border' }
+
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-stretch">
-        
-        {/* LEFT COLUMN: Punch Action & Location Verification */}
-        <div className="lg:col-span-5 flex flex-col justify-between rounded-2xl bg-white/70 backdrop-blur-md p-5 border border-white/80 shadow-xs">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="flex h-2.5 w-2.5 rounded-full bg-blue-600" />
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Live Status</h2>
-              </div>
-              <StatusPill status={status} />
-            </div>
-
-            <p className="text-sm text-slate-600 font-medium leading-relaxed">
-              {isOnFloor
-                ? `Clocked in and active on floor${checkIn !== '—' ? ` since ${checkIn}` : ''}.`
-                : status === 'checked_out'
-                  ? 'Shift completed for today. You are checked out.'
-                  : 'Ready to start your shift. Punch in to mark your attendance.'}
-            </p>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-stretch">
+        {/* Time, status and punch */}
+        <section className="lg:col-span-5 flex flex-col gap-3 rounded-xl border bg-card p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <LiveClock />
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
+              Live
+            </span>
           </div>
 
-          <div className="space-y-3 pt-4">
-            {/* Punch In / Out Button */}
-            {canPunch ? (
+          <div className={`flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center ${tone.box}`}>
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${tone.icon}`}>
+              {isOnFloor || status === 'checked_out' ? <CheckCircle2 className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">{statusLabel}</p>
+              <p className="text-xs text-muted-foreground leading-snug">{statusHint}</p>
+            </div>
+            </div>
+            {canPunch && (
               <Button
-                size="lg"
                 onClick={handlePunch}
                 disabled={!gate.allowed}
-                className={`
-                  h-12 w-full rounded-xl text-base font-bold tracking-wide shadow-md transition-all active:scale-[0.98]
-                  ${isOnFloor
-                    ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/25'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/30'}
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                `}
+                loading={mutation.isPending}
+                variant={isOnFloor ? 'default' : 'success'}
+                className="h-12 w-full shrink-0 px-5 text-base font-semibold sm:h-11 sm:w-auto sm:text-sm"
               >
-                {mutation.isPending ? (
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                ) : isOnFloor ? (
-                  <LogOut className="mr-2 h-5 w-5" />
-                ) : (
-                  <LogIn className="mr-2 h-5 w-5" />
-                )}
+                {!mutation.isPending && (isOnFloor ? <LogOut className="h-5 w-5" /> : <LogIn className="h-5 w-5" />)}
                 {isOnFloor ? 'Punch Out' : 'Punch In'}
               </Button>
-            ) : (
-              <div
-                className={`flex items-center justify-center gap-2 h-12 w-full rounded-xl text-sm font-semibold ring-1
-                  ${STATUS_META[status]?.bg || 'bg-white/80'} ${STATUS_META[status]?.color || 'text-slate-600'} ${STATUS_META[status]?.ring || 'ring-slate-200'}`}
-              >
-                <CheckCircle2 className="h-5 w-5" />
-                {status === 'checked_out' ? "You've checked out for today" : STATUS_META[status]?.label}
-              </div>
             )}
-
-            {/* Geolocation feedback badge */}
-            <div
-              className={`rounded-xl p-3 text-xs border flex items-start gap-2.5 transition-colors ${
-                gate.allowed
-                  ? 'bg-blue-50/70 border-blue-100 text-blue-900'
-                  : 'bg-amber-50/70 border-amber-200/80 text-amber-900'
-              }`}
-            >
-              <MapPin className={`h-4 w-4 shrink-0 mt-0.5 ${gate.allowed ? 'text-blue-600' : 'text-amber-600'}`} />
-              <div className="min-w-0 flex-1">
-                {gate.allowed ? (
-                  <p className="font-semibold text-slate-800">
-                    Location verified · {gate.nearest?.name || 'Salon'}
-                    {geo.position && (
-                      <span className="font-normal text-slate-500 text-[11px] block mt-0.5">
-                        Within salon boundary (±{Math.round(geo.position.accuracy)}m GPS accuracy)
-                      </span>
-                    )}
-                  </p>
-                ) : (
-                  <div>
-                    <p className="font-bold text-amber-900">{gate.reason || 'Checking location…'}</p>
-                    {geo.position && gate.nearest && (
-                      <p className="text-[11px] text-amber-700 mt-0.5 font-medium">
-                        Distance: {gate.nearest.distanceM}m (allowed radius {gate.nearest.radius_m}m) · GPS ±{Math.round(geo.position.accuracy)}m
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN: Today's Shift Telemetry */}
-        <div className="lg:col-span-7 flex flex-col justify-between rounded-2xl bg-white/70 backdrop-blur-md p-5 border border-white/80 shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">Today's Shift Activity</h2>
-            <span className="text-[11px] text-slate-400 font-medium">Live attendance log</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 my-auto">
-            {/* Check In */}
-            <div className="flex items-center gap-3 rounded-xl bg-white p-3.5 border border-slate-100 shadow-2xs">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <LogIn className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Check In</span>
-                <span className="text-lg sm:text-xl font-bold text-slate-800 tabular-nums leading-tight block truncate">
-                  {checkIn}
+          <button
+            type="button"
+            onClick={() => setLocationOpen((o) => !o)}
+            aria-expanded={locationOpen}
+            className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 ${
+              gate.allowed ? 'bg-accent/60 hover:bg-accent' : 'bg-warning/10 border-warning/25'
+            }`}
+          >
+            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${gate.allowed ? 'bg-accent text-primary' : 'bg-warning/20 text-warning'}`}>
+              <MapPin className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-foreground">
+                {gate.allowed ? `Location verified · ${gate.nearest?.name || 'Salon'}` : (gate.reason || 'Checking location…')}
+              </span>
+              {geo.position && (
+                <span className="block text-xs text-muted-foreground">
+                  {gate.allowed ? 'Within salon boundary' : 'Outside salon boundary'} (±{formatMeters(geo.position.accuracy)} GPS accuracy)
                 </span>
-              </div>
-            </div>
+              )}
+              {locationOpen && gate.nearest && (
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Distance {gate.nearest.distanceM} m · allowed radius {gate.nearest.radius_m} m
+                </span>
+              )}
+            </span>
+            <ChevronRight className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${locationOpen ? 'rotate-90' : ''}`} />
+          </button>
+        </section>
 
-            {/* Check Out */}
-            <div className="flex items-center gap-3 rounded-xl bg-white p-3.5 border border-slate-100 shadow-2xs">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
-                <LogOut className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Check Out</span>
-                <span className="text-lg sm:text-xl font-bold text-slate-800 tabular-nums leading-tight block truncate">
-                  {checkOut}
-                </span>
-              </div>
-            </div>
-
-            {/* Worked Hours */}
-            <div className="flex items-center gap-3 rounded-xl bg-white p-3.5 border border-slate-100 shadow-2xs">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
-                <Clock className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Worked Time</span>
-                <span className="text-lg sm:text-xl font-bold text-slate-800 tabular-nums leading-tight block truncate">
-                  {worked || '—'}
-                </span>
-              </div>
-            </div>
-
-            {/* Break */}
-            <div className="flex items-center gap-3 rounded-xl bg-white p-3.5 border border-slate-100 shadow-2xs">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                <Coffee className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Break</span>
-                <span className="text-lg sm:text-xl font-bold text-slate-800 tabular-nums leading-tight block truncate">
-                  {today.total_break_minutes > 0 ? `${today.total_break_minutes}m` : '0m'}
-                </span>
-              </div>
-            </div>
+        {/* Today's shift activity */}
+        <section className="lg:col-span-7 flex flex-col justify-between rounded-xl border bg-card p-4 sm:p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Today's Shift Activity</h2>
+            <span className="text-[11px] text-muted-foreground">Live attendance log</span>
           </div>
 
-          <div className="pt-3 border-t border-slate-100/80 flex items-center justify-between text-xs text-slate-500">
+          <div className="my-auto grid grid-cols-2 gap-3">
+            {[
+              { label: 'Check In', value: checkIn, icon: LogIn, tint: 'bg-primary/10 text-primary' },
+              { label: 'Check Out', value: checkOut, icon: LogOut, tint: 'bg-destructive/10 text-destructive' },
+              { label: 'Worked Time', value: worked || '—', icon: Clock, tint: 'bg-info/10 text-info' },
+              { label: 'Total Break', value: today.total_break_minutes > 0 ? `${today.total_break_minutes}m` : '0m', icon: Coffee, tint: 'bg-warning/10 text-warning' },
+            ].map(({ label, value, icon: Icon, tint }) => (
+              <div key={label} className="flex items-center gap-3 rounded-lg border bg-background p-3">
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${tint}`}>
+                  <Icon className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+                  <span className="block truncate text-base font-bold tabular-nums leading-tight text-foreground sm:text-xl">{value}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <DayVerdict
+            className="mt-3"
+            record={{ ...today, check_in: today.check_in, status: today.day_status }}
+          />
+
+          <div className="mt-3 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
             <span>Shift summary recorded</span>
             <button
               type="button"
               onClick={() => navigate('/my-attendance')}
-              className="font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 transition-colors"
+              className="inline-flex items-center gap-1 rounded font-semibold text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               Full Attendance Record <ArrowRight className="h-3 w-3" />
             </button>
           </div>
-        </div>
-
+        </section>
       </div>
 
       <SelfieCapture
@@ -413,20 +391,20 @@ function HoursThisWeekCard({ userId }) {
   const maxHours = Math.max(...dayData.map((d) => d.hours || 0), 8)
 
   return (
-    <div className="glass-card rounded-3xl p-5 flex flex-col gap-4">
+    <div className="glass-card rounded-xl p-5 flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-primary">
             <BarChart2 className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-sm font-bold text-slate-800">Hours this week</span>
-            <p className="text-xs text-slate-400">Mon – Sun</p>
+            <span className="text-sm font-bold text-foreground">Hours this week</span>
+            <p className="text-xs text-muted-foreground">Mon – Sun</p>
           </div>
         </div>
         <div className="text-right">
-          <span className="text-base font-extrabold text-slate-800 tabular-nums">{formatWorkedHours(totalHours) || '0h'}</span>
-          <p className="text-[10px] text-slate-400 font-semibold uppercase">total</p>
+          <span className="text-base font-extrabold text-foreground tabular-nums">{formatWorkedHours(totalHours) || '0h'}</span>
+          <p className="text-[10px] text-muted-foreground font-semibold uppercase">total</p>
         </div>
       </div>
 
@@ -441,7 +419,7 @@ function HoursThisWeekCard({ userId }) {
             return (
               <div key={day} className="flex flex-col items-center gap-1.5 flex-1">
                 {hours != null && (
-                  <span className="text-[9px] text-slate-500 tabular-nums font-semibold">
+                  <span className="text-[9px] text-muted-foreground tabular-nums font-semibold">
                     {formatWorkedHours(hours) || ''}
                   </span>
                 )}
@@ -449,7 +427,7 @@ function HoursThisWeekCard({ userId }) {
                   <div
                     className={`w-full rounded-t-xl transition-all ${
                       isToday
-                        ? 'bg-blue-600 shadow-xs'
+                        ? 'bg-primary shadow-xs'
                         : hours != null
                           ? 'bg-blue-200 hover:bg-blue-300'
                           : 'bg-slate-100'
@@ -457,7 +435,7 @@ function HoursThisWeekCard({ userId }) {
                     style={{ height: hours != null ? `${pct}%` : '12%', minHeight: '6px', maxHeight: '100%' }}
                   />
                 </div>
-                <span className={`text-[11px] font-bold ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>
+                <span className={`text-[11px] font-bold ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
                   {day}
                 </span>
               </div>
@@ -490,22 +468,22 @@ function ThisMonthCard() {
   const monthName = new Date(month + '-01').toLocaleDateString('en-IN', { month: 'long', timeZone: 'Asia/Kolkata' })
 
   const statItems = [
-    { label: 'Days present', value: presentDays, color: 'text-blue-600', bg: 'bg-blue-50/70 border-blue-100' },
+    { label: 'Days present', value: presentDays, color: 'text-primary', bg: 'bg-blue-50/70 border-blue-100' },
     { label: 'Hours worked', value: formatWorkedHours(totalHours) || '0h', color: 'text-sky-600', bg: 'bg-sky-50/70 border-sky-100' },
     { label: 'On leave', value: leaveDays, color: 'text-amber-600', bg: 'bg-amber-50/70 border-amber-100' },
     { label: 'Absent', value: absentDays, color: 'text-rose-600', bg: 'bg-rose-50/70 border-rose-100' },
   ]
 
   return (
-    <div className="glass-card rounded-3xl p-5 flex flex-col gap-4">
+    <div className="glass-card rounded-xl p-5 flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
             <Calendar className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-sm font-bold text-slate-800">{monthName}</span>
-            <p className="text-xs text-slate-400">Monthly overview</p>
+            <span className="text-sm font-bold text-foreground">{monthName}</span>
+            <p className="text-xs text-muted-foreground">Monthly overview</p>
           </div>
         </div>
       </div>
@@ -517,9 +495,9 @@ function ThisMonthCard() {
       ) : (
         <div className="grid grid-cols-2 gap-2.5">
           {statItems.map(({ label, value, color, bg }) => (
-            <div key={label} className={`rounded-2xl p-3 border ${bg} backdrop-blur-sm`}>
+            <div key={label} className={`rounded-lg p-3 border ${bg} backdrop-blur-sm`}>
               <p className={`text-xl font-extrabold ${color} tabular-nums leading-none`}>{value}</p>
-              <p className="text-xs text-slate-500 mt-1 font-semibold">{label}</p>
+              <p className="text-xs text-muted-foreground mt-1 font-semibold">{label}</p>
             </div>
           ))}
         </div>
@@ -532,22 +510,22 @@ function ThisMonthCard() {
 
 function PayCard() {
   return (
-    <div className="glass-card rounded-3xl p-5 flex flex-col gap-3">
+    <div className="glass-card rounded-xl p-5 flex flex-col gap-3">
       <div className="flex items-center gap-2.5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
           <IndianRupee className="h-5 w-5" />
         </div>
         <div>
-          <span className="text-sm font-bold text-slate-800">Pay & Earnings</span>
-          <p className="text-xs text-slate-400">Monthly payroll</p>
+          <span className="text-sm font-bold text-foreground">Pay & Earnings</span>
+          <p className="text-xs text-muted-foreground">Monthly payroll</p>
         </div>
       </div>
-      <p className="text-sm text-slate-600 leading-relaxed">
+      <p className="text-sm text-muted-foreground leading-relaxed">
         Your payslip is processed monthly by your salon admin.
       </p>
       <div className="mt-auto pt-2">
         <div className="h-px bg-slate-100 mb-3" />
-        <div className="flex items-center gap-2 text-xs font-semibold text-blue-600">
+        <div className="flex items-center gap-2 text-xs font-semibold text-primary">
           <TrendingUp className="h-4 w-4" />
           <span>Payroll processed monthly</span>
         </div>
@@ -566,7 +544,7 @@ function QuickNavCard() {
       sub: 'Full history & records',
       path: '/my-attendance',
       icon: Calendar,
-      color: 'text-blue-600',
+      color: 'text-primary',
       bg: 'bg-blue-50',
     },
     {
@@ -589,8 +567,8 @@ function QuickNavCard() {
   return (
     <section aria-label="Quick access" className="space-y-3">
       <div className="flex items-center gap-2">
-        <Zap className="h-4 w-4 text-blue-600" />
-        <h2 className="text-sm font-bold text-slate-800">Quick access</h2>
+        <Zap className="h-4 w-4 text-primary" />
+        <h2 className="text-sm font-bold text-foreground">Quick access</h2>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {links.map(({ label, sub, path, icon: Icon, color, bg }) => (
@@ -598,16 +576,16 @@ function QuickNavCard() {
             key={path}
             type="button"
             onClick={() => navigate(path)}
-            className="group flex min-h-[72px] items-center gap-4 rounded-3xl glass-card p-4 text-left transition-all hover:bg-white hover:scale-[1.01] hover:shadow-lg hover:shadow-indigo-500/10 active:scale-[0.99]"
+            className="group flex min-h-[72px] items-center gap-4 rounded-xl glass-card p-4 text-left transition-all hover:bg-white hover:scale-[1.01] hover:shadow-lg hover:shadow-indigo-500/10 active:scale-[0.99]"
           >
-            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${bg} transition-transform group-hover:scale-105`}>
+            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${bg} transition-transform group-hover:scale-105`}>
               <Icon className={`h-5 w-5 ${color}`} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-bold text-slate-800">{label}</span>
-              <span className="block truncate text-xs text-slate-400 font-medium">{sub}</span>
+              <span className="block text-sm font-bold text-foreground">{label}</span>
+              <span className="block truncate text-xs text-muted-foreground font-medium">{sub}</span>
             </span>
-            <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-blue-600" />
+            <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-primary" />
           </button>
         ))}
       </div>
@@ -643,16 +621,16 @@ function ServicesList() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-pink-50 text-pink-600">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-pink-50 text-pink-600">
             <Scissors className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-slate-800">Recent Services</h2>
-            <p className="text-xs text-slate-400">Completed jobs</p>
+            <h2 className="text-sm font-bold text-foreground">Recent Services</h2>
+            <p className="text-xs text-muted-foreground">Completed jobs</p>
           </div>
         </div>
         {displayServices.length > 0 && (
-          <Badge variant="secondary" className="text-xs font-bold rounded-xl px-2.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-100">
+          <Badge variant="secondary" className="text-xs font-bold rounded-xl px-2.5 py-0.5 bg-blue-50 text-primary border border-blue-100">
             {displayServices.length}{pagination.has_more ? '+' : ''}
           </Badge>
         )}
@@ -663,13 +641,13 @@ function ServicesList() {
           <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
         </div>
       ) : displayServices.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-3">
-          <div className="h-14 w-14 rounded-3xl bg-slate-50 flex items-center justify-center">
-            <Scissors className="h-6 w-6 opacity-40 text-slate-400" />
+        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
+          <div className="h-14 w-14 rounded-xl bg-slate-50 flex items-center justify-center">
+            <Scissors className="h-6 w-6 opacity-40 text-muted-foreground" />
           </div>
           <div className="text-center">
-            <p className="text-sm font-semibold text-slate-600">No services yet</p>
-            <p className="text-xs text-slate-400 mt-0.5">Your completed services will appear here</p>
+            <p className="text-sm font-semibold text-muted-foreground">No services yet</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Your completed services will appear here</p>
           </div>
         </div>
       ) : (
@@ -677,19 +655,19 @@ function ServicesList() {
           {displayServices.map((svc, i) => (
             <div
               key={`${svc.id ?? i}-${i}`}
-              className="group flex items-center justify-between rounded-2xl bg-white/70 hover:bg-white border border-white/80 p-3.5 transition-all hover:shadow-sm"
+              className="group flex items-center justify-between rounded-lg bg-white/70 hover:bg-white border border-white/80 p-3.5 transition-all hover:shadow-sm"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-xs font-bold text-blue-600">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-xs font-bold text-primary">
                   {i + 1}
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-slate-800">{svc.item_name}</p>
-                  <p className="truncate text-xs text-slate-400">{svc.customer_name}</p>
+                  <p className="truncate text-sm font-bold text-foreground">{svc.item_name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{svc.customer_name}</p>
                 </div>
               </div>
               <div className="shrink-0 text-right ml-3">
-                <p className="text-xs text-slate-400 font-medium whitespace-nowrap">{formatServiceDate(svc.date)}</p>
+                <p className="text-xs text-muted-foreground font-medium whitespace-nowrap">{formatServiceDate(svc.date)}</p>
               </div>
             </div>
           ))}
@@ -698,7 +676,7 @@ function ServicesList() {
             <button
               onClick={() => setOffset((p) => p + limit)}
               disabled={isLoading}
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 py-3 text-sm font-semibold text-slate-500 transition-all hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50/50 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-200 py-3 text-sm font-semibold text-muted-foreground transition-all hover:border-blue-300 hover:text-primary hover:bg-blue-50/50 disabled:opacity-50"
             >
               {isLoading
                 ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -727,6 +705,7 @@ function EmployeeDashboard() {
   const config = configData?.data
   const today = config?.today || {}
   const greeting = getGreeting()
+  const dailyQuote = QUOTES[new Date().getDay()]
   const firstName = user?.fullName?.split(' ')[0] || 'Employee'
 
   const navigate = useNavigate()
@@ -750,44 +729,34 @@ function EmployeeDashboard() {
   return (
     <div className="w-full space-y-5 sm:space-y-6">
 
-      {/* ── Recomposed Hero Banner with Attendance Hub ── */}
-      <div id="attendance-punch" className="glass-panel rounded-3xl p-6 sm:p-8 relative overflow-hidden space-y-6">
-        
-        {/* Top Header: Greeting & Salon on Left, Live Clock on Right */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/60">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white font-extrabold text-lg shadow-sm">
-              {(firstName || 'E').charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  {greeting}
-                </span>
-                <span className="text-slate-300">·</span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700 border border-blue-100">
-                  <Sparkles className="h-3 w-3" />
-                  {user?.branch?.name || 'Magic Scissor'}
-                </span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-800 leading-tight tracking-tight">
-                Welcome back, <span className="text-blue-700">{user?.fullName || firstName}</span>
-              </h1>
-              <p className="mt-1 text-xs sm:text-sm text-slate-500 font-medium">
-                Role: <span className="capitalize font-semibold text-slate-700">{user?.role || 'Employee'}</span>
-              </p>
-            </div>
+      {/* ── Greeting banner ── */}
+      <section
+        id="attendance-punch"
+        className="relative flex items-center justify-between gap-4 overflow-hidden rounded-xl border bg-gradient-to-br from-accent via-background to-accent/40 p-4 sm:p-6"
+      >
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-primary text-lg font-bold text-primary-foreground sm:h-14 sm:w-14 sm:text-xl">
+            {(firstName || 'E').charAt(0).toUpperCase()}
           </div>
-
-          <div className="sm:self-center">
-            <LiveClock />
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground sm:text-sm">{greeting}</p>
+            <h1 className="text-xl font-bold leading-tight tracking-tight text-foreground sm:text-3xl">
+              Welcome back,{' '}
+              <span className="block text-primary sm:inline">{user?.fullName || firstName}</span>
+            </h1>
+            <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
+              Role: <span className="font-semibold capitalize text-foreground">{user?.role || 'Employee'}</span>
+            </p>
           </div>
         </div>
+        <div className="hidden shrink-0 border-l pl-4 text-sm text-muted-foreground min-[380px]:block sm:max-w-[200px]">
+          <Leaf className="mb-1 h-4 w-4 text-primary" />
+          <p className="max-w-[130px] leading-snug sm:max-w-none">{dailyQuote}</p>
+          <span className="mt-2 block h-0.5 w-10 rounded-full bg-primary" />
+        </div>
+      </section>
 
-        {/* Recomposed 2-Column Attendance Console */}
-        <PunchPanel config={config} isLoadingConfig={isLoadingConfig} />
-
-      </div>
+      <PunchPanel config={config} isLoadingConfig={isLoadingConfig} />
 
       {/* ── Quick Nav ─────────────────────────────────────────────────────── */}
       <QuickNavCard />
@@ -800,7 +769,7 @@ function EmployeeDashboard() {
       </div>
 
       {/* ── Recent Services ───────────────────────────────────────────────── */}
-      <div className="glass-card rounded-3xl p-5 sm:p-6">
+      <div className="glass-card rounded-xl p-4 sm:p-6">
         <ServicesList />
       </div>
     </div>

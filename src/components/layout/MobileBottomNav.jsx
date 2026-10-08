@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
-import { Activity, CalendarDays, ClipboardList, FilePlus2, Home, Menu, Receipt } from 'lucide-react'
+import { CalendarDays, ClipboardList, FilePlus2, Home, Menu, Receipt } from 'lucide-react'
 import { useSidebar } from '@/contexts/SidebarContext'
 import { cn } from '@/lib/utils'
 
@@ -9,7 +9,6 @@ const getItems = (role) => {
     return [
       { label: 'Home',       to: '/dashboard/employee',                   icon: Home,       end: true },
       { label: 'Attendance', to: '/my-attendance',                        icon: CalendarDays },
-      { label: 'Punch',      to: '/dashboard/employee#attendance-punch',  icon: Activity,   primary: true },
     ]
   }
   if (role === 'cashier') {
@@ -42,7 +41,7 @@ export default function MobileBottomNav() {
 
   return (
     <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 md:hidden">
-      <div className="border-t border-white/70 bg-white/85 backdrop-blur-2xl pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_32px_rgba(14,134,212,0.06)]">
+      <div className="border-t bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
         <div
           className="mx-auto grid h-16 max-w-xl items-center px-3"
           style={{ gridTemplateColumns: `repeat(${items.length + 1}, 1fr)` }}
@@ -65,37 +64,32 @@ export default function MobileBottomNav() {
                 aria-label={isPunch ? 'Go to check in or check out' : label}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex h-full flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors relative',
+                  'flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors relative',
                   active
-                    ? 'text-blue-600 font-bold'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'text-primary font-bold'
+                    : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 {/* Elevated icon container with smooth translate-y animation */}
                 <span
                   className={cn(
-                    'flex items-center justify-center rounded-2xl transition-all duration-300 ease-out',
+                    'flex items-center justify-center rounded-full transition-all duration-200',
                     active
-                      ? '-translate-y-2 h-11 w-11 bg-blue-600 text-white shadow-lg shadow-blue-500/35 border-2 border-white'
-                      : 'translate-y-0 h-8 w-8 text-slate-500 hover:bg-white/60'
+                      ? 'h-8 w-14 bg-primary/10 text-primary'
+                      : 'h-8 w-14 text-muted-foreground'
                   )}
                 >
-                  <Icon className={cn('transition-all duration-300', active ? 'h-5 w-5' : 'h-[18px] w-[18px]')} aria-hidden="true" />
+                  <Icon className={cn('transition-all duration-300', active ? 'h-5 w-5' : 'h-5 w-5')} aria-hidden="true" />
                 </span>
 
                 <span
                   className={cn(
                     'transition-all duration-300 text-center leading-none',
-                    active ? 'font-bold text-blue-600 translate-y-0' : 'text-slate-500'
+                    active ? 'font-bold text-primary translate-y-0' : 'text-muted-foreground'
                   )}
                 >
                   {label}
                 </span>
-
-                {/* Active indicator dot */}
-                {active && (
-                  <span className="absolute bottom-1 h-1 w-1 rounded-full bg-blue-600 transition-all duration-300" />
-                )}
               </NavLink>
             )
           })}
@@ -107,33 +101,30 @@ export default function MobileBottomNav() {
             aria-label="Open full navigation menu"
             aria-current={mobileOpen ? 'page' : undefined}
             className={cn(
-              'flex h-full flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded-xl',
+              'flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md',
               mobileOpen
-                ? 'text-blue-600 font-bold'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'text-primary font-bold'
+                : 'text-muted-foreground hover:text-foreground'
             )}
           >
             <span
               className={cn(
-                'flex items-center justify-center rounded-2xl transition-all duration-300 ease-out',
+                'flex items-center justify-center rounded-full transition-all duration-200',
                 mobileOpen
-                  ? '-translate-y-2 h-11 w-11 bg-blue-600 text-white shadow-lg shadow-blue-500/35 border-2 border-white'
-                  : 'translate-y-0 h-8 w-8 text-slate-500 hover:bg-white/60'
+                  ? 'h-8 w-14 bg-primary/10 text-primary'
+                  : 'h-8 w-14 text-muted-foreground'
               )}
             >
-              <Menu className={cn('transition-all duration-300', mobileOpen ? 'h-5 w-5' : 'h-[18px] w-[18px]')} aria-hidden="true" />
+              <Menu className={cn('transition-all duration-300', mobileOpen ? 'h-5 w-5' : 'h-5 w-5')} aria-hidden="true" />
             </span>
             <span
               className={cn(
                 'transition-all duration-300 text-center leading-none',
-                mobileOpen ? 'font-bold text-blue-600 translate-y-0' : 'text-slate-500'
+                mobileOpen ? 'font-bold text-primary translate-y-0' : 'text-muted-foreground'
               )}
             >
               More
             </span>
-            {mobileOpen && (
-              <span className="absolute bottom-1 h-1 w-1 rounded-full bg-blue-600 transition-all duration-300" />
-            )}
           </button>
         </div>
       </div>

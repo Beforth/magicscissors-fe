@@ -1,4 +1,4 @@
-const toNum = (v) => (String(v).trim() === '' ? null : Number(v))
+const toNum = (v) => (v == null || String(v).trim() === '' ? null : Number(v))
 
 /** Validates the shift-rule fields of the Shift form and builds the API payload. */
 export function buildRulesPayload({ grace, tiers, halfDayLateAfterMin, halfDayMinHours }) {
@@ -7,13 +7,18 @@ export function buildRulesPayload({ grace, tiers, halfDayLateAfterMin, halfDayMi
 
   for (const t of tiers || []) {
     const a = toNum(t.after_min)
-    const d = toNum(t.deduct_hours)
-    if (a == null && d == null) continue
-    if (a == null || d == null) return { ok: false, error: 'Fill both minutes and hours for each late tier' }
+    const h = toNum(t.deduct_hours)
+    const m = toNum(t.deduct_amount)
+    if (a == null && h == null && m == null) continue
+    if (a == null || (h == null && m == null)) return { ok: false, error: 'Fill both the minutes and a fine (hours or ₹) for each late tier' }
     if (!Number.isInteger(a) || a < 1 || a > 1440) return { ok: false, error: 'Late tier minutes must be a whole number (1-1440)' }
     if (!(a > prev)) return { ok: false, error: 'Late tiers must be in increasing order and above the grace period' }
-    if (!(d > 0) || d > 24) return { ok: false, error: 'Late tier must deduct more than 0 and at most 24 hours' }
-    rows.push({ after_min: a, deduct_hours: d })
+    if (h != null && (!(h > 0) || h > 24)) return { ok: false, error: 'Late tier must deduct more than 0 and at most 24 hours' }
+    if (m != null && (!(m > 0) || m > 1000000)) return { ok: false, error: 'Late fine amount must be more than ₹0 and at most ₹10,00,000' }
+    const row = { after_min: a }
+    if (h != null) row.deduct_hours = h
+    if (m != null) row.deduct_amount = m
+    rows.push(row)
     prev = a
   }
 

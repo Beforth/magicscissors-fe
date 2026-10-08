@@ -43,7 +43,7 @@ import {
   LogOut,
 } from 'lucide-react'
 
-const getNavItemsByRole = (role) => {
+export const getNavItemsByRole = (role) => {
   const allNavItems = [
     { title: 'Dashboard', href: '/dashboard/owner',    icon: LayoutDashboard, roles: ['owner', 'developer'] },
     { title: 'Dashboard', href: '/dashboard/manager',  icon: LayoutDashboard, roles: ['manager'] },
@@ -110,10 +110,10 @@ function NavItemLeaf({ href, icon: Icon, title, collapsed }) {
       title={collapsed ? title : undefined}
       className={({ isActive }) =>
         cn(
-          'group flex items-center gap-3 rounded-2xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200',
+          'group flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-medium transition-all duration-200',
           isActive
-            ? 'bg-white/80 text-blue-600 font-semibold shadow-xs border border-white/60'
-            : 'text-slate-500 hover:bg-white/50 hover:text-slate-800',
+            ? 'bg-[hsl(var(--sidebar-active-bg))] text-[hsl(var(--sidebar-active-text))] font-semibold shadow-sm'
+            : 'text-muted-foreground hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-foreground',
           collapsed && 'justify-center px-2.5'
         )
       }
@@ -122,11 +122,11 @@ function NavItemLeaf({ href, icon: Icon, title, collapsed }) {
         <>
           <Icon className={cn(
             'h-[18px] w-[18px] flex-shrink-0 transition-transform',
-            isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-blue-500 group-hover:scale-105'
+            isActive ? 'text-[hsl(var(--sidebar-active-text))]' : 'text-muted-foreground group-hover:text-primary group-hover:scale-105'
           )} />
           {!collapsed && <span className="truncate">{title}</span>}
           {isActive && !collapsed && (
-            <span className="ml-auto h-2 w-2 rounded-full bg-blue-500 shadow-xs shadow-blue-400/50 flex-shrink-0" />
+            <span className="ml-auto h-2 w-2 rounded-full bg-primary shadow-xs  flex-shrink-0" />
           )}
         </>
       )}
@@ -142,15 +142,15 @@ function NavGroup({ item, collapsed, expandedGroups, toggleGroup }) {
     return (
       <div className="relative group/nav">
         <div
-          className="flex items-center justify-center w-full px-2.5 py-2.5 rounded-2xl text-slate-400 hover:bg-white/50 hover:text-blue-600 transition-all cursor-pointer"
+          className="flex items-center justify-center w-full px-2.5 py-2.5 rounded-lg text-muted-foreground hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-primary transition-all cursor-pointer"
           title={item.title}
         >
           <item.icon className="h-[18px] w-[18px] flex-shrink-0" />
         </div>
         {/* Flyout */}
         <div className="absolute left-full top-0 ml-2 hidden group-hover/nav:block z-50 pointer-events-auto">
-          <div className="bg-white/95 backdrop-blur-xl border border-white/80 rounded-2xl shadow-xl shadow-indigo-500/10 py-2 min-w-[190px]">
-            <div className="px-3.5 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          <div className="bg-popover border rounded-md shadow-lg py-2 min-w-[190px]">
+            <div className="px-3.5 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               {item.title}
             </div>
             {item.children.map((child) => (
@@ -162,8 +162,8 @@ function NavGroup({ item, collapsed, expandedGroups, toggleGroup }) {
                   cn(
                     'flex items-center gap-2.5 px-3.5 py-2 text-sm transition-colors',
                     isActive
-                      ? 'bg-blue-50 text-blue-600 font-semibold'
-                      : 'text-slate-500 hover:bg-white/60 hover:text-slate-800'
+                      ? 'bg-accent text-primary font-semibold'
+                      : 'text-muted-foreground hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-foreground'
                   )
                 }
               >
@@ -181,19 +181,19 @@ function NavGroup({ item, collapsed, expandedGroups, toggleGroup }) {
     <div>
       <button
         onClick={() => toggleGroup(item.title)}
-        className="group flex items-center w-full gap-3 px-3.5 py-2.5 text-sm font-medium rounded-2xl text-slate-500 hover:bg-white/50 hover:text-slate-800 transition-all"
+        className="group flex items-center w-full gap-3 px-3.5 py-2.5 text-sm font-medium rounded-lg text-muted-foreground hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-foreground transition-all"
       >
-        <item.icon className="h-[18px] w-[18px] flex-shrink-0 text-slate-400 group-hover:text-blue-500 group-hover:scale-105 transition-transform" />
+        <item.icon className="h-[18px] w-[18px] flex-shrink-0 text-muted-foreground group-hover:text-primary group-hover:scale-105 transition-transform" />
         <span className="flex-1 text-left truncate">{item.title}</span>
         <ChevronDown
           className={cn(
-            'h-3.5 w-3.5 transition-transform duration-200 text-slate-300',
+            'h-3.5 w-3.5 transition-transform duration-200 text-muted-foreground/60',
             isExpanded && 'rotate-180'
           )}
         />
       </button>
       {isExpanded && (
-        <div className="ml-4 mt-0.5 pl-3 border-l-2 border-indigo-200/60 space-y-0.5 py-0.5">
+        <div className="ml-4 mt-0.5 pl-3 border-l-2 border-border space-y-0.5 py-0.5">
           {item.children.map((child) => (
             <NavLink
               key={child.href}
@@ -201,10 +201,10 @@ function NavGroup({ item, collapsed, expandedGroups, toggleGroup }) {
               end={child.href === '/inventory'}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-2.5 px-2.5 py-1.5 text-sm rounded-xl transition-all',
+                  'flex items-center gap-2.5 px-2.5 py-1.5 text-sm rounded-md transition-all',
                   isActive
-                    ? 'bg-white/80 text-blue-600 font-semibold shadow-2xs'
-                    : 'text-slate-400 hover:bg-white/50 hover:text-slate-700'
+                    ? 'bg-accent text-accent-foreground font-semibold'
+                    : 'text-muted-foreground hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-foreground'
                 )
               }
             >
@@ -225,26 +225,26 @@ function SidebarContent({ collapsed, expandedGroups, toggleGroup, navItems, user
     : 'U'
 
   return (
-    <div className="flex flex-col h-full bg-white/95 backdrop-blur-2xl border-r border-white/80 shadow-lg shadow-sky-950/5">
+    <div className="flex flex-col h-full bg-[hsl(var(--sidebar-bg))] border-r border-[hsl(var(--sidebar-border))]">
       {/* Brand Logo */}
       <div className={cn(
         'flex items-center h-20 flex-shrink-0 px-5 border-b border-white/60',
         collapsed && 'justify-center px-2'
       )}>
         {collapsed ? (
-          <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center shadow-md shadow-blue-500/25">
+          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center ">
             <Scissors className="w-5 h-5 text-white" />
           </div>
         ) : (
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center shadow-md shadow-blue-500/25 flex-shrink-0">
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center  flex-shrink-0">
               <Scissors className="w-5 h-5 text-white" />
             </div>
             <div className="flex flex-col">
-              <span className="text-lg font-black tracking-tight text-blue-700">
+              <span className="text-lg font-black tracking-tight text-primary">
                 Magic Scissor
               </span>
-              <span className="text-[10px] text-slate-500 font-medium -mt-0.5">
+              <span className="text-[10px] text-muted-foreground font-medium -mt-0.5">
                 Salon Management · {CURRENT_VERSION}
               </span>
             </div>
@@ -282,29 +282,29 @@ function SidebarContent({ collapsed, expandedGroups, toggleGroup, navItems, user
       )}>
         {collapsed ? (
           <div className="flex flex-col items-center gap-2" title={user?.fullName || 'User'}>
-            <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-sm">
+            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xs shadow-sm">
               {initials}
             </div>
             <button
               onClick={onLogout}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50/80 transition-colors"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
               title="Logout"
             >
               <LogOut className="h-4 w-4" />
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-3 p-2 rounded-2xl bg-white/80 backdrop-blur-md border border-white/90 shadow-2xs">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-sm flex-shrink-0">
+          <div className="flex items-center gap-3 p-2 rounded-lg bg-card border">
+            <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center text-white font-bold text-xs shadow-sm flex-shrink-0">
               {initials}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-slate-800 truncate">{user?.fullName || 'User'}</p>
-              <p className="text-[11px] text-slate-500 capitalize truncate">{user?.role || 'Staff'}</p>
+              <p className="text-sm font-bold text-foreground truncate">{user?.fullName || 'User'}</p>
+              <p className="text-[11px] text-muted-foreground capitalize truncate">{user?.role || 'Staff'}</p>
             </div>
             <button
               onClick={onLogout}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50/80 transition-colors flex-shrink-0"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
               title="Logout"
             >
               <LogOut className="h-4 w-4" />
@@ -352,11 +352,11 @@ function Sidebar() {
       {/* Mobile drawer */}
       <div className={cn('fixed inset-0 z-50 md:hidden', mobileOpen ? 'pointer-events-auto' : 'pointer-events-none')}>
         <div
-          className={cn('absolute inset-0 bg-slate-900/30 backdrop-blur-sm transition-opacity duration-300', mobileOpen ? 'opacity-100' : 'opacity-0')}
+          className={cn('absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300', mobileOpen ? 'opacity-100' : 'opacity-0')}
           onClick={closeMobile}
         />
         <aside className={cn('relative flex flex-col w-72 max-w-[82vw] h-full shadow-2xl transition-transform duration-300 ease-in-out', mobileOpen ? 'translate-x-0' : '-translate-x-full')}>
-          <button onClick={closeMobile} className="absolute top-4 right-3 z-10 p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-white/60 transition-colors">
+          <button onClick={closeMobile} className="absolute top-4 right-3 z-10 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-[hsl(var(--sidebar-hover-bg))] transition-colors">
             <X className="h-4 w-4" />
           </button>
           <SidebarContent collapsed={false} {...sharedProps} />
@@ -368,10 +368,10 @@ function Sidebar() {
         <SidebarContent collapsed={collapsed} {...sharedProps} />
 
         {/* Collapse toggle */}
-        <div className="flex-shrink-0 border-t border-white/60 bg-[#DDF4FD]/80 backdrop-blur-md">
+        <div className="flex-shrink-0 border-t border-[hsl(var(--sidebar-border))]">
           <button
             onClick={toggle}
-            className={cn('flex items-center w-full px-3 py-2.5 text-slate-500 hover:bg-white/50 hover:text-slate-800 transition-colors', collapsed ? 'justify-center' : 'gap-2')}
+            className={cn('flex items-center w-full px-3 py-2.5 text-muted-foreground hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-foreground transition-colors', collapsed ? 'justify-center' : 'gap-2')}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed

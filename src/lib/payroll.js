@@ -1,4 +1,4 @@
-const SUM_KEYS = ['days_worked', 'half_days', 'hours_worked', 'late_deduction_hours', 'gross', 'late_deduction_amount', 'net_pay']
+const SUM_KEYS = ['days_worked', 'half_days', 'hours_worked', 'late_deduction_hours', 'gross', 'late_deduction_amount', 'late_fine_amount', 'net_pay']
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100
 
 export function payrollTotals(rows) {
@@ -22,6 +22,7 @@ export function reportCsvRows(rows) {
     late_deduction_hours: r.late_deduction_hours,
     gross: r.gross,
     late_deduction_amount: r.late_deduction_amount,
+    late_fine_amount: r.late_fine_amount ?? 0,
     net_pay: r.net_pay,
     warnings: (r.warnings || []).join('; '),
   }))

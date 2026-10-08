@@ -32,6 +32,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Clock, Loader2, Plus, Pencil, Power, PowerOff, Calendar, ChevronLeft, ChevronRight, Trash2, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { buildRulesPayload } from '@/lib/shiftRules'
+import RosterGrid from '@/components/shifts/RosterGrid'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -80,7 +81,11 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
         half_day_late_after_min: shift.half_day_late_after_min == null ? '' : String(shift.half_day_late_after_min),
         half_day_min_hours: shift.half_day_min_hours == null ? '' : String(shift.half_day_min_hours),
       })
-      setTiers((shift.late_tiers || []).map((t) => ({ after_min: String(t.after_min), deduct_hours: String(t.deduct_hours) })))
+      setTiers((shift.late_tiers || []).map((t) => (
+        t.deduct_hours == null && t.deduct_amount != null
+          ? { after_min: String(t.after_min), kind: 'amount', value: String(t.deduct_amount) }
+          : { after_min: String(t.after_min), kind: 'hours', value: String(t.deduct_hours ?? '') }
+      )))
     } else {
       setForm(initialShiftForm)
       setTiers([])
@@ -106,7 +111,11 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
     if (canEditRules) {
       const built = buildRulesPayload({
         grace,
-        tiers,
+        tiers: tiers.map((t) => ({
+          after_min: t.after_min,
+          deduct_hours: t.kind === 'hours' ? t.value : '',
+          deduct_amount: t.kind === 'amount' ? t.value : '',
+        })),
         halfDayLateAfterMin: form.half_day_late_after_min,
         halfDayMinHours: form.half_day_min_hours,
       })
@@ -226,15 +235,30 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
                         onChange={(e) => setTiers((rows) => rows.map((r, j) => (j === i ? { ...r, after_min: e.target.value } : r)))}
                       />
                     </div>
+                    <div className="w-36 space-y-1">
+                      <Label htmlFor={`tier_kind_${i}`} className="text-xs">Fine type</Label>
+                      <select
+                        id={`tier_kind_${i}`}
+                        value={t.kind}
+                        onChange={(e) => setTiers((rows) => rows.map((r, j) => (j === i ? { ...r, kind: e.target.value } : r)))}
+                        className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus:border-ring focus:ring-[3px] focus:ring-ring/15"
+                      >
+                        <option value="amount">₹ Amount</option>
+                        <option value="hours">Hours of pay</option>
+                      </select>
+                    </div>
                     <div className="flex-1 space-y-1">
-                      <Label htmlFor={`tier_deduct_${i}`} className="text-xs">Deduct (hours)</Label>
+                      <Label htmlFor={`tier_deduct_${i}`} className="text-xs">
+                        {t.kind === 'amount' ? 'Deduct (₹)' : 'Deduct (hours)'}
+                      </Label>
                       <Input
                         id={`tier_deduct_${i}`}
                         type="number"
                         min="0"
-                        step="0.25"
-                        value={t.deduct_hours}
-                        onChange={(e) => setTiers((rows) => rows.map((r, j) => (j === i ? { ...r, deduct_hours: e.target.value } : r)))}
+                        step={t.kind === 'amount' ? '1' : '0.25'}
+                        placeholder={t.kind === 'amount' ? 'e.g. 100' : 'e.g. 1'}
+                        value={t.value}
+                        onChange={(e) => setTiers((rows) => rows.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)))}
                       />
                     </div>
                     <Button
@@ -252,13 +276,13 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setTiers((rows) => [...rows, { after_min: '', deduct_hours: '' }])}
+                  onClick={() => setTiers((rows) => [...rows, { after_min: '', kind: 'amount', value: '' }])}
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   Add tier
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Applies after the grace period. Leave empty for no late fine.
+                  Applies after the grace period; the highest tier reached is used. A ₹ amount is deducted from salary as-is; hours are deducted at the employee's hourly rate. Leave empty for no late fine.
                 </p>
               </div>
               <div className="space-y-2">
@@ -319,11 +343,6 @@ function ShiftPage() {
   const isOwner = user?.role === 'owner'
   const userBranchId = user?.branchId || user?.branch_id || user?.branch?.branch_id || user?.branch?.id || ''
   const [selectedBranchId, setSelectedBranchId] = useState(userBranchId)
-  const [selectedMonth, setSelectedMonth] = useState(toYearMonth(new Date()))
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
-  const [detailDate, setDetailDate] = useState(null)
-  const [showDetailModal, setShowDetailModal] = useState(false)
-  const [employeeSearch, setEmployeeSearch] = useState('')
 
   const { data: branchesData } = useQuery({
     queryKey: ['branches'],
@@ -337,23 +356,7 @@ function ShiftPage() {
   })
   const shifts = shiftsData?.data || []
 
-  const { data: assignmentsData, isLoading: assignmentsLoading } = useQuery({
-    queryKey: ['shift-assignments', selectedMonth],
-    queryFn: () => shiftService.getAssignments({ month: selectedMonth }),
-  })
-  const assignments = assignmentsData?.data || []
-
   const effectiveBranchId = isOwnerDev ? selectedBranchId : userBranchId
-  const { data: allUsersData } = useQuery({
-    queryKey: ['users', { role: 'employee,manager,cashier', branch_id: effectiveBranchId }],
-    queryFn: () => userService.getUsers({
-      role: 'employee,manager,cashier',
-      branch_id: effectiveBranchId || undefined,
-      limit: 500,
-    }),
-  })
-
-  const employees = allUsersData?.data || []
 
   const toggleMutation = useMutation({
     mutationFn: (id) => shiftService.toggleActive(id),
@@ -364,90 +367,8 @@ function ShiftPage() {
     onError: (err) => toast.error(err.response?.data?.error?.message || 'Failed to toggle shift'),
   })
 
-  const assignMutation = useMutation({
-    mutationFn: ({ employeeId, shiftId, shiftDate }) =>
-      shiftService.assignShift(employeeId, shiftId, shiftDate),
-    onSuccess: () => {
-      toast.success('Shift assigned')
-      queryClient.invalidateQueries({ queryKey: ['shift-assignments'] })
-    },
-    onError: (err) => toast.error(err.response?.data?.error?.message || 'Failed to assign shift'),
-  })
-
-  const removeAssignmentMutation = useMutation({
-    mutationFn: (id) => shiftService.removeAssignment(id),
-    onSuccess: () => {
-      toast.success('Assignment removed')
-      queryClient.invalidateQueries({ queryKey: ['shift-assignments'] })
-    },
-    onError: (err) => toast.error(err.response?.data?.error?.message || 'Failed to remove assignment'),
-  })
-
   const openAddModal = () => { setEditingShift(null); setModalOpen(true) }
   const openEditModal = (shift) => { setEditingShift(shift); setModalOpen(true) }
-
-  const formatMonthYear = (monthStr) => {
-    if (!monthStr) return ''
-    const [year, month] = monthStr.split('-')
-    const date = new Date(Number(year), Number(month) - 1, 1)
-    return date.toLocaleDateString('default', { month: 'long', year: 'numeric' })
-  }
-
-  const handlePrevMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    const prev = new Date(year, month - 2, 1)
-    setSelectedMonth(toYearMonth(prev))
-  }
-
-  const handleNextMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    const next = new Date(year, month, 1)
-    setSelectedMonth(toYearMonth(next))
-  }
-
-  const calendarCells = useMemo(() => {
-    if (!selectedMonth) return []
-    const [year, monthNum] = selectedMonth.split('-').map(Number)
-    const monthIdx = monthNum - 1
-    const firstDay = new Date(year, monthIdx, 1)
-    const startOfWeekDay = firstDay.getDay()
-    const totalDays = new Date(year, monthIdx + 1, 0).getDate()
-    const prevMonthTotalDays = new Date(year, monthIdx, 0).getDate()
-    const cells = []
-    for (let i = startOfWeekDay - 1; i >= 0; i--) {
-      const d = prevMonthTotalDays - i
-      const mStr = String(monthNum === 1 ? 12 : monthNum - 1).padStart(2, '0')
-      const yVal = monthNum === 1 ? year - 1 : year
-      cells.push({ day: d, dateStr: `${yVal}-${mStr}-${String(d).padStart(2, '0')}`, isCurrentMonth: false })
-    }
-    for (let i = 1; i <= totalDays; i++) {
-      cells.push({
-        day: i,
-        dateStr: `${year}-${String(monthNum).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
-        isCurrentMonth: true,
-      })
-    }
-    const remaining = 42 - cells.length
-    for (let i = 1; i <= remaining; i++) {
-      const mStr = String(monthNum === 12 ? 1 : monthNum + 1).padStart(2, '0')
-      const yVal = monthNum === 12 ? year + 1 : year
-      cells.push({ day: i, dateStr: `${yVal}-${mStr}-${String(i).padStart(2, '0')}`, isCurrentMonth: false })
-    }
-    return cells
-  }, [selectedMonth])
-
-  const getShiftForDate = (employeeId, dateStr) => {
-    return assignments.find((a) => a.employee_id === employeeId && a.shift_date === dateStr) || null
-  }
-
-  const employeeId = (u) => u.user_id || u.id
-
-  const employeeOptions = employees
-    .map((u) => ({ value: employeeId(u), label: u.full_name }))
-
-  const filteredEmployees = employeeSearch.trim()
-    ? employees.filter((emp) => emp.full_name?.toLowerCase().includes(employeeSearch.trim().toLowerCase()))
-    : employees
 
   return (
     <div className="space-y-6">
@@ -557,225 +478,19 @@ function ShiftPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="schedule" className="space-y-6">
-          {/* Filter bar */}
-          <Card>
-            <CardContent className="pt-6 flex flex-wrap gap-4 items-center justify-between">
-              <div className="flex flex-wrap gap-4 items-end">
-                <div className="min-w-[200px]">
-                  <Label className="text-xs mb-1 block">Employee</Label>
-                  <SearchableSelect
-                    options={employeeOptions}
-                    value={selectedEmployeeId}
-                    onChange={setSelectedEmployeeId}
-                    placeholder="All employees"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs mb-1 block">Month</Label>
-                  <div className="flex items-center gap-2 h-10 border rounded-md px-1 bg-background">
-                    <Button variant="ghost" size="icon" onClick={handlePrevMonth} className="h-8 w-8">
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="font-semibold text-sm px-2 min-w-[120px] text-center">
-                      {formatMonthYear(selectedMonth)}
-                    </span>
-                    <Button variant="ghost" size="icon" onClick={handleNextMonth} className="h-8 w-8">
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              {isOwnerDev && (
-                <div className="min-w-[200px]">
-                  <Label className="text-xs mb-1 block">Branch</Label>
-                  <SearchableSelect
-                    options={branches.map((b) => ({ value: b.branch_id, label: b.name }))}
-                    value={selectedBranchId}
-                    onChange={setSelectedBranchId}
-                    placeholder="All branches"
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Calendar Grid */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-7 gap-2">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                  <div key={day} className="text-center font-semibold text-sm text-muted-foreground pb-2">
-                    {day}
-                  </div>
-                ))}
-                {calendarCells.map((cell, idx) => {
-                  const dayAssignments = selectedEmployeeId
-                    ? (() => {
-                        const a = getShiftForDate(selectedEmployeeId, cell.dateStr)
-                        return a ? [a] : []
-                      })()
-                    : assignments.filter((a) => a.shift_date === cell.dateStr)
-
-                  const shiftGroups = {}
-                  dayAssignments.forEach((a) => {
-                    if (!shiftGroups[a.shift_id]) {
-                      const shift = shifts.find((s) => s.id === a.shift_id)
-                      shiftGroups[a.shift_id] = { ...a, shift }
-                    }
-                  })
-
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => {
-                        setDetailDate(cell.dateStr)
-                        setShowDetailModal(true)
-                        setEmployeeSearch('')
-                      }}
-                      className={`min-h-[90px] border rounded-lg p-2 transition-all flex flex-col justify-between cursor-pointer ${
-                        cell.isCurrentMonth
-                          ? 'bg-background hover:bg-slate-50 hover:shadow border-slate-100 hover:border-slate-300'
-                          : 'bg-slate-50/40 opacity-40 border-slate-100/50 cursor-default'
-                      }`}
-                    >
-                      <span className={`text-xs font-semibold self-end ${
-                        cell.isCurrentMonth ? 'text-foreground' : 'text-muted-foreground'
-                      }`}>
-                        {cell.day}
-                      </span>
-                      <div className="flex flex-col gap-1 mt-1">
-                        {selectedEmployeeId ? (
-                          (() => {
-                            const a = getShiftForDate(selectedEmployeeId, cell.dateStr)
-                            const shift = a ? shifts.find((s) => s.id === a.shift_id) : null
-                            return shift ? (
-                              <div className="flex flex-col gap-0.5 min-w-0">
-                                <div className="flex items-center gap-1 min-w-0">
-                                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: shift.color_code || '#6366f1' }} />
-                                  <span className="text-[10px] font-medium truncate">{shift.name}</span>
-                                </div>
-                                <span className="text-[9px] text-muted-foreground font-mono leading-tight pl-3">
-                                  {shift.start_time}–{shift.end_time}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-gray-300 text-xs">—</span>
-                            )
-                          })()
-                        ) : (
-                          Object.values(shiftGroups).length > 0 ? (
-                            Object.values(shiftGroups).slice(0, 3).map((sg) => (
-                              <div key={sg.shift_id} className="flex items-center gap-1">
-                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: sg.shift?.color_code || '#6366f1' }} />
-                                <span className="text-[10px] truncate">{sg.shift?.name}</span>
-                                <span className="text-[9px] text-muted-foreground ml-auto">
-                                  {dayAssignments.filter((a) => a.shift_id === sg.shift_id).length}
-                                </span>
-                              </div>
-                            ))
-                          ) : (
-                            cell.isCurrentMonth && <span className="text-gray-300 text-xs">—</span>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Detail Modal - Assign Shifts */}
-          <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-            <DialogContent className="sm:max-w-[550px]">
-              <DialogHeader>
-                <DialogTitle>
-                  Assign Shifts for {detailDate}
-                  {detailDate && (
-                    <span className="text-sm font-normal text-muted-foreground ml-2">
-                      ({['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(detailDate + 'T00:00:00').getDay()]})
-                    </span>
-                  )}
-                </DialogTitle>
-              </DialogHeader>
-              {detailDate && employees.length > 0 && (
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={employeeSearch}
-                    onChange={(e) => setEmployeeSearch(e.target.value)}
-                    placeholder="Search employee name..."
-                    className="pl-8 h-9"
-                  />
-                </div>
-              )}
-              <div className="space-y-2 max-h-[420px] overflow-y-auto">
-                {!detailDate ? (
-                  <p className="text-muted-foreground">No date selected.</p>
-                ) : employees.length === 0 ? (
-                  <p className="text-muted-foreground">No employees found.</p>
-                ) : filteredEmployees.length === 0 ? (
-                  <p className="text-muted-foreground">No employees match "{employeeSearch}".</p>
-                ) : (
-                  (() => {
-                    return filteredEmployees.map((emp) => {
-                      const empId = employeeId(emp)
-                      const existingAssignment = assignments.find(
-                        (a) => a.employee_id === empId && a.shift_date === detailDate
-                      )
-                      return (
-                        <div key={empId} className="flex items-center gap-3 p-2 border rounded-md">
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">{emp.full_name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {emp.employee_details?.employee_code || ''}
-                            </div>
-                          </div>
-                          <div className="w-44">
-                            <SearchableSelect
-                              options={shifts.filter((s) => s.is_active !== false).map((s) => ({
-                                value: s.id,
-                                label: `${s.name} (${s.start_time}–${s.end_time})`,
-                              }))}
-                              value={existingAssignment?.shift_id || ''}
-                              onChange={(shiftId) => {
-                                if (shiftId) {
-                                  assignMutation.mutate({
-                                    employeeId: empId,
-                                    shiftId,
-                                    shiftDate: detailDate,
-                                  })
-                                }
-                              }}
-                              placeholder="Select shift"
-                              triggerClassName="h-9 text-xs"
-                            />
-                          </div>
-                          {existingAssignment && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeAssignmentMutation.mutate(existingAssignment.id)}
-                              className="h-8 w-8 p-0 text-red-400 hover:text-red-600 flex-shrink-0"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      )
-                    })
-                  })()
-                )}
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => navigate(`/shifts/assignments/${detailDate}`)}>
-                  View Assignments
-                </Button>
-                <Button variant="outline" onClick={() => setShowDetailModal(false)}>Close</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+        <TabsContent value="schedule" className="space-y-4">
+          {isOwnerDev && (
+            <div className="max-w-xs">
+              <Label className="mb-1 block text-xs">Branch</Label>
+              <SearchableSelect
+                options={branches.map((b) => ({ value: b.branch_id, label: b.name }))}
+                value={selectedBranchId}
+                onChange={setSelectedBranchId}
+                placeholder="All branches"
+              />
+            </div>
+          )}
+          <RosterGrid branchId={effectiveBranchId} />
         </TabsContent>
       </Tabs>
 

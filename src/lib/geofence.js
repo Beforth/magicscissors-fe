@@ -22,33 +22,32 @@ export function nearestFence(position, geofences) {
   return best
 }
 
-/** Decides whether the punch button is enabled, and why not. */
+/** Decides whether the punch button is enabled, and why not. The server re-checks everything. */
 export function getPunchGate({ geo, config, busy }) {
   if (busy) return { allowed: false, reason: 'Submitting…', nearest: null }
   if (!config) return { allowed: false, reason: 'Loading…', nearest: null }
+  if (!config.geofences?.length) {
+    return { allowed: false, reason: 'No geofence is set up for your branch. Ask the owner to add one.', nearest: null }
+  }
+  if (!geo?.position) {
+    const reason = geo?.status === 'denied'
+      ? 'Location permission is blocked. Allow location in your browser to punch.'
+      : 'Getting your location…'
+    return { allowed: false, reason, nearest: null }
+  }
 
-  const fallbackFence = config.geofences?.[0] || null
-
-  // If geolocation position is available
-  if (geo?.position) {
-    const nearest = config.geofences?.length ? nearestFence(geo.position, config.geofences) : fallbackFence
-    const isLowAccuracy = config.max_accuracy_m && geo.position.accuracy > config.max_accuracy_m
-    const isOutside = nearest && !nearest.within
-
-    let reason = null
-    if (isLowAccuracy) {
-      reason = `GPS accuracy ±${Math.round(geo.position.accuracy)}m`
-    } else if (isOutside && nearest) {
-      reason = `Near ${nearest.name} (±${Math.round(geo.position.accuracy)}m)`
+  const nearest = nearestFence(geo.position, config.geofences)
+  const accuracy = Math.round(geo.position.accuracy)
+  if (config.max_accuracy_m && geo.position.accuracy > config.max_accuracy_m) {
+    const shown = accuracy >= 1000 ? `${(accuracy / 1000).toFixed(1)} km` : `${accuracy} m`
+    return {
+      allowed: false,
+      reason: `GPS signal too weak (±${shown}, need ≤ ${config.max_accuracy_m} m). Use your phone outdoors.`,
+      nearest,
     }
-
-    return { allowed: true, reason, nearest }
   }
-
-  // Fallback if browser GPS is unavailable/denied or loading: allow punch with branch location
-  return {
-    allowed: true,
-    reason: geo.status === 'denied' ? 'Using branch location (GPS denied)' : null,
-    nearest: fallbackFence,
+  if (!nearest.within) {
+    return { allowed: false, reason: `You are ${nearest.distanceM} m from ${nearest.name} (allowed ${nearest.radius_m} m)`, nearest }
   }
+  return { allowed: true, reason: null, nearest }
 }

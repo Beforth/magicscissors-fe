@@ -203,8 +203,8 @@ export function SearchableSelect({
         className={cn(
           compact
             ? 'flex h-6 w-full items-center justify-between rounded border border-input bg-background px-1 py-0 text-[11px] ring-offset-background'
-            : 'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background',
-          'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+            : 'flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm',
+          'outline-none focus:border-ring focus:ring-[3px] focus:ring-ring/15',
           'disabled:cursor-not-allowed disabled:opacity-50',
           !selectedOption && 'text-muted-foreground',
           triggerClassName
