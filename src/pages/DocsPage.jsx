@@ -115,33 +115,20 @@ export default function DocsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="glass-panel rounded-3xl p-6 sm:p-7 relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center rounded-full bg-white/80 backdrop-blur-md px-3 py-1 mb-2.5 ring-1 ring-white/80 shadow-2xs">
-              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                Knowledge Base & Help
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
-              Docs & Guides
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-              Tutorials and documentation on how to use the Magic Scissor system
-            </p>
-          </div>
-
-          {isOwner && (
-            <Button
-              onClick={openCreate}
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-md shadow-blue-500/20 font-bold self-start sm:self-center"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Doc
-            </Button>
-          )}
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Docs & Guides</h1>
+          <p className="text-gray-500">
+            Tutorials and documentation on how to use the Magic Scissor system
+          </p>
         </div>
+        {isOwner && (
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Doc
+          </Button>
+        )}
       </div>
 
       {isLoading ? (

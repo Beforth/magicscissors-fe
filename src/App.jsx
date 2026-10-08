@@ -111,7 +111,7 @@ function App() {
         {/* Main pages */}
         <Route path="customers" element={<CustomersPage />} />
         <Route path="customers/:id" element={<CustomerDetailPage />} />
-        <Route path="chairs" element={<ChairManagementPage />} />
+        <Route path="chairs" element={<Navigate to="/" replace />} />
         <Route path="bills" element={<BillsPage />} />
         <Route path="bills/new" element={<BillCreatePage />} />
         <Route path="bills/:id" element={<BillDetailPage />} />

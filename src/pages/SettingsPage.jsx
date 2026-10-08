@@ -79,15 +79,6 @@ function SetupChecklist({ status, navigate, setActiveTab }) {
     // Recommended
     {
       section: 'Recommended',
-      key: 'chairs',
-      label: 'Chairs',
-      done: (status.chairs?.count || 0) > 0,
-      doneText: `${status.chairs?.count || 0} chair${(status.chairs?.count || 0) !== 1 ? 's' : ''} set up`,
-      pendingText: 'No chairs configured',
-      link: () => navigate('/chairs'),
-    },
-    {
-      section: 'Recommended',
       key: 'business_info',
       label: 'Business Info',
       done: !!status.business_info_complete,

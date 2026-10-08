@@ -101,33 +101,20 @@ export default function MaintenancePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="glass-panel rounded-3xl p-6 sm:p-7 relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center rounded-full bg-white/80 backdrop-blur-md px-3 py-1 mb-2.5 ring-1 ring-white/80 shadow-2xs">
-              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                Equipment & Facilities
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
-              Maintenance Tracker
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-              Track salon equipment, chairs, and machines sent for servicing or repair
-            </p>
-          </div>
-
-          {canManage && (
-            <Button
-              onClick={() => { setEditRecord(null); setModalOpen(true) }}
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-md shadow-blue-500/20 font-bold self-start sm:self-center"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Record
-            </Button>
-          )}
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Maintenance Tracker</h1>
+          <p className="text-gray-500">
+            Track salon equipment, chairs, and machines sent for servicing or repair
+          </p>
         </div>
+        {canManage && (
+          <Button onClick={() => { setEditRecord(null); setModalOpen(true) }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Record
+          </Button>
+        )}
       </div>
 
       {/* Filters Card */}
