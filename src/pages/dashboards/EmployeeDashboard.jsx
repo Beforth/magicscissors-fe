@@ -34,6 +34,7 @@ import { getPunchGate } from '@/lib/geofence'
 import { formatWorkedHours } from '@/lib/utils'
 import SelfieCapture from '@/components/attendance/SelfieCapture'
 import DayVerdict from '@/components/attendance/DayVerdict'
+import PresenceCodeField from '@/components/attendance/PresenceCodeField'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -161,6 +162,7 @@ function PunchPanel({ config, isLoadingConfig }) {
   const geo = useGeolocation()
   const [selfieOpen, setSelfieOpen] = useState(false)
   const [locationOpen, setLocationOpen] = useState(false)
+  const [presenceCode, setPresenceCode] = useState('')
   const inFlight = useRef(false)
 
   const mutation = useMutation({
@@ -168,11 +170,13 @@ function PunchPanel({ config, isLoadingConfig }) {
     onSettled: () => { inFlight.current = false },
     onSuccess: () => {
       toast.success('Attendance recorded')
+      setPresenceCode('')
       queryClient.invalidateQueries({ queryKey: ['self-config'] })
       queryClient.invalidateQueries({ queryKey: ['attendance-monthly-self'] })
     },
     onError: (err) => {
       toast.error(err.response?.data?.error?.message || 'Punch failed')
+      if (String(err.response?.data?.error?.code || '').startsWith('PRESENCE_CODE')) setPresenceCode('')
       queryClient.invalidateQueries({ queryKey: ['self-config'] })
     },
   })
@@ -188,7 +192,10 @@ function PunchPanel({ config, isLoadingConfig }) {
   const today = config.today || {}
   const status = today.current_status || 'not_arrived'
   const isOnFloor = status === 'on_floor'
-  const canPunch = status === 'not_arrived' || status === 'on_floor'
+  // After checking out an employee may come back (split shift); the time away is an unpaid break.
+  const canPunch = status === 'not_arrived' || status === 'on_floor' || status === 'checked_out'
+  const needsCode = Boolean(config.require_presence_code)
+  const codeReady = !needsCode || presenceCode.length === 6
   const punchType = isOnFloor ? 'out' : 'in'
   const gate = getPunchGate({ geo, config, busy: mutation.isPending })
   const worked = formatWorkedHours(today.working_hours)
@@ -198,9 +205,7 @@ function PunchPanel({ config, isLoadingConfig }) {
   const submit = (selfieBlob) => {
     if (inFlight.current) return
     const latest = getPunchGate({ geo, config, busy: false })
-    const pos = geo.position || (config.geofences?.[0]
-      ? { latitude: config.geofences[0].latitude, longitude: config.geofences[0].longitude, accuracy: 25 }
-      : { latitude: 0, longitude: 0, accuracy: 50 })
+    const pos = geo.position
     if (!latest.allowed || !pos) {
       toast.error(latest.reason || 'Cannot get your location')
       return
@@ -211,21 +216,22 @@ function PunchPanel({ config, isLoadingConfig }) {
     fd.append('latitude', String(pos.latitude))
     fd.append('longitude', String(pos.longitude))
     fd.append('accuracy', String(pos.accuracy))
+    if (needsCode) fd.append('presence_code', presenceCode)
     if (selfieBlob) fd.append('selfie', selfieBlob, 'selfie.jpg')
     mutation.mutate(fd)
   }
 
   const handlePunch = () => {
-    if (!gate.allowed) return
+    if (!gate.allowed || !codeReady) return
     if (config.require_selfie) setSelfieOpen(true)
     else submit(null)
   }
 
-  const statusLabel = isOnFloor ? 'You are checked in' : status === 'checked_out' ? "You've checked out for today" : (STATUS_META[status]?.label || 'Not checked in')
+  const statusLabel = isOnFloor ? 'You are checked in' : status === 'checked_out' ? "You've checked out" : (STATUS_META[status]?.label || 'Not checked in')
   const statusHint = isOnFloor
     ? `Clocked in and active on floor${checkIn !== '—' ? ` since ${checkIn}` : ''}.`
     : status === 'checked_out'
-      ? 'Shift completed for today. See you tomorrow.'
+      ? 'Back for another part of the day? Check back in; the time away is not paid.'
       : status === 'not_arrived'
         ? 'Ready to start your shift. Punch in to mark your attendance.'
         : STATUS_META[status]?.label
@@ -259,16 +265,18 @@ function PunchPanel({ config, isLoadingConfig }) {
             {canPunch && (
               <Button
                 onClick={handlePunch}
-                disabled={!gate.allowed}
+                disabled={!gate.allowed || !codeReady}
                 loading={mutation.isPending}
                 variant={isOnFloor ? 'default' : 'success'}
                 className="h-12 w-full shrink-0 px-5 text-base font-semibold sm:h-11 sm:w-auto sm:text-sm"
               >
                 {!mutation.isPending && (isOnFloor ? <LogOut className="h-5 w-5" /> : <LogIn className="h-5 w-5" />)}
-                {isOnFloor ? 'Punch Out' : 'Punch In'}
+                {isOnFloor ? 'Punch Out' : status === 'checked_out' ? 'Check back in' : 'Punch In'}
               </Button>
             )}
           </div>
+
+          {canPunch && <PresenceCodeField required={needsCode} value={presenceCode} onChange={setPresenceCode} disabled={mutation.isPending} />}
 
           <button
             type="button"

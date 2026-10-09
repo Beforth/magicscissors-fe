@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { geofenceService } from '@/services/geofence.service'
@@ -24,7 +24,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { MapPin, Plus, Pencil, Trash2, Loader2, LocateFixed } from 'lucide-react'
+import { MapPin, Plus, Pencil, Trash2, Loader2, LocateFixed, MonitorSmartphone } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 const EMPTY_FORM = { name: '', latitude: '', longitude: '', radius_m: '100', is_active: true }
 
@@ -50,6 +51,10 @@ export default function GeofencePanel() {
   })
   const geofences = Array.isArray(data?.data?.geofences) ? data.data.geofences : []
   const requireSelfie = !!data?.data?.require_selfie
+  const requirePresence = !!data?.data?.require_presence_code
+  const serverAccuracy = data?.data?.max_accuracy_m ?? 50
+  const [accuracyDraft, setAccuracyDraft] = useState('50')
+  useEffect(() => { setAccuracyDraft(String(serverAccuracy)) }, [serverAccuracy])
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['geofences'] })
   const onError = (fallback) => (err) =>
@@ -195,6 +200,60 @@ export default function GeofencePanel() {
               />
             </div>
           </label>
+
+          <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg gap-4">
+            <div>
+              <p className="font-medium">Require the code shown at the counter</p>
+              <p className="text-sm text-gray-500">
+                GPS can be faked from a phone. With this on, staff must also type a 6-digit code that changes every
+                30 seconds and is shown only on the salon&apos;s own screen. Open the{' '}
+                <Link to="/kiosk" className="text-primary underline">counter screen</Link> on a tablet or the
+                cashier&apos;s PC. <b>Recommended.</b>
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-sm font-medium">{requirePresence ? 'ON' : 'OFF'}</span>
+              <input
+                type="checkbox"
+                className="h-5 w-5 rounded"
+                checked={requirePresence}
+                disabled={!branchId || settingsMutation.isPending}
+                onChange={(e) => settingsMutation.mutate({ require_presence_code: e.target.checked })}
+              />
+            </div>
+          </label>
+
+          <div className="p-4 bg-gray-50 rounded-lg space-y-2">
+            <Label htmlFor="max-accuracy" className="font-medium">GPS accuracy needed to punch (metres)</Label>
+            <p className="text-sm text-gray-500">
+              A phone must report its position to within this many metres. Indoors GPS is often 30-100 m off, so if
+              staff are blocked inside the salon raise this (50 is the default; 10-500 allowed).
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                id="max-accuracy"
+                type="number"
+                min="10"
+                max="500"
+                step="5"
+                className="w-28"
+                value={accuracyDraft}
+                onChange={(e) => setAccuracyDraft(e.target.value)}
+              />
+              <Button
+                type="button"
+                size="sm"
+                disabled={settingsMutation.isPending || Number(accuracyDraft) === serverAccuracy}
+                onClick={() => {
+                  const n = Number(accuracyDraft)
+                  if (!Number.isInteger(n) || n < 10 || n > 500) return toast.error('Enter a whole number from 10 to 500')
+                  settingsMutation.mutate({ max_accuracy_m: n })
+                }}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

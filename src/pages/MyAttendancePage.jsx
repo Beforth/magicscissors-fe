@@ -9,6 +9,7 @@ import { useGeolocation } from '@/hooks/useGeolocation'
 import { getPunchGate } from '@/lib/geofence'
 import SelfieCapture from '@/components/attendance/SelfieCapture'
 import DayVerdict from '@/components/attendance/DayVerdict'
+import PresenceCodeField from '@/components/attendance/PresenceCodeField'
 import { formatDeduction, summarizeMonth } from '@/lib/attendanceDay'
 import { formatWorkedHours } from '@/lib/utils'
 
@@ -73,6 +74,7 @@ export default function MyAttendancePage() {
   const [installEvent, setInstallEvent] = useState(null)
   const [selectedMonth, setSelectedMonth] = useState(() => getShopDate().slice(0, 7))
   const [selectedDate, setSelectedDate] = useState(getShopDate)
+  const [presenceCode, setPresenceCode] = useState('')
   const inFlight = useRef(false)
 
   const { data, isLoading, isError } = useQuery({
@@ -117,11 +119,13 @@ export default function MyAttendancePage() {
     },
     onSuccess: () => {
       toast.success('Attendance recorded')
+      setPresenceCode('')
       queryClient.invalidateQueries({ queryKey: ['self-config'] })
       queryClient.invalidateQueries({ queryKey: ['attendance-monthly-self'] })
     },
     onError: (err) => {
       toast.error(err.response?.data?.error?.message || 'Punch failed')
+      if (String(err.response?.data?.error?.code || '').startsWith('PRESENCE_CODE')) setPresenceCode('')
       queryClient.invalidateQueries({ queryKey: ['self-config'] })
     },
   })
@@ -138,15 +142,15 @@ export default function MyAttendancePage() {
   const gate = getPunchGate({ geo, config, busy: mutation.isPending })
   const status = config?.today?.current_status || 'not_arrived'
   const isOut = status === 'on_floor'
-  const canPunchState = status === 'not_arrived' || status === 'on_floor'
+  const canPunchState = status === 'not_arrived' || status === 'on_floor' || status === 'checked_out'
+  const needsCode = Boolean(config?.require_presence_code)
+  const codeReady = !needsCode || presenceCode.length === 6
   const punchType = isOut ? 'out' : 'in'
 
   const submit = (selfieBlob) => {
     if (inFlight.current) return
     const latest = getPunchGate({ geo, config, busy: false })
-    const pos = geo.position || (config.geofences?.[0]
-      ? { latitude: config.geofences[0].latitude, longitude: config.geofences[0].longitude, accuracy: 25 }
-      : { latitude: 0, longitude: 0, accuracy: 50 })
+    const pos = geo.position
     if (!latest.allowed || !pos) {
       toast.error(latest.reason || 'Cannot get your location')
       return
@@ -157,12 +161,13 @@ export default function MyAttendancePage() {
     fd.append('latitude', String(pos.latitude))
     fd.append('longitude', String(pos.longitude))
     fd.append('accuracy', String(pos.accuracy))
+    if (needsCode) fd.append('presence_code', presenceCode)
     if (selfieBlob) fd.append('selfie', selfieBlob, 'selfie.jpg')
     mutation.mutate(fd)
   }
 
   const handlePunch = () => {
-    if (!gate.allowed) return
+    if (!gate.allowed || !codeReady) return
     if (config.require_selfie) setSelfieOpen(true)
     else submit(null)
   }
@@ -264,9 +269,10 @@ export default function MyAttendancePage() {
 
             {/* Punch Action Button */}
             <div className="pt-1 space-y-2.5">
+              {canPunchState && <PresenceCodeField required={needsCode} value={presenceCode} onChange={setPresenceCode} disabled={mutation.isPending} />}
               <Button
                 size="lg"
-                disabled={!gate.allowed || !canPunchState}
+                disabled={!gate.allowed || !canPunchState || !codeReady}
                 onClick={handlePunch}
                 className={`h-13 w-full rounded-2xl text-base font-bold tracking-wide shadow-md transition-all active:scale-[0.98] ${
                   isOut
@@ -277,7 +283,7 @@ export default function MyAttendancePage() {
                 {mutation.isPending ? (
                   <Loader2 className="h-5 w-5 animate-spin mr-2" />
                 ) : null}
-                {isOut ? 'Punch Out' : 'Punch In'}
+                {isOut ? 'Punch Out' : status === 'checked_out' ? 'Check back in' : 'Punch In'}
               </Button>
 
               {gate.reason && (
@@ -288,9 +294,7 @@ export default function MyAttendancePage() {
                 <p className="text-center text-xs font-medium text-slate-500">
                   {status === 'on_break'
                     ? 'Finish your break before checking out'
-                    : status === 'checked_out'
-                      ? 'You have checked out for today'
-                      : 'You are on leave today'}
+                    : 'You are on leave today'}
                 </p>
               )}
 

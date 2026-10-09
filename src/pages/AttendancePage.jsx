@@ -19,6 +19,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import MonthReport from '@/components/attendance/MonthReport'
 import { Kbd } from '@/components/ui/kbd'
+import { Link } from 'react-router-dom'
 import { formatDeduction, formatLate as formatLateMin } from '@/lib/attendanceDay'
 import PunchMeta from '@/components/attendance/PunchMeta'
 import { attendanceService } from '@/services/attendance.service'
@@ -198,16 +199,18 @@ export default function AttendancePage() {
   }, [roster?.employees, rosterSearch])
 
   const statusCounts = useMemo(() => {
-    const counts = { all: searchedRosterEmployees.length, not_arrived: 0, on_floor: 0, on_break: 0, checked_out: 0, on_leave: 0, late: 0 }
+    const counts = { all: searchedRosterEmployees.length, not_arrived: 0, on_floor: 0, on_break: 0, checked_out: 0, on_leave: 0, late: 0, missing: 0 }
     searchedRosterEmployees.forEach((e) => {
       counts[e.current_status] = (counts[e.current_status] || 0) + 1
       if (Number(e.late_penalty_hours) > 0 || Number(e.late_penalty_amount) > 0) counts.late += 1
+      if (e.missing_checkout) counts.missing += 1
     })
     return counts
   }, [searchedRosterEmployees])
 
   const filteredRosterEmployees = useMemo(() => {
     if (statusFilter === 'all') return searchedRosterEmployees
+    if (statusFilter === 'missing') return searchedRosterEmployees.filter((e) => e.missing_checkout)
     if (statusFilter === 'late') return searchedRosterEmployees.filter((e) => Number(e.late_penalty_hours) > 0 || Number(e.late_penalty_amount) > 0)
     return searchedRosterEmployees.filter((e) => e.current_status === statusFilter)
   }, [searchedRosterEmployees, statusFilter])
@@ -316,10 +319,8 @@ export default function AttendancePage() {
     else breakEndMutation.mutate(payload)
   }
 
-  const getLocalDatetimeString = (date = new Date()) => {
-    const tzOffset = date.getTimezoneOffset() * 60000;
-    return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16)
-  }
+  // "Now" as IST wall-clock for a datetime-local input. India has no daylight saving, so a fixed +05:30 is exact.
+  const getLocalDatetimeString = () => new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 16)
 
   /** Shop date YYYY-MM-DD without UTC day-shift. */
   const getShopDateStr = () => {
@@ -368,8 +369,9 @@ export default function AttendancePage() {
   const submitPunch = () => {
     if (!punchModal) return
     const { employee, type } = punchModal
-    const dateObj = new Date(punchDateTime)
-    if (isNaN(dateObj.getTime())) {
+    // Send the typed IST wall-clock as-is. Converting through the browser's timezone would shift it on any device
+    // that is not set to Indian time.
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(punchDateTime)) {
       toast.error('Invalid date and time selected')
       return
     }
@@ -379,7 +381,7 @@ export default function AttendancePage() {
         ? { employee_code: employee.employee_code }
         : { employee_id: employee.id }),
       machine_no: defaultMachineNo,
-      punch_time: dateObj.toISOString(),
+      punch_time: punchDateTime.length === 16 ? `${punchDateTime}:00` : punchDateTime,
       punch_type: type,
       source: 'manual',
       reason: punchReason || (type === 'in' ? 'Manual check-in (cashier)' : 'Manual check-out (cashier)'),
@@ -557,11 +559,17 @@ export default function AttendancePage() {
   }
 
   const lateCell = (emp) => {
-    if (emp.shift && emp.check_in) {
+    if ((emp.shift || emp.penalty_rule === 'legacy') && emp.check_in) {
       const pen = Number(emp.late_penalty_hours) || 0
       const fine = Number(emp.late_penalty_amount) || 0
       if (pen > 0 || fine > 0) {
-        return <span className="font-medium text-destructive">{formatLateMin(emp.late_minutes)} late<span className="block text-[11px]">−{formatDeduction(pen, fine)} pay</span></span>
+        return (
+          <span className="font-medium text-destructive">
+            {formatLateMin(emp.late_minutes)} late
+            <span className="block text-[11px]">−{formatDeduction(pen, fine)} pay</span>
+            {emp.penalty_rule === 'legacy' && <span className="block text-[10px] font-normal text-muted-foreground">standard rule (no shift assigned)</span>}
+          </span>
+        )
       }
       if (emp.late_minutes > 0) return <span className="text-xs text-muted-foreground">{formatLateMin(emp.late_minutes)} (grace)</span>
       return <span className="text-xs text-success">On time</span>
@@ -598,6 +606,12 @@ export default function AttendancePage() {
             {activeTab === 'today' && roster?.shop_date ? `Shop date ${new Date(roster.shop_date).toLocaleDateString('en-CA')}` : 'Track shifts, floor status, and calendars'}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        {canAct && (
+          <Button asChild variant="outline" size="sm">
+            <Link to="/kiosk">Counter code</Link>
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -607,6 +621,7 @@ export default function AttendancePage() {
           <RefreshCw className={`h-4 w-4 mr-2 ${isFetching || monthlyLoading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -651,7 +666,7 @@ export default function AttendancePage() {
                 <div className="flex flex-wrap gap-1.5">
                   {[
                     ['all', 'Everyone'], ['not_arrived', 'Not in'], ['on_floor', 'On floor'], ['on_break', 'On break'],
-                    ['checked_out', 'Done'], ['on_leave', 'Leave'], ['late', 'Late / penalty'],
+                    ['checked_out', 'Done'], ['on_leave', 'Leave'], ['late', 'Late / penalty'], ['missing', 'Missing check-out'],
                   ].map(([key, label]) => (
                     <button
                       key={key}
@@ -744,6 +759,8 @@ export default function AttendancePage() {
                               {emp.employee_code}
                               {emp.shift ? (
                                 <span className="ml-2">{emp.shift.name} {emp.shift.start_time}–{emp.shift.end_time}</span>
+                              ) : emp.penalty_rule === 'legacy' ? (
+                                <span className="ml-2" title="No shift assigned today, so the profile shift and the standard late rule are used">profile shift {emp.shift_start}–{emp.shift_end}</span>
                               ) : (
                                 <span className="ml-2 text-warning">no shift today</span>
                               )}
@@ -753,6 +770,9 @@ export default function AttendancePage() {
                             <Badge variant={meta.badge}>
                               <Icon className="h-3 w-3 mr-1 inline" />{meta.label}
                             </Badge>
+                            {emp.missing_checkout && <Badge variant="warning" className="ml-1">Missing check-out</Badge>}
+                            {emp.auto_checkout && !emp.missing_checkout && <Badge variant="outline" className="ml-1" title="Closed automatically; check the time is right">Auto</Badge>}
+                            {emp.edited && <Badge variant="outline" className="ml-1" title="A manager changed the times by hand">Edited</Badge>}
                           </TableCell>
                           <TableCell className="font-mono text-xs">
                             {formatTimeStored(emp.check_in)}
@@ -1102,7 +1122,7 @@ export default function AttendancePage() {
           <DialogHeader>
             <DialogTitle>Edit Punch Times — {editTimesModal?.full_name}</DialogTitle>
             <p className="text-xs text-muted-foreground pt-1">
-              Update the check-in or check-out times. Clear the check-out field and save to restore the employee back to active "on floor" status.
+              Times are Indian time. Every change is recorded with the old value and who made it. Clear the check-out and save to put the employee back on the floor.
             </p>
           </DialogHeader>
           <div className="space-y-4 pt-2">

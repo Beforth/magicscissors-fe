@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import LoginPage from './pages/LoginPage'
 import LicensePage from './pages/LicensePage'
+import CounterCodePage from './pages/CounterCodePage'
 import MyAttendancePage from './pages/MyAttendancePage'
 import ProfilePage from './pages/ProfilePage'
 import DashboardLayout from './components/layout/DashboardLayout'
@@ -154,6 +155,7 @@ function App() {
         <Route path="jobs" element={<JobsPage />} />
         <Route path="machines" element={<MachinesPage />} />
         <Route path="attendance" element={<AttendancePage />} />
+        <Route path="kiosk" element={<CounterCodePage />} />
         <Route path="my-attendance" element={<MyAttendancePage />} />
         <Route path="skills" element={<SkillsPage />} />
         <Route path="tokens" element={<TokensPage />} />

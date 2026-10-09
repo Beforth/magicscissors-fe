@@ -26,6 +26,7 @@ export default function DayVerdict({ record, className }) {
             Shift: {record.shift.name} · {record.shift.start_time}–{record.shift.end_time}
           </p>
         )}
+        {verdict.note && <p className="mt-1 text-xs text-muted-foreground">{verdict.note}</p>}
       </div>
     </div>
   )
