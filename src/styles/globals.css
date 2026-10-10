@@ -137,3 +137,9 @@
   background: hsl(var(--muted));
   animation: shimmer 1.5s ease-in-out infinite;
 }
+
+/* Grid/flex children default to min-width:auto, so a long value or wide input stretches the whole form past the screen. */
+form .grid > *,
+[role="dialog"] .grid > * {
+  min-width: 0;
+}

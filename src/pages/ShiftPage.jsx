@@ -159,7 +159,7 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
               placeholder="Morning"
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="start_time">Start Time *</Label>
               <Input
@@ -287,7 +287,7 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
               </div>
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold">Half day</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <Label htmlFor="half_day_late_after_min" className="text-xs">Half day if late by more than (min)</Label>
                     <Input
@@ -372,7 +372,7 @@ function ShiftPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Shifts</h1>
           <p className="text-gray-500">Manage shift definitions and employee assignments</p>
@@ -380,7 +380,7 @@ function ShiftPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-80 grid-cols-2">
+        <TabsList className="grid w-full max-w-xs grid-cols-2">
           <TabsTrigger value="shifts" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Shifts

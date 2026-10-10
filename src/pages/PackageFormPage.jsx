@@ -1,18 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { serviceService } from '@/services/service.service'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Plus, Minus, Trash2, Package, Star, Search, Gift } from 'lucide-react'
+import { ArrowLeft, Loader2, Plus, Minus, Trash2, Package, Star, Search, Gift } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCurrency } from '@/lib/utils'
 
@@ -120,9 +115,19 @@ function ServiceSearchDropdown({ services, onSelect, label, placeholder = 'Searc
   )
 }
 
-function PackageModal({ open, onOpenChange, pkg = null }) {
+function PackageFormPage() {
   const queryClient = useQueryClient()
-  const isEditing = !!pkg
+  const navigate = useNavigate()
+  const { id } = useParams()
+  const isEditing = !!id
+  const goBack = () => navigate('/packages')
+
+  const { data: pkgData, isLoading: pkgLoading } = useQuery({
+    queryKey: ['package', id],
+    queryFn: () => serviceService.getPackageById(id),
+    enabled: isEditing,
+  })
+  const pkg = isEditing ? pkgData?.data : null
 
   const [formData, setFormData] = useState(initialFormData)
 
@@ -130,13 +135,11 @@ function PackageModal({ open, onOpenChange, pkg = null }) {
   const { data: servicesData } = useQuery({
     queryKey: ['services', 'active'],
     queryFn: () => serviceService.getServices({ is_active: 'true' }),
-    enabled: open,
   })
 
   const { data: categoriesData } = useQuery({
     queryKey: ['package-categories'],
     queryFn: () => serviceService.getPackageCategories(),
-    enabled: open,
   })
 
   const services = servicesData?.data || []
@@ -195,14 +198,14 @@ function PackageModal({ open, onOpenChange, pkg = null }) {
     } else {
       setFormData(initialFormData)
     }
-  }, [pkg, open])
+  }, [pkg])
 
   const createMutation = useMutation({
     mutationFn: serviceService.createPackage,
     onSuccess: () => {
       toast.success('Package created successfully')
       queryClient.invalidateQueries({ queryKey: ['packages'] })
-      onOpenChange(false)
+      goBack()
     },
     onError: (error) => {
       toast.error(error.response?.data?.error?.message || 'Failed to create package')
@@ -214,7 +217,7 @@ function PackageModal({ open, onOpenChange, pkg = null }) {
     onSuccess: () => {
       toast.success('Package updated successfully')
       queryClient.invalidateQueries({ queryKey: ['packages'] })
-      onOpenChange(false)
+      goBack()
     },
     onError: (error) => {
       toast.error(error.response?.data?.error?.message || 'Failed to update package')
@@ -428,19 +431,36 @@ function PackageModal({ open, onOpenChange, pkg = null }) {
     }
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            {isEditing ? 'Edit Package' : 'Create New Package'}
-          </DialogTitle>
-        </DialogHeader>
+  if (isEditing && pkgLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
+  return (
+    <div className="space-y-6 w-full">
+      <div>
+        <Link to="/packages" className="mb-2 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800">
+          <ArrowLeft className="h-4 w-4" />
+          Back to packages
+        </Link>
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+          <Package className="h-6 w-6" />
+          {isEditing ? 'Edit package' : 'Create package'}
+        </h1>
+        {isEditing && pkg?.package_name && <p className="mt-1 text-gray-500">{pkg.package_name}</p>}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Package details</CardTitle>
+        </CardHeader>
+        <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Package Details */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="package_name">Package Name *</Label>
               <Input
@@ -479,7 +499,7 @@ function PackageModal({ open, onOpenChange, pkg = null }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="validity_days">Validity (Days)</Label>
               <Input
@@ -740,11 +760,11 @@ function PackageModal({ open, onOpenChange, pkg = null }) {
             </Label>
           </div>
 
-          <DialogFooter>
+          <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={goBack}
               disabled={isLoading}
             >
               Cancel
@@ -753,11 +773,12 @@ function PackageModal({ open, onOpenChange, pkg = null }) {
               {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {isEditing ? 'Update Package' : 'Create Package'}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
-export default PackageModal
+export default PackageFormPage

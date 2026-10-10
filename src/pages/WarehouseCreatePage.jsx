@@ -80,7 +80,7 @@ export default function WarehouseCreatePage() {
   const isLoading = createMutation.isPending
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 w-full">
       <div className="flex items-center gap-4">
         <Button type="button" variant="ghost" size="icon" onClick={() => navigate('/warehouses')}>
           <ArrowLeft className="h-5 w-5" />

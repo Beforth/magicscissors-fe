@@ -42,6 +42,7 @@ const GO_KEYS = {
 const NEW_ROUTES = [
   ['/bills', '/bills/new'],
   ['/services', '/services/new'],
+  ['/packages', '/packages/new'],
   ['/products', '/products/new'],
   ['/staff', '/staff/new'],
   ['/branches', '/branches/new'],

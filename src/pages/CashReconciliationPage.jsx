@@ -177,12 +177,12 @@ function CashReconciliationPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Cash Reconciliation</h1>
           <p className="text-gray-500">End of day cash drawer balancing</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={() => setShowDepositModal(true)}>
             <Building className="h-4 w-4 mr-2" />
             Bank Deposit
@@ -529,7 +529,7 @@ function CashReconciliationPage() {
             {/* Denomination Counter */}
             <div>
               <Label className="mb-3 block">Enter denomination counts</Label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {DENOMINATIONS.map((denom) => (
                   <div
                     key={denom.value}

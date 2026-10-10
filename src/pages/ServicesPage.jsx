@@ -67,7 +67,7 @@ function ServicesPage() {
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => setCategoryModalOpen(true)}>
             <FolderPlus className="h-4 w-4 mr-2" />
-            Add Category
+            Manage Categories
           </Button>
           <Button onClick={() => navigate('/services/new')}>
             <Plus className="h-4 w-4 mr-2" />

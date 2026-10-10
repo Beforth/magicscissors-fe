@@ -64,7 +64,7 @@ export default function UpiAccountsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">UPI Accounts</h1>
           <p className="text-sm text-gray-500 mt-1">Manage UPI sound box accounts and view daily collections</p>
@@ -119,9 +119,9 @@ export default function UpiAccountsPage() {
       {/* Daily Collection Report */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle className="text-lg">Daily Collection Report</CardTitle>
-            <div className="flex gap-2 items-end">
+            <div className="flex flex-wrap gap-2 items-end">
               <div>
                 <Label className="text-xs">Date</Label>
                 <Input

@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { billService } from '@/services/bill.service'
 import { branchService } from '@/services/branch.service'
@@ -52,6 +53,7 @@ import {
   ChevronDown,
   X,
   Plus,
+  History,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { printThermalReceipt } from '@/components/ThermalReceipt'
@@ -77,6 +79,11 @@ const paymentIcons = {
 function BillDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user: authUser } = useSelector((state) => state.auth)
+  // Backend: only owner/manager/developer may edit a bill; owner/manager correct served-by on finished services.
+  const canEdit = ['owner', 'manager', 'developer'].includes(authUser?.role)
+  const [changeServedItem, setChangeServedItem] = useState(null)
+  const [changingServed, setChangingServed] = useState(false)
   const [searchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const returnTo = searchParams.get('returnTo')
@@ -120,12 +127,19 @@ function BillDetailPage() {
 
   const bill = data?.data
 
+  const { data: auditData } = useQuery({
+    queryKey: ['bill-audit', id],
+    queryFn: () => billService.getBillAudit(id),
+    enabled: !!id && canEdit,
+  })
+  const auditRows = auditData?.data || []
+
   // Fetch branch employees for reconfigure modal
   const branchId = bill?.branch?.branch_id
   const { data: employeesData } = useQuery({
     queryKey: ['employees', branchId],
     queryFn: () => branchService.getBranchEmployees(branchId),
-    enabled: !!branchId && reconfigModalOpen,
+    enabled: !!branchId,
   })
   const employees = employeesData?.data || []
 
@@ -186,7 +200,12 @@ function BillDetailPage() {
 
   const getDropdownOptions = (item) => {
     const assignedIds = getItemEmployeeIds(item)
-    return availableEmployees.filter(e => !assignedIds.includes(e.employee_id))
+    // Checked-in staff first; everyone else at the branch stays selectable (e.g. nobody has punched in yet).
+    const queueIds = new Set(availableEmployees.map((e) => e.employee_id))
+    const others = employees
+      .filter((e) => !queueIds.has(e.employee_id))
+      .map((e) => ({ ...e, full_name: `${e.full_name} (not in queue)` }))
+    return [...availableEmployees, ...others].filter((e) => !assignedIds.includes(e.employee_id))
   }
 
   const completeItemMutation = useMutation({
@@ -444,12 +463,144 @@ function BillDetailPage() {
     )
   }
 
+  // "Served by" control and status badge, shared by the desktop table and the phone cards.
+  const renderServedBy = (item) => (
+    <>
+                          {item.status === 'completed' && getItemEmployeeIds(item).length > 0 ? (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {(item.employees?.length > 0 ? item.employees : item.employee ? [{ full_name: item.employee.full_name }] : []).map((emp, i) => (
+                                <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium">
+                                  {emp.full_name}
+                                </span>
+                              )) || '-'}
+                {canEdit && (
+                  <button
+                    type="button"
+                    title="Change who served this"
+                    className="text-[11px] text-muted-foreground underline hover:text-foreground"
+                    onClick={() => setChangeServedItem(item)}
+                  >
+                    Change
+                  </button>
+                )}
+                            </div>
+                          ) : (item.employees?.length > 0 || item.employee?.employee_id) ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1 flex-wrap flex-1 min-w-0">
+                              {(item.employees?.length > 0 ? item.employees : item.employee?.employee_id ? [{ employee_id: item.employee.employee_id, full_name: item.employee.full_name }] : []).map((emp) => (
+                                <span key={emp.employee_id} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${emp.completed_at ? 'bg-green-100 text-green-800' : 'bg-primary text-primary-foreground'}`}>
+                                  {emp.full_name}
+                                  {!emp.completed_at && (
+                                    <button
+                                      type="button"
+                                      className="hover:text-primary-foreground/70"
+                                      onClick={() => unassignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: emp.employee_id })}
+                                      disabled={unassignEmployeeMutation.isPending}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </span>
+                              ))}
+                              </div>
+                              {getDropdownOptions(item).length > 0 && (
+                              <SearchableSelect
+                                key={`${item.item_id}-${selectResetKey}`}
+                                options={getDropdownOptions(item).map(emp => ({ value: emp.employee_id, label: emp.full_name }))}
+                                value=""
+                                onChange={(empId) => {
+                                  setAssigningItemId(item.item_id)
+                                  assignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: empId })
+                                }}
+                                disabled={assigningItemId === item.item_id}
+                                placeholder="Select employee"
+                                triggerClassName="h-7 w-auto min-w-[120px] px-2 gap-1"
+                              />
+                              )}
+                              {getDropdownOptions(item).length === 0 && (
+                                <span className="text-[11px] text-muted-foreground" title="Add staff under Staff → Add employee">
+                                  No other employee at this branch
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  setAssigningItemId(item.item_id)
+                                  assignEmployeeMutation.mutate({ itemId: item.item_id })
+                                }}
+                                disabled={assigningItemId === item.item_id}
+                              >
+                                {assigningItemId === item.item_id
+                                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                                  : 'From Queue'}
+                              </Button>
+                              <SearchableSelect
+                                key={selectResetKey}
+                                options={getDropdownOptions(item).map(emp => ({ value: emp.employee_id, label: emp.full_name }))}
+                                onChange={(empId) => {
+                                  setAssigningItemId(item.item_id)
+                                  assignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: empId })
+                                }}
+                                disabled={assigningItemId === item.item_id}
+                                placeholder="Select employee"
+                                triggerClassName="h-7 w-auto min-w-[160px] px-2 gap-1"
+                              />
+                            </div>
+                          )}
+                        
+    </>
+  )
+
+  const renderStatus = (item) => (
+    <>
+                          <div className="flex items-center justify-center gap-1">
+                            {(() => {
+                              const itemEmployeeCount = getItemEmployeeIds(item).length
+                              const showStarted = itemEmployeeCount > 0 && (item.status === 'in_progress' || item.status === 'pending')
+                              return showStarted ? (
+                                <Badge
+                                  variant="default"
+                                  className={`text-xs capitalize ${completingItemId === item.item_id ? 'opacity-50' : 'cursor-pointer hover:bg-primary/80'}`}
+                                  onClick={() => {
+                                    if (completingItemId) return
+                                    const employeeIds = getItemEmployeeIds(item)
+                                    if (!employeeIds.length) {
+                                      toast.error('No employee assigned to this service')
+                                      return
+                                    }
+                                    setCompletingItemId(item.item_id)
+                                    completeItemMutation.mutate({ itemId: item.item_id, employeeIds })
+                                  }}
+                                >
+                                  {completingItemId === item.item_id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : 'Started'}
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant={itemEmployeeCount > 0 && item.status !== 'pending' ? 'success' : 'warning'}
+                                  className="text-xs capitalize"
+                                >
+                                  {itemEmployeeCount > 0 ? (item.status || 'completed') : item.status === 'completed' ? 'no employee' : 'pending'}
+                                </Badge>
+                              )
+                            })()}
+                          </div>
+                        
+    </>
+  )
+
   const isPending = bill.status === 'pending' || bill.status === 'partial'
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-4">
           <button
             onClick={goBack}
@@ -479,54 +630,70 @@ function BillDetailPage() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex flex-wrap items-center gap-2">
           {isPending && (
-            <>
-              <Button
-                onClick={() => {
-                  setCompleteBillModalOpen(true)
-                }}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <Check className="h-4 w-4 mr-2" />
-                Complete Bill
-              </Button>
-              <Button
-                variant="outline"
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                onClick={() => setCancelConfirmOpen(true)}
-                disabled={deleteBillMutation.isPending}
-              >
-                <XCircle className="h-4 w-4 mr-2" />
-                Cancel Bill
-              </Button>
-            </>
+            <Button onClick={() => setCompleteBillModalOpen(true)} className="bg-green-600 hover:bg-green-700">
+              <Check className="mr-2 h-4 w-4" />
+              Complete bill &amp; collect payment
+            </Button>
           )}
-          <Button variant="outline" onClick={() => printThermalReceipt(bill)} title="Print Receipt">
-            <Printer className="h-4 w-4" />
-          </Button>
-          {bill.status !== 'cancelled' && bill.status !== 'completed' && (
+          {bill.status !== 'cancelled' && canEdit && (
             <Button
               variant="outline"
-              onClick={() => setEditModalOpen(true)}
-              title="Edit"
+              onClick={() => navigate(`/bills/${id}/edit`)}
             >
-              <Pencil className="h-4 w-4" />
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit bill
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => printThermalReceipt(bill)}>
+            <Printer className="mr-2 h-4 w-4" />
+            Print
+          </Button>
+          {isPending && (
+            <Button
+              variant="outline"
+              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+              onClick={() => setCancelConfirmOpen(true)}
+              disabled={deleteBillMutation.isPending}
+            >
+              <XCircle className="mr-2 h-4 w-4" />
+              Cancel bill
             </Button>
           )}
           {bill.status !== 'cancelled' && !isPending && (
             <Button
               variant="outline"
-              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+              className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
               onClick={() => setDeleteConfirmOpen(true)}
               disabled={deleteBillMutation.isPending}
-              title="Delete"
+              title="Delete bill"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
         </div>
       </div>
+
+      {/* At-a-glance money summary */}
+      {(() => {
+        const paid = (bill.payments || []).reduce((n, p) => n + Number(p.amount || 0), 0)
+        const total = Number(bill.total_amount || 0)
+        const due = Math.max(0, total - paid)
+        const tile = (label, value, tone = '') => (
+          <div className="rounded-xl border bg-card p-3 sm:p-4">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+            <p className={`mt-0.5 text-xl font-bold sm:text-2xl ${tone}`}>{value}</p>
+          </div>
+        )
+        return (
+          <div className="no-print grid grid-cols-3 gap-3">
+            {tile('Total', formatCurrency(total))}
+            {tile('Paid', formatCurrency(paid), 'text-green-600')}
+            {tile(bill.status === 'cancelled' ? 'Cancelled' : 'Balance due', formatCurrency(due), due > 0 && bill.status !== 'cancelled' ? 'text-amber-600' : '')}
+          </div>
+        )
+      })()}
 
       {/* Bill Content - This is what gets printed */}
       <div ref={printRef}>
@@ -634,6 +801,7 @@ function BillDetailPage() {
             <CardTitle>Items</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -713,114 +881,8 @@ function BillDetailPage() {
                               <TableCell className="text-right text-sm">
                                 {formatCurrency(item.total_price)}
                               </TableCell>
-                              <TableCell className="text-sm">
-                                {item.status === 'completed' ? (
-                                  <div className="flex items-center gap-1 flex-wrap">
-                                    {(item.employees?.length > 0 ? item.employees : item.employee ? [{ full_name: item.employee.full_name }] : []).map((emp, i) => (
-                                      <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium">
-                                        {emp.full_name}
-                                      </span>
-                                    )) || '-'}
-                                  </div>
-                                ) : (item.employees?.length > 0 || item.employee?.employee_id) ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <div className="flex items-center gap-1 flex-wrap flex-1 min-w-0">
-                                    {(item.employees?.length > 0 ? item.employees : item.employee?.employee_id ? [{ employee_id: item.employee.employee_id, full_name: item.employee.full_name }] : []).map((emp) => (
-                                      <span key={emp.employee_id} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${emp.completed_at ? 'bg-green-100 text-green-800' : 'bg-primary text-primary-foreground'}`}>
-                                        {emp.full_name}
-                                        {!emp.completed_at && (
-                                          <button
-                                            type="button"
-                                            className="hover:text-primary-foreground/70"
-                                            onClick={() => unassignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: emp.employee_id })}
-                                            disabled={unassignEmployeeMutation.isPending}
-                                          >
-                                            <X className="h-3 w-3" />
-                                          </button>
-                                        )}
-                                      </span>
-                                    ))}
-                                    </div>
-                                    {getDropdownOptions(item).length > 0 && (
-                                    <SearchableSelect
-                                      key={`${item.item_id}-${selectResetKey}`}
-                                      options={getDropdownOptions(item).map(emp => ({ value: emp.employee_id, label: emp.full_name }))}
-                                      value=""
-                                      onChange={(empId) => {
-                                        setAssigningItemId(item.item_id)
-                                        assignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: empId })
-                                      }}
-                                      disabled={assigningItemId === item.item_id}
-                                      placeholder="Select employee"
-                                      triggerClassName="h-7 w-auto min-w-[120px] px-2 gap-1"
-                                    />
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-xs"
-                                      onClick={() => {
-                                        setAssigningItemId(item.item_id)
-                                        assignEmployeeMutation.mutate({ itemId: item.item_id })
-                                      }}
-                                      disabled={assigningItemId === item.item_id}
-                                    >
-                                      {assigningItemId === item.item_id
-                                        ? <Loader2 className="h-3 w-3 animate-spin" />
-                                        : 'From Queue'}
-                                    </Button>
-                                    <SearchableSelect
-                                      key={selectResetKey}
-                                      options={getDropdownOptions(item).map(emp => ({ value: emp.employee_id, label: emp.full_name }))}
-                                      onChange={(empId) => {
-                                        setAssigningItemId(item.item_id)
-                                        assignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: empId })
-                                      }}
-                                      disabled={assigningItemId === item.item_id}
-                                      placeholder="Select employee"
-                                      triggerClassName="h-7 w-auto min-w-[160px] px-2 gap-1"
-                                    />
-                                  </div>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <div className="flex items-center justify-center gap-1">
-                                  {(() => {
-                                    const itemEmployeeCount = getItemEmployeeIds(item).length
-                                    const showStarted = itemEmployeeCount > 0 && (item.status === 'in_progress' || item.status === 'pending')
-                                    return showStarted ? (
-                                      <Badge
-                                        variant="default"
-                                        className={`text-xs capitalize ${completingItemId === item.item_id ? 'opacity-50' : 'cursor-pointer hover:bg-primary/80'}`}
-                                        onClick={() => {
-                                          if (completingItemId) return
-                                          const employeeIds = getItemEmployeeIds(item)
-                                          if (!employeeIds.length) {
-                                            toast.error('No employee assigned to this service')
-                                            return
-                                          }
-                                          setCompletingItemId(item.item_id)
-                                          completeItemMutation.mutate({ itemId: item.item_id, employeeIds })
-                                        }}
-                                      >
-                                        {completingItemId === item.item_id ? (
-                                          <Loader2 className="h-3 w-3 animate-spin" />
-                                        ) : 'Started'}
-                                      </Badge>
-                                    ) : (
-                                      <Badge
-                                        variant={itemEmployeeCount > 0 && item.status !== 'pending' ? 'success' : 'warning'}
-                                        className="text-xs capitalize"
-                                      >
-                                        {itemEmployeeCount > 0 ? (item.status || 'completed') : 'pending'}
-                                      </Badge>
-                                    )
-                                  })()}
-                                </div>
-                              </TableCell>
+                              <TableCell className="text-sm">{renderServedBy(item)}</TableCell>
+                              <TableCell className="text-center">{renderStatus(item)}</TableCell>
                             </TableRow>
                           ))}
                         </React.Fragment>
@@ -861,114 +923,8 @@ function BillDetailPage() {
                         <TableCell className="text-right font-medium">
                           {formatCurrency(item.total_price)}
                         </TableCell>
-                        <TableCell className="text-sm">
-                          {item.status === 'completed' ? (
-                            <div className="flex items-center gap-1 flex-wrap">
-                              {(item.employees?.length > 0 ? item.employees : item.employee ? [{ full_name: item.employee.full_name }] : []).map((emp, i) => (
-                                <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-xs font-medium">
-                                  {emp.full_name}
-                                </span>
-                              )) || '-'}
-                            </div>
-                          ) : (item.employees?.length > 0 || item.employee?.employee_id) ? (
-                            <div className="flex items-center gap-1.5">
-                              <div className="flex items-center gap-1 flex-wrap flex-1 min-w-0">
-                              {(item.employees?.length > 0 ? item.employees : item.employee?.employee_id ? [{ employee_id: item.employee.employee_id, full_name: item.employee.full_name }] : []).map((emp) => (
-                                <span key={emp.employee_id} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${emp.completed_at ? 'bg-green-100 text-green-800' : 'bg-primary text-primary-foreground'}`}>
-                                  {emp.full_name}
-                                  {!emp.completed_at && (
-                                    <button
-                                      type="button"
-                                      className="hover:text-primary-foreground/70"
-                                      onClick={() => unassignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: emp.employee_id })}
-                                      disabled={unassignEmployeeMutation.isPending}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </button>
-                                  )}
-                                </span>
-                              ))}
-                              </div>
-                              {getDropdownOptions(item).length > 0 && (
-                              <SearchableSelect
-                                key={`${item.item_id}-${selectResetKey}`}
-                                options={getDropdownOptions(item).map(emp => ({ value: emp.employee_id, label: emp.full_name }))}
-                                value=""
-                                onChange={(empId) => {
-                                  setAssigningItemId(item.item_id)
-                                  assignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: empId })
-                                }}
-                                disabled={assigningItemId === item.item_id}
-                                placeholder="Select employee"
-                                triggerClassName="h-7 w-auto min-w-[120px] px-2 gap-1"
-                              />
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs"
-                                onClick={() => {
-                                  setAssigningItemId(item.item_id)
-                                  assignEmployeeMutation.mutate({ itemId: item.item_id })
-                                }}
-                                disabled={assigningItemId === item.item_id}
-                              >
-                                {assigningItemId === item.item_id
-                                  ? <Loader2 className="h-3 w-3 animate-spin" />
-                                  : 'From Queue'}
-                              </Button>
-                              <SearchableSelect
-                                key={selectResetKey}
-                                options={getDropdownOptions(item).map(emp => ({ value: emp.employee_id, label: emp.full_name }))}
-                                onChange={(empId) => {
-                                  setAssigningItemId(item.item_id)
-                                  assignEmployeeMutation.mutate({ itemId: item.item_id, employeeId: empId })
-                                }}
-                                disabled={assigningItemId === item.item_id}
-                                placeholder="Select employee"
-                                triggerClassName="h-7 w-auto min-w-[160px] px-2 gap-1"
-                              />
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            {(() => {
-                              const itemEmployeeCount = getItemEmployeeIds(item).length
-                              const showStarted = itemEmployeeCount > 0 && (item.status === 'in_progress' || item.status === 'pending')
-                              return showStarted ? (
-                                <Badge
-                                  variant="default"
-                                  className={`text-xs capitalize ${completingItemId === item.item_id ? 'opacity-50' : 'cursor-pointer hover:bg-primary/80'}`}
-                                  onClick={() => {
-                                    if (completingItemId) return
-                                    const employeeIds = getItemEmployeeIds(item)
-                                    if (!employeeIds.length) {
-                                      toast.error('No employee assigned to this service')
-                                      return
-                                    }
-                                    setCompletingItemId(item.item_id)
-                                    completeItemMutation.mutate({ itemId: item.item_id, employeeIds })
-                                  }}
-                                >
-                                  {completingItemId === item.item_id ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : 'Started'}
-                                </Badge>
-                              ) : (
-                                <Badge
-                                  variant={itemEmployeeCount > 0 && item.status !== 'pending' ? 'success' : 'warning'}
-                                  className="text-xs capitalize"
-                                >
-                                  {itemEmployeeCount > 0 ? (item.status || 'completed') : 'pending'}
-                                </Badge>
-                              )
-                            })()}
-                          </div>
-                        </TableCell>
+                        <TableCell className="text-sm">{renderServedBy(item)}</TableCell>
+                              <TableCell className="text-center">{renderStatus(item)}</TableCell>
                       </TableRow>
                     )
                   })
@@ -1023,8 +979,96 @@ function BillDetailPage() {
                 </TableRow>
               </TableFooter>
             </Table>
+            </div>
+
+            {/* Phones: one card per line instead of an 8-column table */}
+            <div className="space-y-3 md:hidden">
+              {groupedBillItems.map((group, gIdx) => {
+                const lineCard = (item, nested) => (
+                  <div key={item.item_id} className={`space-y-2 rounded-lg border p-3 ${nested ? 'bg-background' : 'bg-card'}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium leading-snug">
+                          {item.item_name ?? item.service?.service_name ?? item.package?.package_name ?? item.product?.product_name ?? item.notes ?? 'Item'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.quantity} x {formatCurrency(item.unit_price)}
+                          {item.discount_amount > 0 ? ` - discount ${formatCurrency(item.discount_amount)}` : ''}
+                        </p>
+                      </div>
+                      <span className="shrink-0 font-semibold">{formatCurrency(item.total_price)}</span>
+                    </div>
+                    {item.item_type !== 'product' && (
+                      <div className="space-y-1.5 border-t pt-2">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Served by</p>
+                        <div className="text-sm">{renderServedBy(item)}</div>
+                        <div className="flex">{renderStatus(item)}</div>
+                      </div>
+                    )}
+                  </div>
+                )
+                if (group.type === 'package') {
+                  return (
+                    <div key={`m-pkg-${group.package_instance_id || gIdx}`} className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/40 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2 font-semibold text-blue-900">
+                          <Package className="h-4 w-4" />
+                          {group.package_name}
+                          <Badge variant="outline" className="text-xs">Package</Badge>
+                        </div>
+                        <span className="shrink-0 font-semibold">{formatCurrency(group.total)}</span>
+                      </div>
+                      {group.items.map((item) => lineCard(item, true))}
+                    </div>
+                  )
+                }
+                return lineCard(group.item, false)
+              })}
+              <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3 text-lg font-bold">
+                <span>Total</span>
+                <span className="text-primary">{formatCurrency(bill.total_amount)}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
+
+        {/* Edit history */}
+        {canEdit && auditRows.length > 0 && (
+          <Card className="mt-6 no-print">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <History className="h-4 w-4" />
+                Edit history
+                <Badge variant="secondary">{auditRows.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ol className="space-y-4">
+                {auditRows.map((a) => (
+                  <li key={a.audit_id} className="border-l-2 border-primary/30 pl-4">
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                      <span className="font-medium">{a.by?.full_name || 'Someone'}</span>
+                      <span className="text-xs text-muted-foreground">{formatDateTime(a.at)}</span>
+                      {a.old_total != null && a.new_total != null && a.old_total !== a.new_total && (
+                        <span className="text-xs font-medium">
+                          {formatCurrency(a.old_total)} → {formatCurrency(a.new_total)}
+                        </span>
+                      )}
+                    </div>
+                    {a.reason && <p className="mt-0.5 text-sm italic text-muted-foreground">"{a.reason}"</p>}
+                    {a.changes.length > 0 && (
+                      <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-sm">
+                        {a.changes.map((c, i) => (
+                          <li key={i}>{c}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Bill Items - Print version (packages collapsed) */}
         <Card className="mt-6 hidden print-only" style={{ display: 'none' }}>
@@ -1493,6 +1537,44 @@ function BillDetailPage() {
             >
               {updateBillMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change who served a finished service */}
+      <Dialog open={!!changeServedItem} onOpenChange={(o) => !o && !changingServed && setChangeServedItem(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Change who served this?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            The current employee is removed from this service so you can pick the right one. Staff reports follow the new choice.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangeServedItem(null)} disabled={changingServed}>
+              Cancel
+            </Button>
+            <Button
+              disabled={changingServed}
+              onClick={async () => {
+                setChangingServed(true)
+                try {
+                  for (const empId of getItemEmployeeIds(changeServedItem)) {
+                    await billService.unassignEmployee(id, changeServedItem.item_id, empId)
+                  }
+                  await queryClient.invalidateQueries({ queryKey: ['bill', id] })
+                  setChangeServedItem(null)
+                  toast.success('Pick the new employee in the Served by column')
+                } catch (err) {
+                  toast.error(err.response?.data?.error?.message || 'Could not change the employee')
+                } finally {
+                  setChangingServed(false)
+                }
+              }}
+            >
+              {changingServed && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Remove &amp; choose again
             </Button>
           </DialogFooter>
         </DialogContent>

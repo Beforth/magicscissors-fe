@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { serviceService } from '@/services/service.service'
@@ -13,15 +14,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import PackageModal from '@/components/modals/PackageModal'
 import PackageCategoryModal from '@/components/modals/PackageCategoryModal'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Package, Plus, Loader2, Pencil, Calendar, Tag, Search, FolderPlus, ChevronDown } from 'lucide-react'
 
 function PackagesPage() {
-  const [modalOpen, setModalOpen] = useState(false)
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
-  const [editingPackage, setEditingPackage] = useState(null)
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
 
   const { data, isLoading, error } = useQuery({
@@ -64,25 +63,19 @@ function PackagesPage() {
     }))
   }
 
-  const handleAddPackage = () => {
-    setEditingPackage(null)
-    setModalOpen(true)
-  }
+  const handleAddPackage = () => navigate('/packages/new')
 
-  const handleEditPackage = (pkg) => {
-    setEditingPackage(pkg)
-    setModalOpen(true)
-  }
+  const handleEditPackage = (pkg) => navigate(`/packages/${pkg.package_id}/edit`)
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Packages</h1>
           <p className="text-gray-500">Create and manage service packages</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={() => setCategoryModalOpen(true)}>
             <FolderPlus className="h-4 w-4 mr-2" />
             Manage Categories
@@ -248,11 +241,6 @@ function PackagesPage() {
       )}
 
       {/* Modals */}
-      <PackageModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        pkg={editingPackage}
-      />
       <PackageCategoryModal
         open={categoryModalOpen}
         onOpenChange={setCategoryModalOpen}

@@ -199,7 +199,7 @@ function StaffModal({ open, onOpenChange, staff = null }) {
 
             {/* Basic Info Tab */}
             <TabsContent value="basic" className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="full_name">Full Name *</Label>
                   <Input
@@ -221,7 +221,7 @@ function StaffModal({ open, onOpenChange, staff = null }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email *</Label>
                   <Input
@@ -243,7 +243,7 @@ function StaffModal({ open, onOpenChange, staff = null }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="password">
                     Password {!isEditing && '*'}
@@ -273,7 +273,7 @@ function StaffModal({ open, onOpenChange, staff = null }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="branch_id">Primary Branch *</Label>
                   <select
@@ -341,7 +341,7 @@ function StaffModal({ open, onOpenChange, staff = null }) {
 
             {/* Employment Tab */}
             <TabsContent value="employment" className="space-y-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="employee_code">Employee Code</Label>
                   <Input
@@ -362,7 +362,7 @@ function StaffModal({ open, onOpenChange, staff = null }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="date_of_birth">Date of Birth</Label>
                   <Input
@@ -394,7 +394,7 @@ function StaffModal({ open, onOpenChange, staff = null }) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="aadhar_number">Aadhar Number</Label>
                   <Input
@@ -417,7 +417,7 @@ function StaffModal({ open, onOpenChange, staff = null }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="emergency_contact_name">Emergency Contact Name</Label>
                   <Input
@@ -451,7 +451,7 @@ function StaffModal({ open, onOpenChange, staff = null }) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="bank_account_number">Account Number</Label>
                   <Input

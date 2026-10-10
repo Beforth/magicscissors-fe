@@ -214,10 +214,21 @@ function CompleteBillModal({ open, onOpenChange, bill }) {
                       {isPending && (
                         <Badge variant="warning" className="text-[10px] px-1.5 py-0">Pending</Badge>
                       )}
+                      {!isPending && item.status === 'in_progress' && (
+                        <Badge className="bg-indigo-600 text-[10px] px-1.5 py-0 text-white">Started</Badge>
+                      )}
+                      {!isPending && item.item_type === 'service' && item.status === 'pending' && (
+                        <Badge variant="warning" className="text-[10px] px-1.5 py-0">Pending</Badge>
+                      )}
                     </label>
                   )
                 })}
               </div>
+              {bill.items?.some((i) => i.status === 'in_progress' && !pendingItemIds.includes(i.item_id)) && (
+                <p className="text-xs text-indigo-700 mt-1.5">
+                  Started services stay Started when you collect payment. Finish each one from Employee Status or Pending services when the work is done.
+                </p>
+              )}
               {pendingItemIds.length > 0 && (
                 <p className="text-xs text-amber-600 mt-1.5">
                   {pendingItemIds.length} service{pendingItemIds.length > 1 ? 's' : ''} will remain pending — employee will be assigned when completed later. Full payment is still required.

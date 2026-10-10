@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSelector } from 'react-redux'
 import { billService } from '@/services/bill.service'
@@ -51,13 +51,18 @@ function EmployeeStatusPage() {
   })
   const branches = branchesData?.data || []
 
+  // Owners start on their first branch instead of an empty page asking them to pick one.
+  useEffect(() => {
+    if (isOwner && !selectedBranch && branches.length > 0) setSelectedBranch(branches[0].branch_id)
+  }, [isOwner, selectedBranch, branches])
+
   // Only query when a branch is explicitly selected or user has a fixed branch
   const effectiveBranchId = selectedBranch || user?.branchId || ''
   const { data: statusData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['employee-status', effectiveBranchId],
     queryFn: () => billService.getEmployeeStatus({ branch_id: effectiveBranchId }),
     enabled: !!effectiveBranchId,
-    refetchInterval: 30000,
+    refetchInterval: 10000,
   })
 
   const employees = statusData?.data || []
@@ -194,6 +199,9 @@ function EmployeeStatusPage() {
                       <TableCell>{a.service_name}</TableCell>
                       <TableCell className="text-xs text-muted-foreground font-mono">
                         {a.bill_number}
+                        {a.bill_status && a.bill_status !== 'completed' && (
+                          <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-amber-700"title="The bill is not paid yet; the service can still be completed" >Unpaid</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-center">
                         <StatusBadge

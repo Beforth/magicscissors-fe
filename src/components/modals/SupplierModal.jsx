@@ -67,7 +67,7 @@ export default function SupplierModal({ open, onOpenChange, editSupplier, onSucc
             <Label>Name</Label>
             <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="ABC Cosmetics" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Phone</Label>
               <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="9876543210" />

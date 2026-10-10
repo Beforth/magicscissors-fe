@@ -21,6 +21,10 @@ export const billService = {
 
   getEmployeeStatus: (params) => api.get('/bills/employee-status', { params }),
 
+  getBillAudit: (id) => api.get(`/bills/${id}/audit`),
+
+  reviseBill: (id, data) => api.put(`/bills/${id}/revise`, data),
+
   assignEmployeeFromQueue: (billId, itemId, data = {}) => api.post(`/bills/${billId}/items/${itemId}/assign-employee`, data),
 
   unassignEmployee: (billId, itemId, employeeId) => api.delete(`/bills/${billId}/items/${itemId}/employees/${employeeId}`),

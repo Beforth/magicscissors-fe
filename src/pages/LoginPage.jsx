@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { login, clearError } from '@/store/slices/authSlice'
+import { authService } from '@/services/auth.service'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,6 +35,20 @@ function LoginPage() {
       password: '',
     },
   })
+
+  // A brand-new system has no users yet: send the first visitor to onboarding.
+  useEffect(() => {
+    let cancelled = false
+    authService
+      .setupStatus()
+      .then((res) => {
+        if (!cancelled && res?.data?.needs_setup) navigate('/setup', { replace: true })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [navigate])
 
   const onSubmit = async (data) => {
     dispatch(clearError())

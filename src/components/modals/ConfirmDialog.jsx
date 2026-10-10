@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -11,12 +12,24 @@ export default function ConfirmDialog({
   onConfirm,
   variant = 'default',
   loading = false,
+  autoFocusConfirm = false,
 }) {
   const isDestructive = variant === 'destructive'
+  const confirmRef = useRef(null)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent
+        className="max-w-md"
+        onOpenAutoFocus={
+          autoFocusConfirm
+            ? (e) => {
+                e.preventDefault()
+                confirmRef.current?.focus()
+              }
+            : undefined
+        }
+      >
         <DialogHeader>
           {isDestructive && (
             <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
@@ -31,6 +44,7 @@ export default function ConfirmDialog({
             Cancel
           </Button>
           <Button
+            ref={confirmRef}
             variant={isDestructive ? 'destructive' : 'default'}
             onClick={onConfirm}
             disabled={loading}

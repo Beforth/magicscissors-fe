@@ -292,7 +292,7 @@ function StockTransfersPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Stock Transfers</h1>
           <p className="text-gray-500">
@@ -555,7 +555,7 @@ function StockTransfersPage() {
           )}
 
           <form onSubmit={handleCreateTransfer} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>From (your branch) *</Label>
                 <select

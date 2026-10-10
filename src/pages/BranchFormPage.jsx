@@ -159,7 +159,7 @@ export default function BranchFormPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 w-full">
       <div>
         <Link
           to="/branches"
@@ -182,7 +182,7 @@ export default function BranchFormPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Branch Name *</Label>
                 <Input
@@ -244,7 +244,7 @@ export default function BranchFormPage() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="city">City</Label>
                 <Input
@@ -274,7 +274,7 @@ export default function BranchFormPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
                 <Input
@@ -296,7 +296,7 @@ export default function BranchFormPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="legal_business_name">Legal Business Name</Label>
                 <Input
@@ -318,7 +318,7 @@ export default function BranchFormPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="open_time">Open Time (HH:MM, IST)</Label>
                 <Input

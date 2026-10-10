@@ -185,7 +185,7 @@ export default function ProductFormPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 w-full">
       <div>
         <Link
           to="/products"
@@ -270,7 +270,7 @@ export default function ProductFormPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Pack size (optional)</Label>
                 <Input
@@ -304,7 +304,7 @@ export default function ProductFormPage() {
                   Stock is in pieces. When taken in use, this amount is available for recipes (e.g. 250 ml per bottle).
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-xs">Amount per piece</Label>
                   <Input

@@ -116,7 +116,7 @@ export default function MaintenanceModal({ open, onOpenChange, editRecord }) {
         </DialogHeader>
         <div className="space-y-4 py-2 max-h-[70vh] overflow-y-auto pr-1">
           {/* Item Details */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>Item Name *</Label>
               <Input
@@ -149,7 +149,7 @@ export default function MaintenanceModal({ open, onOpenChange, editRecord }) {
           {/* Vendor Details */}
           <div className="border-t pt-3">
             <p className="text-sm font-medium text-gray-500 mb-3">Vendor Details</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Vendor Name *</Label>
                 <Input
@@ -181,7 +181,7 @@ export default function MaintenanceModal({ open, onOpenChange, editRecord }) {
 
           {/* Dates & Cost */}
           <div className="border-t pt-3">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Sent Date *</Label>
                 <Input
@@ -223,7 +223,7 @@ export default function MaintenanceModal({ open, onOpenChange, editRecord }) {
 
           {/* Status & Return (edit only) */}
           {editRecord && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Status</Label>
                 <SearchableSelect
@@ -245,7 +245,7 @@ export default function MaintenanceModal({ open, onOpenChange, editRecord }) {
           )}
 
           {/* Notes & Branch */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>Branch *</Label>
               <SearchableSelect

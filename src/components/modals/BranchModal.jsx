@@ -162,7 +162,7 @@ function BranchModal({ open, onOpenChange, branch = null, presetType }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name & Code */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Branch Name *</Label>
               <Input
@@ -227,7 +227,7 @@ function BranchModal({ open, onOpenChange, branch = null, presetType }) {
           </div>
 
           {/* City, State, Pincode */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="city">City</Label>
               <Input
@@ -258,7 +258,7 @@ function BranchModal({ open, onOpenChange, branch = null, presetType }) {
           </div>
 
           {/* Phone & Email */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
               <Input
@@ -281,7 +281,7 @@ function BranchModal({ open, onOpenChange, branch = null, presetType }) {
           </div>
 
           {/* GST / invoice details */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="legal_business_name">Legal Business Name</Label>
               <Input
@@ -304,7 +304,7 @@ function BranchModal({ open, onOpenChange, branch = null, presetType }) {
           </div>
 
           {/* Shop Hours */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="open_time">Open Time (HH:MM, IST)</Label>
               <Input

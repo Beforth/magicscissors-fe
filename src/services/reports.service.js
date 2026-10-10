@@ -3,6 +3,15 @@ import api from './api'
 export const reportsService = {
   getDashboardStats: (params) => api.get('/reports/dashboard', { params }),
 
+  getDashboardInsights: (params) => api.get('/reports/dashboard-insights', { params }),
+
+  // Unified range reports (start_date / end_date inclusive)
+  hubSales: (params) => api.get('/reports/hub/sales', { params }),
+  hubCustomers: (params) => api.get('/reports/hub/customers', { params }),
+  hubStaff: (params) => api.get('/reports/hub/staff', { params }),
+  hubCatalog: (params) => api.get('/reports/hub/catalog', { params }),
+  hubProfitLoss: (params) => api.get('/reports/hub/profit-loss', { params }),
+
   getDailySales: (params) => api.get('/reports/daily-sales', { params }),
 
   getMonthlyRevenue: (params) => api.get('/reports/monthly-revenue', { params }),

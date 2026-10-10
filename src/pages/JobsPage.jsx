@@ -94,7 +94,7 @@ export default function JobsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
           <p className="text-gray-500">Scheduler execution history. Records kept for 30 days.</p>
@@ -138,7 +138,7 @@ export default function JobsPage() {
           <div>
             <Label className="text-xs font-medium text-gray-700 mb-1.5 block">Status</Label>
             <Tabs value={statusTab} onValueChange={(v) => { setStatusTab(v); setPage(1) }}>
-              <TabsList>
+              <TabsList className="h-auto flex-wrap justify-start">
                 <TabsTrigger value="all">All</TabsTrigger>
                 <TabsTrigger value="succeeded">Succeeded</TabsTrigger>
                 <TabsTrigger value="failed">Failed</TabsTrigger>
@@ -255,7 +255,7 @@ export default function JobsPage() {
           </DialogHeader>
           {detail && (
             <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <div className="text-xs text-muted-foreground">Status</div>
                   <Badge variant={STATUS_BADGE[detail.status] || 'default'} className="capitalize mt-1">

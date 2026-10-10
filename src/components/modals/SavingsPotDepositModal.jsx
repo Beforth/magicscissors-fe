@@ -129,7 +129,7 @@ export default function SavingsPotDepositModal({ open, onOpenChange, allPots, pe
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Total Amount *</Label>
               <Input

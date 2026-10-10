@@ -110,6 +110,7 @@ export default function EmployeeRotationPanel({
   heldEmployeeIds = [],
   compact = false,
   accordion = false,
+  strip = false,
   accordionOpen = false,
   onAccordionToggle = () => {},
   floatExpand = false,
@@ -137,6 +138,66 @@ export default function EmployeeRotationPanel({
   const nextUp = board.next_up
   const readyCount = summary.available ?? 0
   const visibleLimit = compact ? 5 : 8
+
+  /* ── STRIP MODE: one line, expands as a floating list ───── */
+  if (strip) {
+    return (
+      <div className="relative">
+        <button
+          type="button"
+          onClick={onAccordionToggle}
+          className="flex w-full items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-left text-sm hover:bg-muted/50"
+          title={accordionOpen ? 'Collapse queue' : 'Show the check-in queue'}
+        >
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+          <span className="text-muted-foreground">Next up:</span>
+          {isLoading ? (
+            <span className="text-muted-foreground">loading…</span>
+          ) : nextUp ? (
+            <>
+              <span className="truncate font-medium">{nextUp.full_name}</span>
+              <StatusBadge displayStatus={nextUp.display_status || nextUp.status} />
+            </>
+          ) : queue.length > 0 ? (
+            <span className="truncate text-amber-700">nobody matches this service&apos;s skills</span>
+          ) : (
+            <span className="text-muted-foreground">no staff checked in yet</span>
+          )}
+          <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            {readyCount} ready
+          </span>
+          {accordionOpen ? <ChevronUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+        </button>
+        {accordionOpen && (
+          <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 space-y-1.5 overflow-y-auto rounded-lg border bg-card p-2 shadow-lg">
+            {queue.length === 0 ? (
+              <p className="p-2 text-xs text-muted-foreground">No checked-in staff yet.</p>
+            ) : (
+              queue.slice(0, 12).map((row) => (
+                <QueueRow key={row.employee_id} row={row} highlight={row.employee_id === nextUp?.employee_id} hideMeta />
+              ))
+            )}
+            <div className="flex items-center justify-between px-1 pt-1 text-[11px] text-muted-foreground">
+              <span>
+                {readyCount} ready · {summary.busy ?? 0} busy · {summary.on_break ?? 0} on break
+              </span>
+              <span
+                role="button"
+                tabIndex={0}
+                className="inline-flex cursor-pointer items-center gap-1 hover:text-foreground"
+                onClick={() => refetch()}
+                onKeyDown={(e) => e.key === 'Enter' && refetch()}
+              >
+                <RefreshCw className={`h-3 w-3 ${isFetching ? 'animate-spin' : ''}`} />
+                Refresh
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   /* ── ACCORDION MODE ─────────────────────────────────────── */
   if (accordion) {

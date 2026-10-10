@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { customerService } from '@/services/customer.service'
@@ -27,6 +27,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { Kbd } from '@/components/ui/kbd'
 import { formatCurrency, fuzzyMatch, fuzzyScore } from '@/lib/utils'
 import { computeBillTaxTotals } from '@/lib/gst'
 import {
@@ -106,6 +107,20 @@ function BillCreatePage() {
   const initialBillType = searchParams.get('type') === 'previous' ? 'previous' : 'current'
   const [billType, setBillType] = useState(initialBillType)
 
+  // Edit mode: /bills/:id/edit reuses this screen with the bill's lines in the cart.
+  const { id: editId } = useParams()
+  const isEdit = !!editId
+  const { data: editBillData, isLoading: editLoading, error: editError } = useQuery({
+    queryKey: ['bill', editId],
+    queryFn: () => billService.getBillById(editId),
+    enabled: isEdit,
+  })
+  const editBill = editBillData?.data
+  const editCompleted = isEdit && editBill?.status === 'completed'
+  const [keptPackages, setKeptPackages] = useState({}) // package_instance_id -> still on the bill
+  const [editReason, setEditReason] = useState('')
+  const seededRef = useRef(false)
+
   // Date/time for previous bills
   const [billDate, setBillDate] = useState('')
   const [billTime, setBillTime] = useState('')
@@ -143,7 +158,19 @@ function BillCreatePage() {
 
   // Cart
   const [cartItems, setCartItems] = useState([])
-  const [cartCollapsed, setCartCollapsed] = useState(false)
+  const [cartCollapsedRaw, setCartCollapsed] = useState(false)
+  // The side-by-side cart (and its collapsed rail) only exists on large screens; phones always get the full cart below.
+  const [isLg, setIsLg] = useState(() => typeof window === 'undefined' || window.matchMedia('(min-width: 1024px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const on = () => setIsLg(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  const cartCollapsed = cartCollapsedRaw && isLg
+  const [catalogCategory, setCatalogCategory] = useState('all')
+  const cartPanelRef = useRef(null)
+  const detailsRef = useRef(null)
   const [queueOpen, setQueueOpen] = useState(false)
   const [pendingCartItem, setPendingCartItem] = useState(null)
   const [skillWarnOpen, setSkillWarnOpen] = useState(false)
@@ -202,72 +229,7 @@ function BillCreatePage() {
       serviceId
       || (selectedCategory === 'services' ? selectedItemId : null)
 
-    // Skill check: if cart already has employees, ensure at least one has the required skills
-    if (svcId) {
-      let requiredSkills = []
-      if (serviceId) {
-        const svc = services.find((s) => s.service_id === serviceId)
-        requiredSkills = svc?.skills || []
-      } else if (selectedItem) {
-        requiredSkills = selectedItem.skills || []
-      }
-
-      if (requiredSkills.length > 0) {
-        const requiredSkillIds = new Set(requiredSkills.map((s) => String(s.id)))
-
-        // Gather all unique employee IDs already assigned to cart items
-        const cartEmployeeIds = new Set()
-        for (const item of cartItems) {
-          if (item.item_type === 'service') {
-            for (const id of item.employee_ids || []) {
-              if (id) cartEmployeeIds.add(String(id))
-            }
-          } else if (item.item_type === 'package') {
-            for (const svc of item.selected_services || []) {
-              for (const id of svc.employee_ids || []) {
-                if (id) cartEmployeeIds.add(String(id))
-              }
-            }
-          }
-        }
-
-        if (cartEmployeeIds.size > 0) {
-          let hasMatch = false
-          const missingEmployees = []
-
-          for (const empId of cartEmployeeIds) {
-            const emp = employees.find((e) => String(e.employee_id) === empId)
-            if (emp) {
-              const empSkillIds = new Set((emp.skills || []).map((s) => String(s.id)))
-              const hasAll = [...requiredSkillIds].every((skillId) => empSkillIds.has(skillId))
-              if (hasAll) {
-                hasMatch = true
-                break
-              }
-              const missingNames = [...requiredSkillIds]
-                .filter((skillId) => !empSkillIds.has(skillId))
-                .map((skillId) => {
-                  const skill = requiredSkills.find((s) => String(s.id) === skillId)
-                  return skill?.name || skillId
-                })
-              missingEmployees.push({ name: emp.full_name, missing: missingNames })
-            }
-          }
-
-          if (!hasMatch && missingEmployees.length > 0) {
-            const parts = missingEmployees.map((e) => e.name)
-            const svcName = serviceId
-              ? (services.find((s) => s.service_id === serviceId)?.service_name || 'this service')
-              : (selectedItem?.name || 'this service')
-            setSkillWarnMsg(
-              `${parts.join(', ')} ${missingEmployees.length === 1 ? "doesn't" : "don't"} have the required skills for ${svcName}. The service can be added without an assigned employee and you can assign someone later from the bill details page.`
-            )
-            setSkillWarnOpen(true)
-            return
-          }
-        }
-      }
-    }
+    // (The queue itself only returns employees who have the service's required skills.)
 
     // Exclude every employee already picked for any component of this selection,
     // plus employees already assigned to existing cart items, so the same person
@@ -279,7 +241,7 @@ function BillCreatePage() {
         if (id) excludeAll.add(String(id))
       }
     }
-    for (const id of heldEmployeeIds) excludeAll.add(String(id))
+    // Employees already on other cart lines are NOT excluded: the same person can do several services on one bill.
     const row = await pickFromRotationQueue({ serviceId: svcId, exclude: [...excludeAll] })
     if (!row) {
       toast.warning('No eligible employee in the check-in queue')
@@ -425,7 +387,7 @@ function BillCreatePage() {
         tax_rate: s.tax_rate ?? 0,
         hsn_sac_code: s.hsn_sac_code || null,
         duration: s.duration_minutes,
-        category: s.category?.name,
+        category: s.category?.category_name ?? s.category?.name,
         star_points: s.star_points ?? 0,
         is_multi_employee: s.is_multi_employee ?? false,
         employee_count: s.employee_count ?? null,
@@ -498,12 +460,21 @@ function BillCreatePage() {
   }
 
   // Calculate totals (incl. GST)
-  const taxPreviewItems = cartItems.map((item) => ({
-    unitPrice: item.unit_price,
-    quantity: item.quantity,
-    discountAmount: getItemDiscount(item),
-    taxRate: item.tax_rate ?? 0,
-  }))
+  // Packages that already sit on the bill being edited (priced as a distribution, so they are not editable here).
+  const keptPackageLines = isEdit
+    ? (editBill?.items || [])
+        .filter((i) => i.package_instance_id && keptPackages[i.package_instance_id])
+        .map((i) => ({ unitPrice: i.unit_price, quantity: i.quantity, discountAmount: i.discount_amount || 0, taxRate: i.tax_rate || 0 }))
+    : []
+  const taxPreviewItems = [
+    ...cartItems.map((item) => ({
+      unitPrice: item.unit_price,
+      quantity: item.quantity,
+      discountAmount: getItemDiscount(item),
+      taxRate: item.tax_rate ?? 0,
+    })),
+    ...keptPackageLines,
+  ]
   const grossBeforeBillDisc =
     taxPreviewItems.reduce((s, l) => s + l.unitPrice * l.quantity, 0) -
     taxPreviewItems.reduce((s, l) => s + l.discountAmount, 0)
@@ -553,6 +524,7 @@ function BillCreatePage() {
 
   // Handlers
   const handleSelectCustomer = (customer) => {
+    setTimeout(() => catalogSearchRef.current?.focus(), 0)
     setSelectedCustomer(customer)
     setCustomerSearch(customer.customer_name)
     setShowCustomerDropdown(false)
@@ -1236,6 +1208,7 @@ function BillCreatePage() {
   }
 
   const handleSubmit = () => {
+    if (isEdit) return handleSaveEdit()
     if (!selectedCustomer) {
       toast.error('Please select a customer')
       return
@@ -1299,6 +1272,63 @@ function BillCreatePage() {
     createBillMutation.mutate(billData)
   }
 
+  const reviseMutation = useMutation({
+    mutationFn: (body) => billService.reviseBill(editId, body),
+    onSuccess: () => {
+      toast.success('Bill updated')
+      for (const key of [['bills'], ['bill', editId], ['bill-audit', editId], ['pending-services'], ['dashboard-stats'], ['customers']]) {
+        queryClient.invalidateQueries({ queryKey: key })
+      }
+      navigate(`/bills/${editId}`)
+    },
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Could not update the bill'),
+  })
+
+  const handleSaveEdit = () => {
+    if (!selectedCustomer) return toast.error('Please select a customer')
+    if (cartItems.length + keptPackageLines.length === 0) return toast.error('A bill needs at least one item')
+    const validPayments = payments.filter((p) => parseFloat(p.amount) > 0)
+    if (editCompleted) {
+      const paymentTotal = validPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0)
+      if (validPayments.length === 0) return toast.error('Please add at least one payment')
+      if (Math.abs(paymentTotal - totalAmount) > 0.01) {
+        return toast.error(`Payment total (${formatCurrency(paymentTotal)}) must equal the new total (${formatCurrency(totalAmount)})`)
+      }
+      if (editReason.trim().length < 3) return toast.error('Give a short reason for the change')
+    }
+    const submitted = cartItems.map((item) =>
+      item.source_item_id
+        ? {
+            item_id: item.source_item_id,
+            item_type: item.item_type,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            discount_amount: parseFloat(getItemDiscount(item).toFixed(2)),
+            employee_ids: item.item_type === 'service' ? (item.employee_ids || []).filter(Boolean) : undefined,
+          }
+        : buildSubmitItems([item])[0]
+    )
+    reviseMutation.mutate({
+      customer_id: selectedCustomer.customer_id,
+      book_number: bookNumber.trim() || null,
+      notes: notes || null,
+      discount_amount: parseFloat(billDiscount.toFixed(2)),
+      reason: editReason.trim() || undefined,
+      keep_package_instance_ids: Object.keys(keptPackages).filter((k) => keptPackages[k]),
+      items: submitted,
+      ...(editCompleted
+        ? {
+            payments: validPayments.map((p) => ({
+              ...(p.payment_id ? { payment_id: p.payment_id } : {}),
+              payment_mode: p.payment_mode,
+              amount: parseFloat(p.amount),
+              ...(p.payment_mode === 'upi' && p.upi_account_id ? { upi_account_id: p.upi_account_id } : {}),
+            })),
+          }
+        : {}),
+    })
+  }
+
   // Start service — creates a pending bill without payments
   const handleStartService = () => {
     if (!selectedCustomer) {
@@ -1358,10 +1388,56 @@ function BillCreatePage() {
     }
   }, [billType, billDate])
 
-  // Clear cart when branch changes
+  // Edit mode: load the bill into the cart once
   useEffect(() => {
-    setCartItems([])
-  }, [selectedBranch])
+    if (!isEdit || !editBill || seededRef.current) return
+    seededRef.current = true
+    const bid = editBill.branch?.branch_id
+    if (bid && bid !== selectedBranch) setSelectedBranch(bid)
+    setSelectedCustomer({ customer_id: editBill.customer.customer_id, customer_name: editBill.customer.customer_name, phone_masked: editBill.customer.phone_masked })
+    setCustomerSearch(editBill.customer.customer_name)
+    setBookNumber(editBill.book_number || '')
+    setNotes(editBill.notes || '')
+    const singles = editBill.items.filter((i) => !i.package_instance_id)
+    setCartItems(
+      singles.map((i) => ({
+        cart_id: crypto.randomUUID(),
+        source_item_id: i.item_id,
+        item_type: i.item_type,
+        service_id: i.service?.service_id ?? null,
+        product_id: i.product?.product_id ?? null,
+        package_id: i.package?.package_id ?? null,
+        item_name: i.item_name,
+        unit_price: i.unit_price,
+        quantity: i.quantity,
+        employee_ids: (i.employees || []).map((e) => e.employee_id),
+        employee_id: null,
+        star_points: 0,
+        tax_rate: i.tax_rate || 0,
+        hsn_sac_code: i.hsn_sac_code || null,
+        discount_percent: 0,
+        discount_amount_override: i.discount_amount > 0 ? i.discount_amount : undefined,
+        item_status: i.status === 'pending' ? 'pending' : i.status === 'in_progress' ? 'in_progress' : 'completed',
+        selected_services: [],
+      }))
+    )
+    setKeptPackages(Object.fromEntries((editBill.package_summary || []).map((p) => [p.package_instance_id, true])))
+    if (editBill.status === 'completed') {
+      setPayments(
+        (editBill.payments || []).map((p) => ({
+          payment_id: p.payment_id,
+          payment_mode: p.payment_mode,
+          amount: String(p.amount),
+          ...(p.upi_account_id ? { upi_account_id: p.upi_account_id } : {}),
+        }))
+      )
+    }
+    // Bill-level discount as a percentage of the pre-discount value (this screen's model).
+    const lineDisc = editBill.items.reduce((n, i) => n + (i.discount_amount || 0), 0)
+    const gross = editBill.items.reduce((n, i) => n + i.unit_price * i.quantity, 0) - lineDisc
+    const extra = Math.max(0, editBill.discount_amount - lineDisc)
+    setBillDiscountPercent(gross > 0 ? (extra / gross) * 100 : 0)
+  }, [isEdit, editBill]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Default OR group selections when a package with service_groups is selected (e.g. after branch switch)
   useEffect(() => {
@@ -1403,21 +1479,377 @@ function BillCreatePage() {
   // Today in IST for max date on picker and defaults
   const todayStr = getTodayIST()
 
-  return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] min-h-0">
-      {/* Compact Top Strip - Back, Bill Type, Customer, Branch, Chair, Book No, Date */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pb-3">
-        <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => navigate('/bills')}>
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
-        </Button>
+  const switchCategory = (v) => {
+    setSelectedCategory(v)
+    setCatalogCategory('all')
+    setSelectedItemId(null)
+    setItemSearch('')
+    setItemPrice('')
+  }
 
-        {/* Branch — first because all other dropdowns (customer, chair, services, tokens) are branch-scoped */}
-        {!branchId ? (
+  // ---- Keyboard layer (capture phase, so it wins over the global shortcuts while on this screen) ----
+  const kbRef = useRef({})
+  kbRef.current = { handleSubmit, handleStartService, switchCategory, handlePaymentChange, paymentsLength: payments.length, isEdit, editCompleted }
+  useEffect(() => {
+    const onKey = (e) => {
+      const k = e.key
+      const lower = k.toLowerCase()
+      const h = kbRef.current
+      const dialogOpen = !!document.querySelector('[role=dialog]')
+      const typing = /^(input|textarea|select)$/i.test(e.target.tagName) || e.target.isContentEditable
+
+      if ((e.ctrlKey || e.metaKey) && k === 'Enter' && !dialogOpen) {
+        e.preventDefault()
+        e.stopPropagation()
+        if (e.shiftKey && !h.isEdit) h.handleStartService()
+        else h.handleSubmit()
+        return
+      }
+      if (dialogOpen) return
+      if (k === 'F2') {
+        e.preventDefault()
+        customerInputRef.current?.focus()
+        customerInputRef.current?.select()
+      } else if (k === 'F3' && !h.isEdit) {
+        e.preventDefault()
+        tokenBoxRef.current?.querySelector('input')?.focus()
+      } else if (k === '/' && !typing) {
+        e.preventDefault()
+        e.stopPropagation()
+        catalogSearchRef.current?.focus()
+        catalogSearchRef.current?.select()
+      } else if (e.altKey && ['1', '2', '3'].includes(k)) {
+        e.preventDefault()
+        h.switchCategory(['services', 'packages', 'products'][Number(k) - 1])
+        setTimeout(() => catalogSearchRef.current?.focus(), 0)
+      } else if (e.altKey && ['c', 'd', 'u'].includes(lower) && (!h.isEdit || h.editCompleted) && h.paymentsLength > 0) {
+        e.preventDefault()
+        h.handlePaymentChange(h.paymentsLength - 1, 'payment_mode', { c: 'cash', d: 'card', u: 'upi' }[lower])
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
+  // Fast billing: land in the customer box, and return to the catalog search after each item.
+  useEffect(() => {
+    if (!isEdit) customerInputRef.current?.focus()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const prevSelectedRef = useRef(null)
+  useEffect(() => {
+    if (prevSelectedRef.current && !selectedItemId) setTimeout(() => catalogSearchRef.current?.focus(), 0)
+    prevSelectedRef.current = selectedItemId
+  }, [selectedItemId])
+
+  // Arrow keys move through the catalog grid; ArrowUp from the first row returns to the search box.
+  const handleGridKey = (e) => {
+    if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return
+    const tiles = [...e.currentTarget.querySelectorAll('[data-tile]')]
+    const i = tiles.indexOf(document.activeElement)
+    if (i < 0 || tiles.length === 0) return
+    const top0 = tiles[0].offsetTop
+    const cols = Math.max(1, tiles.filter((t) => t.offsetTop === top0).length)
+    let n = i
+    if (e.key === 'ArrowRight') n = i + 1
+    else if (e.key === 'ArrowLeft') n = i - 1
+    else if (e.key === 'ArrowDown') n = i + cols
+    else if (e.key === 'ArrowUp') n = i - cols
+    else if (e.key === 'Home') n = 0
+    else if (e.key === 'End') n = tiles.length - 1
+    e.preventDefault()
+    if (n < 0) return catalogSearchRef.current?.focus()
+    if (n < tiles.length) {
+      tiles[n].focus()
+      tiles[n].scrollIntoView({ block: 'nearest' })
+    }
+  }
+
+  // Branch picker: a single-branch account never needs to choose
+  useEffect(() => {
+    if (!selectedBranch && branches.length === 1) setSelectedBranch(branches[0].branch_id)
+  }, [branches, selectedBranch])
+
+  // Fit the whole screen into the window on desktop: no page scrollbar, only the lists scroll.
+  const rootRef = useRef(null)
+  useLayoutEffect(() => {
+    const fit = () => {
+      const el = rootRef.current
+      if (!el) return
+      if (isEdit || !window.matchMedia('(min-width: 1024px)').matches) {
+        el.style.height = ''
+        return
+      }
+      const top = el.getBoundingClientRect().top
+      // Leave room for the layout's own bottom padding so the document itself never scrolls
+      const pad = parseFloat(getComputedStyle(el.closest('main') || el.parentElement).paddingBottom) || 0
+      el.style.height = `${Math.max(440, window.innerHeight - top - pad - 2)}px`
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [editLoading, !!editBill]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Package: give the next eligible employee from the check-in queue to every service they are qualified for
+  const assignPackageFromQueue = async () => {
+    const standaloneServices = selectedItem.services || []
+    const serviceGroups = selectedItem.service_groups || []
+
+    const allPkgServices = []
+    for (const ps of standaloneServices) {
+      allPkgServices.push({ service_id: ps.service_id, service_name: ps.service_name, slot_type: 'standalone', slot_index: allPkgServices.length })
+    }
+    for (let gi = 0; gi < serviceGroups.length; gi++) {
+      const selectedId = (packageGroupSelections[selectedItemId] || [])[gi]
+      const chosen = (serviceGroups[gi].services || []).find((s) => s.service_id === selectedId)
+      if (chosen) allPkgServices.push({ service_id: chosen.service_id, service_name: chosen.service_name, slot_type: 'group', slot_index: standaloneServices.length + gi })
+    }
+
+    if (allPkgServices.length === 0) return
+
+    const row = await pickFromRotationQueue({})
+    if (!row) {
+      toast.warning('No eligible employee in the check-in queue')
+      return
+    }
+
+    const empSkillIds = new Set((row.skills || []).map((s) => String(s.id)))
+    const known = []
+    const unknown = []
+
+    for (const svc of allPkgServices) {
+      const svcData = services.find((s) => s.service_id === svc.service_id)
+      const requiredSkills = svcData?.skills || []
+      if (requiredSkills.length === 0) {
+        known.push(svc)
+      } else {
+        const allMatch = requiredSkills.every((sk) => empSkillIds.has(String(sk.id)))
+        if (allMatch) known.push(svc)
+        else unknown.push(svc)
+      }
+    }
+
+    const updated = { ...componentEmployees }
+    for (const svc of known) {
+      const idx = svc.slot_index
+      const current = (updated[idx] || []).filter(Boolean)
+      if (!current.includes(row.employee_id)) {
+        updated[idx] = [...current, row.employee_id]
+      }
+    }
+
+    setComponentEmployees(updated)
+
+    if (unknown.length === 0) {
+      toast.success(`Assigned ${row.full_name} to all ${known.length} service(s)`)
+    } else if (known.length > 0) {
+      toast.success(`Assigned ${row.full_name} to ${known.length} service(s)`)
+      const unknownNames = unknown.map((s) => s.service_name).join(', ')
+      setSkillWarnMsg(
+        `${row.full_name} doesn't know: ${unknownNames}. You can assign someone later from the bill details page.`
+      )
+      setSkillWarnOpen(true)
+    } else {
+      const unknownNames = unknown.map((s) => s.service_name).join(', ')
+      setSkillWarnMsg(
+        `${row.full_name} doesn't know: ${unknownNames}. You can assign someone later from the bill details page.`
+      )
+      setSkillWarnOpen(true)
+    }
+  }
+
+  const canQueuePick =
+    selectedCategory === 'services' ||
+    (selectedCategory === 'packages' && !!selectedItem && (selectedItem.services?.length > 0 || selectedItem.service_groups?.length > 0))
+  const runQueuePick = () => {
+    if (selectedCategory === 'packages') return assignPackageFromQueue()
+    return handleAddEmployeeFromQueue(0, selectedItemId)
+  }
+
+  // Billing fits the window (lists scroll inside); editing lets the page grow so no line is ever squeezed out of view.
+  const ovH = isEdit ? '' : 'lg:overflow-hidden'
+  const ovA = isEdit ? '' : 'lg:overflow-auto'
+  const hasLines = cartItems.length > 0 || keptPackageLines.length > 0
+  const customerInputRef = useRef(null)
+  const catalogSearchRef = useRef(null)
+  const [custIdx, setCustIdx] = useState(0)
+  useEffect(() => setCustIdx(0), [customers])
+  const handleCustomerKeyDown = (e) => {
+    if (!showCustomerDropdown || customerSearch.length < 2) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setCustIdx((i) => Math.min(customers.length - 1, i + 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setCustIdx((i) => Math.max(0, i - 1))
+    } else if (e.key === 'Enter' && customers[custIdx]) {
+      e.preventDefault()
+      handleSelectCustomer(customers[custIdx])
+      setTimeout(() => catalogSearchRef.current?.focus(), 0)
+    } else if (e.key === 'Escape') {
+      setShowCustomerDropdown(false)
+    }
+  }
+
+  const catalogCategories = useMemo(() => {
+    if (selectedCategory !== 'services') return []
+    return [...new Set(itemOptions.map((o) => o.category).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+  }, [itemOptions, selectedCategory])
+
+  const filteredCatalog = useMemo(
+    () =>
+      filteredItemOptions.filter(
+        (o) => selectedCategory !== 'services' || catalogCategory === 'all' || o.category === catalogCategory
+      ),
+    [filteredItemOptions, selectedCategory, catalogCategory]
+  )
+
+  const cartCountFor = (id) =>
+    cartItems.filter((i) => (i.service_id || i.package_id || i.product_id) === id).reduce((n, i) => n + (i.quantity || 1), 0)
+
+  const pickCatalogItem = (id) => {
+    handleItemSelect(id)
+    setItemSearch('')
+    // On phones the details panel sits above the grid: bring it into view.
+    setTimeout(() => detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  }
+
+  if (isEdit && editLoading) {
+    return (
+      <div className="flex justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+  if (isEdit && (editError || !editBill)) {
+    return <Card><CardContent className="py-10 text-center text-red-500">{editError?.response?.data?.error?.message || 'Bill not found'}</CardContent></Card>
+  }
+  if (isEdit && (!['owner', 'manager', 'developer'].includes(user?.role) || editBill.status === 'cancelled')) {
+    return (
+      <Card>
+        <CardContent className="space-y-3 py-10 text-center">
+          <p>{editBill.status === 'cancelled' ? 'A cancelled bill cannot be edited.' : 'Only an owner or manager can edit a bill.'}</p>
+          <Button variant="outline" onClick={() => navigate(`/bills/${editId}`)}>Back to bill</Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div ref={rootRef} className={`flex min-h-0 flex-col pb-20 ${ovH} lg:pb-0`}>
+      {/* Header: compact, two short rows so the whole billing screen fits without scrolling */}
+      <div className="mb-2 rounded-xl border bg-card px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => navigate(isEdit ? `/bills/${editId}` : '/bills')}>
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Back
+          </Button>
+          <h1 className="text-base font-semibold">
+            {isEdit ? `Edit bill ${editBill?.bill_number || ''}` : 'New bill'}
+          </h1>
+          {isEdit && editBill && (
+            <Badge variant={editCompleted ? 'success' : 'warning'}>{editBill.status.toUpperCase()}</Badge>
+          )}
+          {!isEdit && (
+            <Tabs value={billType} onValueChange={(v) => setBillType(v)} className="h-8">
+              <TabsList className="h-8">
+                <TabsTrigger value="current" className="h-7 px-3 text-xs">Current</TabsTrigger>
+                <TabsTrigger value="previous" className="h-7 px-3 text-xs">Previous</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
+          {/* Date / time: the live clock, or the old bill's date and time picker, top right */}
+          <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+            {isEdit ? (
+              <span>
+                Bill date: {editBill ? new Date(editBill.bill_date).toLocaleString('en-IN', { timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+              </span>
+            ) : billType === 'previous' ? (
+              <>
+                <span className="font-medium text-foreground">Bill date</span>
+                <Input type="date" className="h-8 w-[9.5rem] text-sm" value={billDate} onChange={(e) => setBillDate(e.target.value)} max={todayStr} />
+                <Input type="time" className="h-8 w-[7.5rem] text-sm" value={billTime} onChange={(e) => setBillTime(e.target.value)} />
+              </>
+            ) : (
+              <span>{getCurrentDateTimeIST().date}, {getCurrentDateTimeIST().time}</span>
+            )}
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="min-w-[200px] flex-[2]">
+          <div className="relative">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+            <Input
+              placeholder="Customer * (F2): name, phone or ID"
+              className="h-9 pl-8 pr-8 text-sm"
+              value={customerSearch}
+              onChange={(e) => {
+                setCustomerSearch(e.target.value)
+                setShowCustomerDropdown(true)
+                if (!e.target.value) { setSelectedCustomer(null); setConsumedTokenId(null) }
+              }}
+              onFocus={() => setShowCustomerDropdown(true)}
+              onKeyDown={handleCustomerKeyDown}
+              ref={customerInputRef}
+            />
+            {selectedCustomer && (
+              <Check className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-green-500" />
+            )}
+          </div>
+          {showCustomerDropdown && customerSearch.length >= 2 && (
+            <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-auto">
+              {customersLoading ? (
+                <div className="p-3 text-center text-gray-500 text-sm">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin inline mr-1" />
+                  Searching...
+                </div>
+              ) : customers.length === 0 ? (
+                <div className="p-3 text-center">
+                  <p className="text-gray-500 text-xs mb-2">No customers found</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => {
+                      setShowCustomerDropdown(false)
+                      setAddCustomerModalOpen(true)
+                    }}
+                  >
+                    <UserPlus className="h-3.5 w-3.5 mr-1" />
+                    Add New
+                  </Button>
+                </div>
+              ) : (
+                customers.map((customer, cIdx) => (
+                  <div
+                    key={customer.customer_id}
+                    className={`px-3 py-2 cursor-pointer border-b last:border-b-0 ${cIdx === custIdx ? 'bg-accent' : 'hover:bg-gray-50'}`}
+                    onClick={() => handleSelectCustomer(customer)}
+                  >
+                    <div className="font-medium text-sm">
+                      {customer.customer_code && <span className="text-gray-400 font-mono text-xs mr-1">#{customer.customer_code}</span>}
+                      {customer.customer_name}
+                    </div>
+                    <div className="text-xs text-gray-500">{customer.phone_masked}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+          </div>
+          </div>
+          {!isEdit && (
+            <div className="w-36">
+          {!branchId ? (
           <select
-            className="h-8 px-2 text-sm border rounded-md w-40"
+            className="h-9 px-2 text-sm border rounded-md w-full bg-background"
             value={selectedBranch || ''}
-            onChange={(e) => setSelectedBranch(e.target.value)}
+            onChange={(e) => {
+              // Items belong to a branch's catalog, so picking another branch starts a fresh cart.
+              setSelectedBranch(e.target.value)
+              setCartItems([])
+            }}
             title="Branch"
           >
             <option value="">Select branch...</option>
@@ -1428,29 +1860,20 @@ function BillCreatePage() {
             ))}
           </select>
         ) : (
-          <span className="inline-flex items-center h-8 px-2 text-xs font-medium text-gray-700 bg-gray-100 rounded-md">
+          <span className="inline-flex w-full items-center h-9 px-3 text-sm font-medium text-gray-700 bg-gray-100 rounded-md">
             {user?.branch?.name || 'Branch'}
           </span>
         )}
-
-        <Tabs
-          value={billType}
-          onValueChange={(v) => setBillType(v)}
-          className="h-8"
-        >
-          <TabsList className="h-8">
-            <TabsTrigger value="current" className="h-7 text-xs px-3">Current</TabsTrigger>
-            <TabsTrigger value="previous" className="h-7 text-xs px-3">Previous</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {/* Token searchable dropdown */}
-        <div className="relative" ref={tokenBoxRef}>
+            </div>
+          )}
+          {!isEdit && (
+            <div className="w-36">
+          <div className="relative" ref={tokenBoxRef}>
           <div className="relative">
             <Ticket className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
             <Input
-              placeholder="Token # / customer..."
-              className="h-8 pl-7 pr-2 text-sm w-56"
+              placeholder="Token # (F3)"
+              className="h-9 pl-7 pr-2 text-sm w-full"
               value={tokenInput}
               onChange={(e) => { setTokenInput(e.target.value); setShowTokenDropdown(true) }}
               onFocus={() => setShowTokenDropdown(true)}
@@ -1495,75 +1918,14 @@ function BillCreatePage() {
               )}
             </div>
           )}
-        </div>
-        {consumedTokenId && (
-          <span className="text-xs text-green-700 font-medium">Token attached</span>
-        )}
-
-        <div className="flex-1 min-w-[200px] max-w-[320px] relative">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-            <Input
-              placeholder="Customer name, phone or ID..."
-              className="h-8 pl-8 pr-8 text-sm"
-              value={customerSearch}
-              onChange={(e) => {
-                setCustomerSearch(e.target.value)
-                setShowCustomerDropdown(true)
-                if (!e.target.value) { setSelectedCustomer(null); setConsumedTokenId(null) }
-              }}
-              onFocus={() => setShowCustomerDropdown(true)}
-            />
-            {selectedCustomer && (
-              <Check className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-green-500" />
-            )}
           </div>
-          {showCustomerDropdown && customerSearch.length >= 2 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-auto">
-              {customersLoading ? (
-                <div className="p-3 text-center text-gray-500 text-sm">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin inline mr-1" />
-                  Searching...
-                </div>
-              ) : customers.length === 0 ? (
-                <div className="p-3 text-center">
-                  <p className="text-gray-500 text-xs mb-2">No customers found</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => {
-                      setShowCustomerDropdown(false)
-                      setAddCustomerModalOpen(true)
-                    }}
-                  >
-                    <UserPlus className="h-3.5 w-3.5 mr-1" />
-                    Add New
-                  </Button>
-                </div>
-              ) : (
-                customers.map((customer) => (
-                  <div
-                    key={customer.customer_id}
-                    className="px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                    onClick={() => handleSelectCustomer(customer)}
-                  >
-                    <div className="font-medium text-sm">
-                      {customer.customer_code && <span className="text-gray-400 font-mono text-xs mr-1">#{customer.customer_code}</span>}
-                      {customer.customer_name}
-                    </div>
-                    <div className="text-xs text-gray-500">{customer.phone_masked}</div>
-                  </div>
-                ))
-              )}
             </div>
           )}
-        </div>
-
-        {selectedBranch && (
+          {!isEdit && (
+            <div className="w-32">
+          {selectedBranch && (
           <select
-            className="h-8 px-2 text-sm border rounded-md w-40"
+            className="h-9 px-2 text-sm border rounded-md w-full bg-background"
             value={selectedChair}
             onChange={(e) => setSelectedChair(e.target.value)}
             title="Chair (optional)"
@@ -1576,53 +1938,40 @@ function BillCreatePage() {
             ))}
           </select>
         )}
-
-        <Input
+            </div>
+          )}
+          <div className="w-40">
+            <Input
+              type="text"
+              placeholder="Notes (optional)"
+              className="h-9 w-full text-sm"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              maxLength={1000}
+            />
+          </div>
+          <div className="w-24">
+          <Input
           type="text"
           placeholder="Book No."
-          className="h-8 w-24 text-sm"
+          className="h-9 w-full text-sm"
           value={bookNumber}
           onChange={(e) => setBookNumber(e.target.value)}
           maxLength={50}
         />
-
-        {billType === 'previous' ? (
-          <>
-            <Input
-              type="date"
-              className="h-8 w-36 text-sm"
-              value={billDate}
-              onChange={(e) => setBillDate(e.target.value)}
-              max={todayStr}
-            />
-            <Input
-              type="time"
-              className="h-8 w-28 text-sm"
-              value={billTime}
-              onChange={(e) => setBillTime(e.target.value)}
-            />
-          </>
-        ) : (
-          <span className="text-xs text-gray-400 px-2 py-1 bg-gray-50 border rounded-md">
-            {getCurrentDateTimeIST().date}, {getCurrentDateTimeIST().time}
-          </span>
-        )}
+          </div>
+        </div>
       </div>
 
       {/* Main Content - Two Panels */}
-      <div className="flex flex-1 gap-4 overflow-hidden">
+      <div className={`flex flex-1 flex-col gap-4 lg:flex-row ${ovH}`}>
         {/* Left Panel - Item Selection */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Card className="flex-1 overflow-hidden flex flex-col">
+        <div className={`flex flex-1 flex-col ${ovH}`}>
+          <Card className={`flex-1 flex flex-col ${ovH}`}>
             <CardHeader className="pb-2">
               <Tabs
                 value={selectedCategory}
-                onValueChange={(v) => {
-                  setSelectedCategory(v)
-                  setSelectedItemId(null)
-                  setItemSearch('')
-                  setItemPrice('')
-                }}
+                onValueChange={switchCategory}
               >
                 <TabsList className="w-full">
                   <TabsTrigger value="services" className="flex-1">
@@ -1636,8 +1985,20 @@ function BillCreatePage() {
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
+              {selectedBranch && (selectedCategory === 'services' || selectedCategory === 'packages') && (
+                <div className="mt-2">
+                  <EmployeeRotationPanel
+                    strip
+                    branchId={selectedBranch}
+                    serviceId={selectedCategory === 'services' ? (selectedItemId || undefined) : undefined}
+                    serviceName={selectedCategory === 'services' ? selectedItem?.name : undefined}
+                    accordionOpen={queueOpen}
+                    onAccordionToggle={() => setQueueOpen((o) => !o)}
+                  />
+                </div>
+              )}
             </CardHeader>
-            <CardContent className="flex-1 overflow-auto p-4 space-y-4">
+            <CardContent className={`flex flex-1 flex-col gap-4 p-3 sm:p-4 ${ovA}`}>
               {/* Barcode Scan Input — products only */}
               {selectedCategory === 'products' && (
                 <div>
@@ -1653,70 +2014,120 @@ function BillCreatePage() {
                   />
                 </div>
               )}
-              {/* Item Combobox: type to search, dropdown shows results — click to select */}
-              <div ref={itemComboboxRef} className="space-y-2">
-                <Label className="mb-2 block">
-                  Select{' '}
-                  {selectedCategory === 'services'
-                    ? 'Service'
-                    : selectedCategory === 'packages'
-                      ? 'Package'
-                      : 'Product'}
-                </Label>
+              {/* Catalog: search, category chips and a tap-to-select grid */}
+              <div className="order-2 space-y-3">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
+                    ref={catalogSearchRef}
                     type="text"
-                    placeholder={
-                      selectedCategory === 'services'
-                        ? 'Type to search service...'
-                        : selectedCategory === 'packages'
-                          ? 'Type to search package...'
-                          : 'Type to search product...'
-                    }
+                    placeholder={`Search ${selectedCategory}... ( / )  Enter picks the first match, ↓ moves into the list`}
                     value={itemSearch}
-                    onChange={(e) => {
-                      setItemSearch(e.target.value)
-                      setItemDropdownOpen(true)
+                    onChange={(e) => setItemSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && filteredCatalog[0]) {
+                        e.preventDefault()
+                        pickCatalogItem(filteredCatalog[0].id)
+                      } else if (e.key === 'ArrowDown') {
+                        e.preventDefault()
+                        document.querySelector('[data-tile]')?.focus()
+                      } else if (e.key === 'Escape') {
+                        setItemSearch('')
+                      }
                     }}
-                    onFocus={() => setItemDropdownOpen(true)}
-                    className="pl-9 h-10"
+                    className="h-10 pl-9"
                   />
-                  {/* Dropdown list: appears below input when open */}
-                  {itemDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-auto rounded-md border bg-popover shadow-lg z-50">
-                      {filteredItemOptions.length === 0 ? (
-                        <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-                          No matching {selectedCategory === 'services' ? 'service' : selectedCategory === 'packages' ? 'package' : 'product'} found.
-                        </div>
-                      ) : (
-                        <ul className="p-1">
-                          {filteredItemOptions.map((opt) => (
-                            <li key={opt.id}>
-                              <button
-                                type="button"
-                                className="w-full text-left px-3 py-2.5 text-sm rounded-md hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:outline-none"
-                                onClick={() => {
-                                  handleItemSelect(opt.id)
-                                  setItemSearch('')
-                                  setItemDropdownOpen(false)
-                                }}
-                              >
-                                {opt.description ? `[${opt.description}] ` : ''}{opt.name} — {formatCurrency(opt.price)}
-                                {selectedCategory === 'services' && opt.star_points != null && opt.star_points > 0 ? ` (⭐ ${opt.star_points})` : ''}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
                 </div>
+                {catalogCategories.length > 1 && (
+                  <div className="flex gap-1.5 overflow-x-auto pb-1">
+                    {['all', ...catalogCategories].map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setCatalogCategory(c)}
+                        className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                          catalogCategory === c ? 'border-primary bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-secondary'
+                        }`}
+                      >
+                        {c === 'all' ? 'All' : c}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {filteredCatalog.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    No matching {selectedCategory === 'services' ? 'service' : selectedCategory === 'packages' ? 'package' : 'product'} found.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4" onKeyDown={handleGridKey}>
+                    {filteredCatalog.map((opt) => {
+                      const inCart = cartCountFor(opt.id)
+                      const outOfStock = selectedCategory === 'products' && (opt.stock ?? 0) <= 0
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          data-tile
+                          disabled={outOfStock}
+                          onClick={() => pickCatalogItem(opt.id)}
+                          className={`relative flex min-h-[84px] flex-col justify-between rounded-lg border p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${
+                            selectedItemId === opt.id ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'bg-card hover:border-primary/50 hover:bg-secondary/50'
+                          }`}
+                        >
+                          <span className="line-clamp-2 text-sm font-medium leading-snug">
+                            {opt.description && selectedCategory === 'packages' ? <span className="text-primary">[{opt.description}] </span> : null}
+                            {opt.name}
+                          </span>
+                          <span className="mt-1.5 flex items-center justify-between text-xs">
+                            <span className="font-semibold">{formatCurrency(opt.price)}</span>
+                            <span className="text-muted-foreground">
+                              {selectedCategory === 'services' && opt.star_points > 0 ? `⭐ ${opt.star_points}` : null}
+                              {selectedCategory === 'products' ? (outOfStock ? 'Out of stock' : `${opt.stock} in stock`) : null}
+                            </span>
+                          </span>
+                          {inCart > 0 && (
+                            <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                              {inCart}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Item Details */}
-              {selectedItem && (
-                <div className="p-4 bg-gray-50 rounded-lg space-y-3 border">
+              <Dialog
+                open={!!selectedItem}
+                onOpenChange={(o) => {
+                  if (!o) handleItemSelect(null)
+                }}
+              >
+                <DialogContent
+                  className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"
+                  onOpenAutoFocus={(e) => {
+                    e.preventDefault()
+                    const target = document.getElementById('bill-item-qty') || document.querySelector('[role=dialog] input')
+                    target?.focus()
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.altKey && e.key.toLowerCase() === 'q' && canQueuePick) {
+                      e.preventDefault()
+                      runQueuePick()
+                      return
+                    }
+                    // Enter adds the item from any plain field (not inside a search list or on a button)
+                    if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return
+                    const t = e.target
+                    if (t.tagName === 'BUTTON' || t.closest('[data-searchable-select-dropdown]') || t.tagName === 'TEXTAREA') return
+                    e.preventDefault()
+                    handleAddToCart()
+                  }}
+                >
+                  <DialogTitle className="sr-only">Add item to bill</DialogTitle>
+                  {selectedItem && (
+                    <div ref={detailsRef} className="space-y-3">
                   <div>
                     <div className="font-semibold text-lg">{selectedItem.name}</div>
                     {selectedCategory === 'services' && (
@@ -1784,9 +2195,11 @@ function BillCreatePage() {
                       <div className="w-24">
                         <Label className="mb-1 block text-sm">Qty</Label>
                         <Input
+                          id="bill-item-qty"
                           type="number"
                           min="1"
                           value={itemQuantity}
+                          onFocus={(e) => e.target.select()}
                           onChange={(e) => setItemQuantity(parseInt(e.target.value) || 1)}
                         />
                       </div>
@@ -2190,132 +2603,44 @@ function BillCreatePage() {
                         >
                           <Plus className="h-4 w-4 mr-1" /> Add employee
                         </Button>
-                        {selectedCategory === 'services' && (
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => handleAddEmployeeFromQueue(0, selectedItemId)}
-                          >
-                            <Users className="h-4 w-4 mr-1" /> From queue
-                          </Button>
-                        )}
                       </div>
                     </div>
                   )}
 
-                  {selectedCategory === 'packages' && selectedItem && (selectedItem.services?.length > 0 || selectedItem.service_groups?.length > 0) && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="w-full"
-                      onClick={async () => {
-                        const standaloneServices = selectedItem.services || []
-                        const serviceGroups = selectedItem.service_groups || []
 
-                        const allPkgServices = []
-                        for (const ps of standaloneServices) {
-                          allPkgServices.push({ service_id: ps.service_id, service_name: ps.service_name, slot_type: 'standalone', slot_index: allPkgServices.length })
-                        }
-                        for (let gi = 0; gi < serviceGroups.length; gi++) {
-                          const selectedId = (packageGroupSelections[selectedItemId] || [])[gi]
-                          const chosen = (serviceGroups[gi].services || []).find((s) => s.service_id === selectedId)
-                          if (chosen) allPkgServices.push({ service_id: chosen.service_id, service_name: chosen.service_name, slot_type: 'group', slot_index: standaloneServices.length + gi })
-                        }
-
-                        if (allPkgServices.length === 0) return
-
-                        const row = await pickFromRotationQueue({})
-                        if (!row) {
-                          toast.warning('No eligible employee in the check-in queue')
-                          return
-                        }
-
-                        const empSkillIds = new Set((row.skills || []).map((s) => String(s.id)))
-                        const known = []
-                        const unknown = []
-
-                        for (const svc of allPkgServices) {
-                          const svcData = services.find((s) => s.service_id === svc.service_id)
-                          const requiredSkills = svcData?.skills || []
-                          if (requiredSkills.length === 0) {
-                            known.push(svc)
-                          } else {
-                            const allMatch = requiredSkills.every((sk) => empSkillIds.has(String(sk.id)))
-                            if (allMatch) known.push(svc)
-                            else unknown.push(svc)
-                          }
-                        }
-
-                        const updated = { ...componentEmployees }
-                        for (const svc of known) {
-                          const idx = svc.slot_index
-                          const current = (updated[idx] || []).filter(Boolean)
-                          if (!current.includes(row.employee_id)) {
-                            updated[idx] = [...current, row.employee_id]
-                          }
-                        }
-
-                        setComponentEmployees(updated)
-
-                        if (unknown.length === 0) {
-                          toast.success(`Assigned ${row.full_name} to all ${known.length} service(s)`)
-                        } else if (known.length > 0) {
-                          toast.success(`Assigned ${row.full_name} to ${known.length} service(s)`)
-                          const unknownNames = unknown.map((s) => s.service_name).join(', ')
-                          setSkillWarnMsg(
-                            `${row.full_name} doesn't know: ${unknownNames}. You can assign someone later from the bill details page.`
-                          )
-                          setSkillWarnOpen(true)
-                        } else {
-                          const unknownNames = unknown.map((s) => s.service_name).join(', ')
-                          setSkillWarnMsg(
-                            `${row.full_name} doesn't know: ${unknownNames}. You can assign someone later from the bill details page.`
-                          )
-                          setSkillWarnOpen(true)
-                        }
-                      }}
-                    >
-                      <Users className="h-4 w-4 mr-1" /> From queue
+                  <div className="flex items-center gap-2">
+                    {canQueuePick && (
+                      <Button type="button" variant="secondary" className="flex-1" onClick={runQueuePick}>
+                        <Users className="mr-2 h-4 w-4" />
+                        From queue
+                        <Kbd className="ml-2">Alt+Q</Kbd>
+                      </Button>
+                    )}
+                    <Button type="button" className="flex-1" onClick={handleAddToCart}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add to cart
+                      <Kbd className="ml-2 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground">Enter</Kbd>
                     </Button>
+                  </div>
+                    </div>
                   )}
-
-                  <Button className="w-full" onClick={handleAddToCart}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add to Cart
-                  </Button>
-                </div>
-              )}
-
-
+                  <p className="text-xs text-muted-foreground">
+                    <Kbd>Alt+Q</Kbd> next from queue (press again for another) &nbsp; <Kbd>Enter</Kbd> add to cart &nbsp; <Kbd>Esc</Kbd> cancel
+                  </p>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         </div>
 
         {/* Right Panel - Cart + Checkout (collapsible) */}
         <div
-          className={`flex flex-col flex-shrink-0 transition-[width] duration-200 ease-in-out ${
-            cartCollapsed ? 'w-14' : 'w-[480px]'
+          ref={cartPanelRef}
+          className={`flex w-full flex-col transition-[width] duration-200 ease-in-out lg:flex-shrink-0 ${
+            cartCollapsed ? 'lg:w-14' : 'lg:w-[480px]'
           }`}
         >
-          {/* Check-in queue accordion — above cart, Services & Packages tabs only */}
-          {!cartCollapsed && selectedBranch && (selectedCategory === 'services' || selectedCategory === 'packages') && (
-            <div className="mb-2">
-              <EmployeeRotationPanel
-                branchId={selectedBranch}
-                serviceId={selectedCategory === 'services' ? (selectedItemId || undefined) : undefined}
-                serviceName={selectedCategory === 'services' ? selectedItem?.name : undefined}
-                heldEmployeeIds={heldEmployeeIds}
-                accordion
-                accordionOpen={queueOpen}
-                onAccordionToggle={() => setQueueOpen((o) => !o)}
-              />
-            </div>
-          )}
-
-          <Card className="flex-1 overflow-hidden flex flex-col">
+          <Card className={`flex-1 flex flex-col ${ovH}`}>
             {/* Sticky Cart Header */}
             <CardHeader className="pb-0 flex flex-row items-center gap-0 p-0 min-h-0 flex-shrink-0 border-b">
               {cartCollapsed ? (
@@ -2342,13 +2667,13 @@ function BillCreatePage() {
                 <CardTitle className="flex items-center justify-between flex-1 py-2.5 px-4">
                   <span className="flex items-center gap-2 text-sm">
                     <ShoppingCart className="h-4 w-4" />
-                    Cart
+                    {isEdit ? 'Bill items' : 'Cart'}
                     <Badge variant="secondary" className="text-xs">{cartItems.length}</Badge>
                   </span>
                   <button
                     type="button"
                     onClick={() => setCartCollapsed(true)}
-                    className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+                    className="hidden rounded-md p-1 transition-colors hover:bg-gray-100 lg:block"
                     title="Collapse cart"
                   >
                     <ChevronRight className="h-4 w-4 text-gray-600" />
@@ -2360,8 +2685,8 @@ function BillCreatePage() {
             {!cartCollapsed && (
             <>
             {/* Scrollable Cart + Checkout Content */}
-            <CardContent className="flex-1 overflow-auto p-3 space-y-3">
-              {cartItems.length === 0 ? (
+            <CardContent className={`min-h-0 flex-1 space-y-3 p-3 ${ovA}`}>
+              {!hasLines ? (
                 <div className="text-center py-8 text-gray-500">
                   <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-20" />
                   <p className="text-sm">No items in cart</p>
@@ -2369,6 +2694,37 @@ function BillCreatePage() {
                 </div>
               ) : (
                 <>
+                {/* Packages already on the bill being edited */}
+                {isEdit && (editBill?.package_summary || []).length > 0 && (
+                  <div className="space-y-1.5">
+                    {editBill.package_summary.map((p) => {
+                      const kept = keptPackages[p.package_instance_id]
+                      const pkgItems = editBill.items.filter((i) => i.package_instance_id === p.package_instance_id)
+                      const total = pkgItems.reduce((n, i) => n + i.total_price, 0)
+                      return (
+                        <div key={p.package_instance_id} className={`flex items-center justify-between gap-2 rounded-lg border p-2 text-sm ${kept ? 'border-blue-200 bg-blue-50/50' : 'bg-red-50 opacity-60'}`}>
+                          <span className="min-w-0">
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <Package className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+                              <span className="truncate font-medium">{p.package_name}</span>
+                              <Badge variant="outline" className="text-[10px]">Package</Badge>
+                            </span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                              {pkgItems.map((i) => `${i.item_name}${(i.employees || []).length ? ` (${i.employees.map((e) => e.full_name).join(', ')})` : ''}`).join(' · ')}
+                            </span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            <span className="font-medium">{formatCurrency(total)}</span>
+                            <button type="button" className="text-xs underline text-muted-foreground hover:text-foreground" onClick={() => setKeptPackages((k) => ({ ...k, [p.package_instance_id]: !kept }))}>
+                              {kept ? 'Remove' : 'Undo'}
+                            </button>
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
                 {/* Cart Items */}
                 <div className="space-y-2">
                   {groupedCart.map((group) => {
@@ -2676,12 +3032,21 @@ function BillCreatePage() {
                   })}
                 </div>
 
+                </>
+              )}
+            </CardContent>
+
+            {/* Checkout: stays in view while the item list scrolls */}
+            {hasLines && (
+              <div className="shrink-0 space-y-2 border-t bg-card p-3">
                 {/* Summary */}
-                <div className="border-t pt-2 space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Subtotal</span>
-                    <span>{formatCurrency(subtotal)}</span>
-                  </div>
+                <div className="space-y-1 text-sm">
+                  {(itemsDiscount > 0 || billDiscount > 0 || taxAmount > 0) && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Subtotal</span>
+                      <span>{formatCurrency(subtotal)}</span>
+                    </div>
+                  )}
                   {itemsDiscount > 0 && (
                     <div className="flex justify-between text-red-500 text-xs">
                       <span>Item Discounts</span>
@@ -2714,16 +3079,13 @@ function BillCreatePage() {
 
                 {/* Bill Discount */}
                 <div className="border-t pt-2">
-                  <Label className="text-xs font-medium flex items-center gap-1 mb-1">
-                    <Percent className="h-3 w-3" /> Bill Discount
-                  </Label>
                   <div className="flex gap-1.5">
-                    <div className="w-16 relative">
+                    <div className="w-20 relative">
                       <Input
                         type="number"
                         min="0"
                         max="100"
-                        placeholder="%"
+                        placeholder="Disc %"
                         className="h-8 text-sm pr-5"
                         value={billDiscountPercent || ''}
                         onChange={(e) =>
@@ -2737,7 +3099,7 @@ function BillCreatePage() {
                       </span>
                     </div>
                     <Input
-                      placeholder="Reason"
+                      placeholder="Bill discount reason"
                       className="h-8 text-sm flex-1"
                       value={discountReason}
                       onChange={(e) => setDiscountReason(e.target.value)}
@@ -2746,6 +3108,7 @@ function BillCreatePage() {
                 </div>
 
                 {/* Payment */}
+                {(!isEdit || editCompleted) && (
                 <div className="border-t pt-2">
                   <div className="flex items-center gap-1.5 mb-1.5">
                     <Label className="text-xs font-medium flex items-center gap-1">
@@ -2764,7 +3127,7 @@ function BillCreatePage() {
                   </div>
                   <div className="space-y-1.5">
                     {payments.map((payment, index) => (
-                      <div key={index} className="space-y-1.5">
+                      <div key={index} className="flex flex-wrap items-center gap-1.5">
                         <div className="flex gap-1">
                           {PAYMENT_MODES.map((mode) => (
                             <button
@@ -2786,6 +3149,7 @@ function BillCreatePage() {
                         </div>
                         {payment.payment_mode === 'upi' && upiAccounts.length > 0 && (
                           <SearchableSelect
+                            className="order-last basis-full"
                             value={payment.upi_account_id || ''}
                             onChange={(val) => handlePaymentChange(index, 'upi_account_id', val)}
                             placeholder="Select UPI Account"
@@ -2793,7 +3157,7 @@ function BillCreatePage() {
                             triggerClassName="h-8 text-sm"
                           />
                         )}
-                        <div className="flex gap-1.5 items-center">
+                        <div className="flex min-w-[130px] flex-1 items-center gap-1.5">
                           <div className="flex-1 relative">
                             <Input
                               type="number"
@@ -2845,49 +3209,56 @@ function BillCreatePage() {
                     </div>
                   )}
                 </div>
+                )}
+
+                {editCompleted && (
+                  <div className="border-t pt-2">
+                    <Label className="text-xs font-medium mb-1 block">Why are you changing this bill? *</Label>
+                    <Input
+                      placeholder="e.g. Customer returned a bottle; wrong price entered"
+                      className="h-8 text-sm"
+                      value={editReason}
+                      onChange={(e) => setEditReason(e.target.value)}
+                      maxLength={500}
+                    />
+                  </div>
+                )}
 
                 {/* Notes */}
-                <div className="border-t pt-2">
-                  <Label className="text-xs font-medium mb-1 block">Notes</Label>
-                  <Input
-                    placeholder="Add notes..."
-                    className="h-8 text-sm"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </div>
-                </>
-              )}
-            </CardContent>
+              </div>
+            )}
 
             {/* Sticky Footer - Submit Buttons */}
-            {cartItems.length > 0 && (
-            <div className="flex-shrink-0 border-t p-3 space-y-1.5 bg-white">
+            {hasLines && (
+            <div className="flex-shrink-0 space-y-1 border-t bg-white p-2.5">
               <Button
-                className="w-full h-10 text-sm"
+                className="h-9 w-full text-sm"
                 onClick={handleSubmit}
                 disabled={
                   createBillMutation.isPending ||
+                  reviseMutation.isPending ||
                   !selectedCustomer ||
-                  cartItems.length === 0 ||
-                  Math.abs(totalPaid - totalAmount) > 0.01
+                  !hasLines ||
+                  ((!isEdit || editCompleted) && Math.abs(totalPaid - totalAmount) > 0.01)
                 }
               >
-                {createBillMutation.isPending ? (
+                {createBillMutation.isPending || reviseMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                    Creating...
+                    {isEdit ? 'Saving...' : 'Creating...'}
                   </>
                 ) : (
                   <>
                     <Check className="h-4 w-4 mr-1.5" />
-                    Complete Bill - {formatCurrency(totalAmount)}
+                    {isEdit ? 'Save changes' : 'Complete Bill'} - {formatCurrency(totalAmount)}
+                    <Kbd className="ml-2 hidden lg:inline-flex">Ctrl+Enter</Kbd>
                   </>
                 )}
               </Button>
+              {!isEdit && (
               <Button
                 variant="outline"
-                className="w-full h-8 text-xs border-primary text-primary hover:bg-primary/5"
+                className="h-7 w-full border-primary text-xs text-primary hover:bg-primary/5"
                 onClick={handleStartService}
                 disabled={
                   createBillMutation.isPending ||
@@ -2897,7 +3268,9 @@ function BillCreatePage() {
               >
                 <Play className="h-3.5 w-3.5 mr-1.5" />
                 Start Service (Save as Pending)
+                <Kbd className="ml-2 hidden lg:inline-flex">Ctrl+Shift+Enter</Kbd>
               </Button>
+              )}
             </div>
             )}
             </>
@@ -2905,6 +3278,31 @@ function BillCreatePage() {
           </Card>
         </div>
       </div>
+
+      {/* Keyboard hints (desktop) */}
+      <div className="mt-1.5 hidden shrink-0 flex-wrap items-center gap-x-3 gap-y-0.5 px-1 text-[10px] text-muted-foreground lg:flex">
+        <span><Kbd>F2</Kbd> customer</span>
+        <span><Kbd>/</Kbd> search</span>
+        <span><Kbd>↑↓←→</Kbd> move</span>
+        <span><Kbd>Enter</Kbd> pick / add</span>
+        <span><Kbd>Alt+1</Kbd><Kbd>2</Kbd><Kbd>3</Kbd> tabs</span>
+        {(!isEdit || editCompleted) && <span><Kbd>Alt+C</Kbd><Kbd>D</Kbd><Kbd>U</Kbd> cash / card / UPI</span>}
+        <span><Kbd>Ctrl+Enter</Kbd> {isEdit ? 'save' : 'complete'}</span>
+        {!isEdit && <span><Kbd>Ctrl+Shift+Enter</Kbd> pending</span>}
+      </div>
+
+      {/* Phones: always-visible total with a jump to the cart */}
+      {hasLines && (
+        <div className="fixed inset-x-0 bottom-16 z-30 border-t bg-background/95 p-2.5 backdrop-blur lg:hidden">
+          <Button className="h-11 w-full justify-between" onClick={() => cartPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            <span className="flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4" />
+              {cartItems.length} item{cartItems.length === 1 ? '' : 's'} in cart
+            </span>
+            <span className="font-semibold">{formatCurrency(totalAmount)} - Review &amp; pay</span>
+          </Button>
+        </div>
+      )}
 
       {/* Edit Cart Item Modal */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
@@ -3296,7 +3694,7 @@ function BillCreatePage() {
         onOpenChange={(open) => { if (!open) setPendingCartItem(null) }}
         onConfirm={() => {
           if (pendingCartItem) {
-            setCartItems((prev) => [...prev, pendingCartItem])
+            setCartItems((prev) => [...prev, { ...pendingCartItem, item_status: 'pending' }])
             setPendingCartItem(null)
             setSelectedItemId(null)
             setItemPrice('')
@@ -3309,8 +3707,9 @@ function BillCreatePage() {
           }
         }}
         title="No Employee Assigned"
-        description="No employee has been assigned to this service. Do you want to proceed?"
-        confirmLabel="Yes, proceed"
+        description="No employee has been assigned to this service. It will be added as a pending service, and you can assign who served it later from the bill or from Pending Services."
+        confirmLabel="Add as pending"
+        autoFocusConfirm
       />
 
       <ConfirmDialog

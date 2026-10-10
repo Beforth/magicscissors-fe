@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import LoginPage from './pages/LoginPage'
+import OnboardingPage from './pages/OnboardingPage'
+import SetupPage from './pages/SetupPage'
 import LicensePage from './pages/LicensePage'
 import CounterCodePage from './pages/CounterCodePage'
 import MyAttendancePage from './pages/MyAttendancePage'
@@ -17,6 +19,7 @@ import BillCreatePage from './pages/BillCreatePage'
 import BillDetailPage from './pages/BillDetailPage'
 import ServicesPage from './pages/ServicesPage'
 import ServiceFormPage from './pages/ServiceFormPage'
+import PackageFormPage from './pages/PackageFormPage'
 import PackagesPage from './pages/PackagesPage'
 import ProductsPage from './pages/ProductsPage'
 import ProductFormPage from './pages/ProductFormPage'
@@ -85,6 +88,8 @@ function App() {
         element={isAuthenticated ? <Navigate to={getDashboardByRole()} replace /> : <LoginPage />}
       />
 
+      <Route path="/setup" element={isAuthenticated ? <Navigate to={getDashboardByRole()} replace /> : <SetupPage />} />
+
       <Route path="/license" element={<LicensePage />} />
 
       <Route
@@ -106,6 +111,8 @@ function App() {
       >
         <Route index element={<Navigate to={getDashboardByRole()} replace />} />
 
+        <Route path="onboarding" element={<OnboardingPage />} />
+
         {/* Dashboards */}
         <Route path="dashboard/owner" element={<OwnerDashboard />} />
         <Route path="dashboard/manager" element={<ManagerDashboard />} />
@@ -119,6 +126,7 @@ function App() {
         <Route path="bills" element={<BillsPage />} />
         <Route path="bills/new" element={<BillCreatePage />} />
         <Route path="bills/:id" element={<BillDetailPage />} />
+        <Route path="bills/:id/edit" element={<BillCreatePage />} />
         <Route path="shifts" element={<ShiftPage />} />
         <Route path="shifts/assignments/:date" element={<ShiftAssignmentsPage />} />
         <Route path="employee-status" element={<EmployeeStatusPage />} />
@@ -126,6 +134,8 @@ function App() {
         <Route path="services/new" element={<ServiceFormPage />} />
         <Route path="services/:id/edit" element={<ServiceFormPage />} />
         <Route path="packages" element={<PackagesPage />} />
+        <Route path="packages/new" element={<PackageFormPage />} />
+        <Route path="packages/:id/edit" element={<PackageFormPage />} />
         <Route path="products" element={<ProductsPage />} />
         <Route path="products/new" element={<ProductFormPage />} />
         <Route path="products/:id/edit" element={<ProductFormPage />} />

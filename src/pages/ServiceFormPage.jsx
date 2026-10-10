@@ -234,7 +234,7 @@ export default function ServiceFormPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 w-full">
       <div>
         <Link
           to="/services"
@@ -257,7 +257,8 @@ export default function ServiceFormPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="service_name">Service Name *</Label>
               <Input
                 id="service_name"
@@ -276,8 +277,9 @@ export default function ServiceFormPage() {
                 placeholder="Select category"
               />
             </div>
+            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-2">
                 <Label htmlFor="price">Price (₹) *</Label>
                 <Input
@@ -303,9 +305,6 @@ export default function ServiceFormPage() {
                   placeholder="18"
                 />
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="hsn_sac_code">SAC Code</Label>
                 <Input
@@ -328,6 +327,7 @@ export default function ServiceFormPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="star_points">Star Points</Label>
               <Input
@@ -374,6 +374,7 @@ export default function ServiceFormPage() {
                 />
               </div>
             )}
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>

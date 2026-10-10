@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { logout } from '@/store/slices/authSlice'
@@ -134,47 +135,89 @@ function NavItemLeaf({ href, icon: Icon, title, collapsed }) {
   )
 }
 
+// Collapsed rail: the sub-menu is a fixed, portalled flyout so the scrolling <nav> can't clip it.
+function CollapsedNavGroup({ item }) {
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ left: 0, top: 0, maxHeight: 400 })
+  const triggerRef = useRef(null)
+  const closeTimer = useRef(null)
+
+  const show = () => {
+    clearTimeout(closeTimer.current)
+    const r = triggerRef.current?.getBoundingClientRect()
+    if (r) {
+      const maxHeight = Math.max(160, window.innerHeight - 16)
+      // Keep the whole menu on screen: slide it up if it would run past the bottom.
+      const estimated = Math.min(maxHeight, 44 + item.children.length * 36)
+      const top = Math.max(8, Math.min(r.top, window.innerHeight - estimated - 8))
+      setPos({ left: r.right, top, maxHeight })
+    }
+    setOpen(true)
+  }
+  const hideSoon = () => {
+    clearTimeout(closeTimer.current)
+    closeTimer.current = setTimeout(() => setOpen(false), 120)
+  }
+  useEffect(() => () => clearTimeout(closeTimer.current), [])
+
+  return (
+    <div onMouseEnter={show} onMouseLeave={hideSoon} onFocus={show} onBlur={hideSoon}>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={item.title}
+        onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+        className="flex w-full cursor-pointer items-center justify-center rounded-lg px-2.5 py-2.5 text-muted-foreground transition-all hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <item.icon className="h-[18px] w-[18px] flex-shrink-0" />
+      </button>
+      {open &&
+        createPortal(
+          <div
+            className="fixed z-[70] pl-2"
+            style={{ left: pos.left, top: pos.top }}
+            onMouseEnter={show}
+            onMouseLeave={hideSoon}
+            onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+          >
+            <div role="menu" className="min-w-[200px] overflow-y-auto rounded-md border bg-popover py-2 shadow-lg" style={{ maxHeight: pos.maxHeight }}>
+              <div className="px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{item.title}</div>
+              {item.children.map((child) => (
+                <NavLink
+                  key={child.href}
+                  to={child.href}
+                  end={child.href === '/inventory'}
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-2.5 px-3.5 py-2 text-sm transition-colors',
+                      isActive
+                        ? 'bg-accent font-semibold text-primary'
+                        : 'text-muted-foreground hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-foreground'
+                    )
+                  }
+                >
+                  <child.icon className="h-4 w-4 flex-shrink-0" />
+                  {child.title}
+                </NavLink>
+              ))}
+            </div>
+          </div>,
+          document.body
+        )}
+    </div>
+  )
+}
+
 // ── Nav group ─────────────────────────────────────────────────────────────────
 function NavGroup({ item, collapsed, expandedGroups, toggleGroup }) {
   const isExpanded = expandedGroups[item.title]
 
   if (collapsed) {
-    return (
-      <div className="relative group/nav">
-        <div
-          className="flex items-center justify-center w-full px-2.5 py-2.5 rounded-lg text-muted-foreground hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-primary transition-all cursor-pointer"
-          title={item.title}
-        >
-          <item.icon className="h-[18px] w-[18px] flex-shrink-0" />
-        </div>
-        {/* Flyout */}
-        <div className="absolute left-full top-0 ml-2 hidden group-hover/nav:block z-50 pointer-events-auto">
-          <div className="bg-popover border rounded-md shadow-lg py-2 min-w-[190px]">
-            <div className="px-3.5 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-              {item.title}
-            </div>
-            {item.children.map((child) => (
-              <NavLink
-                key={child.href}
-                to={child.href}
-                end={child.href === '/inventory'}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-2.5 px-3.5 py-2 text-sm transition-colors',
-                    isActive
-                      ? 'bg-accent text-primary font-semibold'
-                      : 'text-muted-foreground hover:bg-[hsl(var(--sidebar-hover-bg))] hover:text-foreground'
-                  )
-                }
-              >
-                <child.icon className="h-4 w-4 flex-shrink-0" />
-                {child.title}
-              </NavLink>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
+    return <CollapsedNavGroup item={item} />
   }
 
   return (
@@ -219,7 +262,7 @@ function NavGroup({ item, collapsed, expandedGroups, toggleGroup }) {
 }
 
 // ── Sidebar Content ───────────────────────────────────────────────────────────
-function SidebarContent({ collapsed, expandedGroups, toggleGroup, navItems, user, onLogout }) {
+function SidebarContent({ collapsed, expandedGroups, toggleGroup, navItems, user, onLogout, onToggleCollapse }) {
   const initials = user?.fullName
     ? user.fullName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
     : 'U'
@@ -231,25 +274,40 @@ function SidebarContent({ collapsed, expandedGroups, toggleGroup, navItems, user
         'flex items-center h-20 flex-shrink-0 px-5 border-b border-white/60',
         collapsed && 'justify-center px-2'
       )}>
-        {collapsed ? (
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center ">
-            <Scissors className="w-5 h-5 text-white" />
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center  flex-shrink-0">
-              <Scissors className="w-5 h-5 text-white" />
+        {(() => {
+          // On desktop the logo doubles as the collapse button: hover swaps it for the panel icon.
+          const mark = onToggleCollapse ? (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              title={collapsed ? 'Expand sidebar  ( [ )' : 'Collapse sidebar  ( [ )'}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="group/logo relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-white outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <Scissors className="h-5 w-5 transition-opacity group-hover/logo:opacity-0 group-focus-visible/logo:opacity-0" />
+              {collapsed ? (
+                <PanelLeftOpen className="absolute h-5 w-5 opacity-0 transition-opacity group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100" />
+              ) : (
+                <PanelLeftClose className="absolute h-5 w-5 opacity-0 transition-opacity group-hover/logo:opacity-100 group-focus-visible/logo:opacity-100" />
+              )}
+            </button>
+          ) : (
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-primary">
+              <Scissors className="h-5 w-5 text-white" />
             </div>
-            <div className="flex flex-col">
-              <span className="text-lg font-black tracking-tight text-primary">
-                Magic Scissor
-              </span>
-              <span className="text-[10px] text-muted-foreground font-medium -mt-0.5">
-                Salon Management · {CURRENT_VERSION}
-              </span>
+          )
+          return collapsed ? (
+            mark
+          ) : (
+            <div className="flex items-center gap-3">
+              {mark}
+              <div className="flex flex-col">
+                <span className="text-lg font-black tracking-tight text-primary">Magic Scissor</span>
+                <span className="-mt-0.5 text-[10px] font-medium text-muted-foreground">Salon Management · {CURRENT_VERSION}</span>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
 
       {/* Navigation */}
@@ -365,7 +423,7 @@ function Sidebar() {
 
       {/* Desktop sidebar */}
       <aside className={cn('hidden md:flex md:flex-col md:fixed md:inset-y-0 transition-[width] duration-200 ease-in-out z-30', collapsed ? 'md:w-16' : 'md:w-64')}>
-        <SidebarContent collapsed={collapsed} {...sharedProps} />
+        <SidebarContent collapsed={collapsed} onToggleCollapse={toggle} {...sharedProps} />
 
         {/* Collapse toggle */}
         <div className="flex-shrink-0 border-t border-[hsl(var(--sidebar-border))]">

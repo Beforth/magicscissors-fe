@@ -6,6 +6,10 @@ export const serviceService = {
 
   createCategory: (data) => api.post('/services/categories', data),
 
+  updateCategory: (id, data) => api.put(`/services/categories/${id}`, data),
+
+  deleteCategory: (id) => api.delete(`/services/categories/${id}`),
+
   // Services
   getServices: (params) => api.get('/services', { params }),
 
@@ -21,6 +25,10 @@ export const serviceService = {
   getPackageCategories: (params) => api.get('/packages/categories', { params }),
 
   createPackageCategory: (data) => api.post('/packages/categories', data),
+
+  updatePackageCategory: (id, data) => api.put(`/packages/categories/${id}`, data),
+
+  deletePackageCategory: (id) => api.delete(`/packages/categories/${id}`),
 
   // Packages
   getPackages: (params) => api.get('/packages', { params }),

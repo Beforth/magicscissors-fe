@@ -64,7 +64,7 @@ export default function CounterWithdrawalsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Counter Withdrawals</h1>
           <p className="text-sm text-gray-500 mt-1">Track cash withdrawals from the counter</p>

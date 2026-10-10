@@ -135,7 +135,7 @@ function CustomerModal({ open, onOpenChange, customer = null, minimal = false, p
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name & Phone */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="customer_name">Name *</Label>
               <Input
@@ -187,7 +187,7 @@ function CustomerModal({ open, onOpenChange, customer = null, minimal = false, p
               </div>
 
               {/* Gender & Age Category */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Gender</Label>
                   <SearchableSelect
@@ -241,7 +241,7 @@ function CustomerModal({ open, onOpenChange, customer = null, minimal = false, p
               </div>
 
               {/* City & Pincode */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="city">City</Label>
                   <Input

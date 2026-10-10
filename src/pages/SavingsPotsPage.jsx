@@ -211,12 +211,12 @@ export default function SavingsPotsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Savings Pots</h1>
           <p className="text-sm text-gray-500 mt-1">Manage fixed deposits and savings accounts</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {canManagePots && (
             <Button variant="outline" onClick={handleGlobalDeposit} disabled={pots.filter(p => p.is_active).length === 0}>
               <ArrowDownToLine className="h-4 w-4 mr-2" />

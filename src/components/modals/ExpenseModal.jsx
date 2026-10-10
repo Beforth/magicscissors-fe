@@ -261,7 +261,7 @@ function ExpenseModal({ open, onOpenChange, expense = null }) {
           )}
 
           {/* Category + Amount */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Category *</Label>
               <SearchableSelect
@@ -300,7 +300,7 @@ function ExpenseModal({ open, onOpenChange, expense = null }) {
           )}
 
           {/* Date + Time + Payment Mode */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="exp-date">Expense Date *</Label>
               <Input
