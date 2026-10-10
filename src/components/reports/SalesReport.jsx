@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { reportsService } from '@/services/reports.service'
 import { formatCurrency } from '@/lib/utils'
-import { ChartTip, DataTable, Empty, ExportMenu, Kpi, Panel, ReportError, ReportLoading, ShareBar, WEEKDAYS, compact, shortDate, useChartColors } from './ReportKit'
+import { ChartTip, DataTable, Empty, ExportMenu, Kpi, Panel, ReportError, ReportLoading, ShareBar, WEEKDAYS, compact, shortDate, useChartColors, ExportAllMenu } from './ReportKit'
 
 const MODE = { cash: 'Cash', card: 'Card', upi: 'UPI', online: 'Online', other: 'Other' }
 
@@ -31,6 +31,15 @@ export default function SalesReport({ from, to, branchId }) {
 
   return (
     <div className="space-y-4">
+      <ExportAllMenu title="Sales" sets={[
+        { label: 'Bills', rows: exportRows, filename: `sales-bills-${data.range.from}-to-${data.range.to}` },
+        { label: 'Revenue by day', rows: data.daily, filename: `sales-by-day-${data.range.from}-to-${data.range.to}` },
+        { label: 'Payment modes', rows: data.payment_mix, filename: `sales-payment-modes-${data.range.from}-to-${data.range.to}` },
+        { label: 'Weekdays', rows: data.by_weekday, filename: `sales-weekdays-${data.range.from}-to-${data.range.to}` },
+        { label: 'Top services', rows: data.top_services, filename: `sales-top-services-${data.range.from}-to-${data.range.to}` },
+        { label: 'Top products', rows: data.top_products, filename: `sales-top-products-${data.range.from}-to-${data.range.to}` },
+        { label: 'Branches', rows: data.branches, filename: `sales-branches-${data.range.from}-to-${data.range.to}` },
+      ]} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Revenue" value={formatCurrency(t.revenue)} change={t.revenue_change} />
         <Kpi label="Bills" value={t.bills} change={t.bills_change} />

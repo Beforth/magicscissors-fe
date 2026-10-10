@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
 import { reportsService } from '@/services/reports.service'
-import { DataTable, Delta, Empty, ExportMenu, Kpi, Panel, ReportError, ReportLoading, ShareBar, useChartColors } from './ReportKit'
+import { DataTable, Delta, Empty, ExportMenu, Kpi, Panel, ReportError, ReportLoading, ShareBar, useChartColors, ExportAllMenu } from './ReportKit'
 
 export default function CatalogReport({ from, to, branchId }) {
   const colors = useChartColors()
@@ -19,6 +19,11 @@ export default function CatalogReport({ from, to, branchId }) {
 
   return (
     <div className="space-y-4">
+      <ExportAllMenu title="Catalog" sets={[
+        { label: 'Services', rows: data.services, filename: `catalog-services-${from}-to-${to}` },
+        { label: 'Categories', rows: data.by_category, filename: `catalog-categories-${from}-to-${to}` },
+        { label: 'Products', rows: data.products, filename: `catalog-products-${from}-to-${to}` },
+      ]} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Services sold" value={t.services_sold} />
         <Kpi label="Service revenue" value={formatCurrency(t.revenue)} />

@@ -6,6 +6,7 @@ import { SidebarProvider, useSidebar } from '@/contexts/SidebarContext'
 import DocsFirstTimeModal from '@/components/DocsFirstTimeModal'
 import CommandCenter from './CommandCenter'
 import LicenseBanner from './LicenseBanner'
+import InstallAppBanner from '@/components/InstallAppBanner'
 
 function DashboardContent() {
   const { collapsed, openMobile } = useSidebar()
@@ -31,6 +32,7 @@ function DashboardContent() {
         }`}
       >
         <LicenseBanner />
+        <InstallAppBanner />
         <Header onMenuClick={openMobile} />
 
         <main id="main-content" tabIndex={-1} className="flex-1 outline-none pb-24 pt-4 sm:pt-6 md:pb-8">

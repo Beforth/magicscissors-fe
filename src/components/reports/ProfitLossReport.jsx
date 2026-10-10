@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { formatCurrency } from '@/lib/utils'
 import { reportsService } from '@/services/reports.service'
-import { DataTable, Empty, ExportMenu, Kpi, Panel, ReportError, ReportLoading, ShareBar } from './ReportKit'
+import { DataTable, Empty, ExportMenu, Kpi, Panel, ReportError, ReportLoading, ShareBar, ExportAllMenu } from './ReportKit'
 
 export default function ProfitLossReport({ from, to, branchId }) {
   const { data, isLoading, error, refetch } = useQuery({
@@ -17,6 +17,10 @@ export default function ProfitLossReport({ from, to, branchId }) {
 
   return (
     <div className="space-y-4">
+      <ExportAllMenu title="Profit and loss" sets={[
+        { label: 'Branches', rows: data.branches, filename: `profit-loss-branches-${from}-to-${to}` },
+        { label: 'Expenses by category', rows: data.expenses_by_category, filename: `profit-loss-expenses-${from}-to-${to}` },
+      ]} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Revenue" value={formatCurrency(t.revenue)} />
         <Kpi label="Expenses" value={formatCurrency(t.expenses)} tone={t.expenses ? 'text-amber-600' : ''} />

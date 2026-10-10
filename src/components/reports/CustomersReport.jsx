@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { reportsService } from '@/services/reports.service'
 import { formatCurrency } from '@/lib/utils'
-import { ChartTip, DataTable, Empty, ExportMenu, Kpi, Panel, ReportError, ReportLoading, shortDate, useChartColors } from './ReportKit'
+import { ChartTip, DataTable, Empty, ExportMenu, Kpi, Panel, ReportError, ReportLoading, shortDate, useChartColors, ExportAllMenu } from './ReportKit'
 
 export default function CustomersReport({ from, to, branchId }) {
   const colors = useChartColors()
@@ -28,6 +28,12 @@ export default function CustomersReport({ from, to, branchId }) {
 
   return (
     <div className="space-y-4">
+      <ExportAllMenu title="Customers" sets={[
+        { label: 'Top customers', rows: data.top_customers, filename: `customers-top-${from}-to-${to}` },
+        { label: 'Win-back list', rows: data.lapsed, filename: `customers-winback-${from}-to-${to}` },
+        { label: 'Visit frequency', rows: data.frequency, filename: `customers-frequency-${from}-to-${to}` },
+        { label: 'New customers per day', rows: data.new_per_day, filename: `customers-new-${from}-to-${to}` },
+      ]} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Customers served" value={t.served} />
         <Kpi label="New customers" value={t.new} hint="first ever bill in this period" tone="text-emerald-600" />

@@ -1,12 +1,14 @@
 import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { logout } from '@/store/slices/authSlice'
 import { notificationService } from '@/services/notification.service'
 import { branchService } from '@/services/branch.service'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
+import { usePwaInstall } from '@/lib/pwaInstall'
 import { OPEN_PALETTE_EVENT } from './CommandCenter'
 import {
   DropdownMenu,
@@ -31,6 +33,7 @@ import {
   Check,
   TrendingUp,
   Receipt,
+  Download,
 } from 'lucide-react'
 import EmployeeRotationPanel from '@/components/billing/EmployeeRotationPanel'
 
@@ -42,6 +45,7 @@ function usePageTitle() {
 }
 
 function Header({ onMenuClick }) {
+  const pwa = usePwaInstall()
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -312,6 +316,14 @@ function Header({ onMenuClick }) {
             <DropdownMenuItem onClick={() => navigate('/profile')} className="gap-2.5 px-3 py-2 text-muted-foreground hover:text-primary rounded-md">
               <User className="h-4 w-4" />Profile
             </DropdownMenuItem>
+            {!pwa.installed && (pwa.canPrompt || pwa.isIOS) && (
+              <DropdownMenuItem
+                onClick={() => (pwa.canPrompt ? pwa.install() : toast.info('Tap Share, then “Add to Home Screen”'))}
+                className="gap-2.5 px-3 py-2 text-muted-foreground hover:text-primary rounded-md"
+              >
+                <Download className="h-4 w-4" />Install app
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator className="bg-border" />
             <DropdownMenuItem
               onClick={handleLogout}

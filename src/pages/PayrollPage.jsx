@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -50,6 +50,7 @@ function ReportTab({ branchId, month }) {
   const rows = res?.data?.rows || []
   const settings = res?.data?.settings
   const totals = payrollTotals(rows)
+  const hasServiceTime = rows.some((r) => r.service_time)
 
   const divisor = settings?.monthly_days_mode === 'fixed'
     ? `${settings.monthly_fixed_days} fixed days`
@@ -102,6 +103,7 @@ function ReportTab({ branchId, month }) {
                 <TableHead className="text-right">Gross</TableHead>
                 <TableHead className="text-right">Late deduction</TableHead>
                 <TableHead className="text-right">Late fine (₹)</TableHead>
+                {hasServiceTime && <TableHead className="text-right">Overtime</TableHead>}
                 <TableHead className="text-right">Net pay</TableHead>
               </TableRow>
             </TableHeader>
@@ -124,6 +126,12 @@ function ReportTab({ branchId, month }) {
                   <TableCell className="text-right">{formatMoney(r.gross)}</TableCell>
                   <TableCell className="text-right">{formatMoney(r.late_deduction_amount)}</TableCell>
                   <TableCell className="text-right">{formatMoney(r.late_fine_amount ?? 0)}</TableCell>
+                  {hasServiceTime && (
+                    <TableCell className="text-right">
+                      {formatMoney(r.service_time_pay ?? 0)}
+                      <div className="text-xs text-gray-500">{r.service_time?.overtime_minutes || 0} min</div>
+                    </TableCell>
+                  )}
                   <TableCell className="text-right font-medium">{formatMoney(r.net_pay)}</TableCell>
                 </TableRow>
               ))}
@@ -138,10 +146,223 @@ function ReportTab({ branchId, month }) {
                 <TableCell className="text-right">{formatMoney(totals.gross)}</TableCell>
                 <TableCell className="text-right">{formatMoney(totals.late_deduction_amount)}</TableCell>
                 <TableCell className="text-right">{formatMoney(totals.late_fine_amount)}</TableCell>
+                {hasServiceTime && (
+                  <TableCell className="text-right">
+                    {formatMoney(rows.reduce((t, r) => t + (r.service_time_pay || 0), 0))}
+                  </TableCell>
+                )}
                 <TableCell className="text-right">{formatMoney(totals.net_pay)}</TableCell>
               </TableRow>
             </TableBody>
           </Table>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function ServiceTimeTab({ branchId, month }) {
+  const { data: res, isLoading, isError, error } = useQuery({
+    queryKey: ['payroll-service-time', branchId, month],
+    queryFn: () => payrollService.getServiceTimeReport(branchId, month),
+    enabled: !!branchId && !!month,
+  })
+  const employees = res?.data?.employees || []
+  const rules = res?.data?.rules
+  const hm = (m) => `${Math.floor(m / 60)}h ${String(Math.round(m % 60)).padStart(2, '0')}m`
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Service time &amp; overtime</CardTitle>
+        <CardDescription>
+          Time spent on completed services, split into inside the shift (valued at the normal hourly rate) and
+          outside it (overtime, prorated to the minute).
+          {rules && !rules.enabled && ' Overtime pay is switched off, so none of this is added to payroll — turn on “Service time pay” in the rules above.'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Spinner />
+        ) : isError ? (
+          <p className="text-center text-red-500 py-8">{errMsg(error, 'Failed to load service time')}</p>
+        ) : employees.length === 0 ? (
+          <p className="text-center text-gray-500 py-8">
+            No completed services with a recorded start and end time this month.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Employee / day</TableHead>
+                <TableHead className="text-right">Service time</TableHead>
+                <TableHead className="text-right">In shift</TableHead>
+                <TableHead className="text-right">Overtime</TableHead>
+                <TableHead className="text-right">Overtime rate</TableHead>
+                <TableHead className="text-right">Overtime pay</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {employees.map((e) => (
+                <Fragment key={e.user_id}>
+                  <TableRow className="bg-gray-50 font-semibold">
+                    <TableCell>{e.full_name}</TableCell>
+                    <TableCell className="text-right">{hm(e.service_minutes)}</TableCell>
+                    <TableCell className="text-right">{hm(e.in_shift_minutes)}</TableCell>
+                    <TableCell className="text-right">{hm(e.overtime_minutes)}</TableCell>
+                    <TableCell />
+                    <TableCell className="text-right">{formatMoney(e.overtime_amount)}</TableCell>
+                  </TableRow>
+                  {e.days.map((d) => (
+                    <TableRow key={d.date}>
+                      <TableCell className="pl-8 text-sm text-gray-600">
+                        {d.date}
+                        <span className="ml-2 text-xs text-gray-400">
+                          {d.has_shift ? `shift ${d.shift_start}–${d.shift_end}` : 'no shift'} · {d.services} service(s)
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right text-sm">{hm(d.service_minutes)}</TableCell>
+                      <TableCell className="text-right text-sm">{hm(d.in_shift_minutes)}</TableCell>
+                      <TableCell className="text-right text-sm">{hm(d.overtime_minutes)}</TableCell>
+                      <TableCell className="text-right text-sm">
+                        {d.overtime_rate == null ? '—' : `${formatMoney(d.overtime_rate)}/h`}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">{formatMoney(d.overtime_amount)}</TableCell>
+                    </TableRow>
+                  ))}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function ServiceTimeRulesCard() {
+  const queryClient = useQueryClient()
+  const [draft, setDraft] = useState(null)
+  const { data: res, isLoading } = useQuery({
+    queryKey: ['payroll-service-time-rules'],
+    queryFn: payrollService.getServiceTimeRules,
+  })
+  const server = res?.data
+  const f = draft || (server && {
+    enabled: server.enabled,
+    add_in_shift: server.in_shift?.add_to_pay,
+    ot_enabled: server.overtime.enabled,
+    rate_mode: server.overtime.rate_mode,
+    hourly_rate: String(server.overtime.hourly_rate),
+    multiplier: String(server.overtime.multiplier),
+    before_shift: server.overtime.before_shift,
+    min_minutes: String(server.overtime.min_minutes),
+    rounding_minutes: String(server.overtime.rounding_minutes),
+  })
+  const set = (k, v) => setDraft({ ...f, [k]: v })
+
+  const save = useMutation({
+    mutationFn: (payload) => payrollService.setServiceTimeRules(payload),
+    onSuccess: () => {
+      toast.success('Service time pay rules saved')
+      setDraft(null)
+      queryClient.invalidateQueries({ queryKey: ['payroll-service-time-rules'] })
+      queryClient.invalidateQueries({ queryKey: ['payroll-service-time'] })
+      queryClient.invalidateQueries({ queryKey: ['payroll-report'] })
+    },
+    onError: (err) => toast.error(errMsg(err, 'Failed to save rules')),
+  })
+
+  const handleSave = () => {
+    const n = (v) => Number(v)
+    if ([f.hourly_rate, f.multiplier, f.min_minutes, f.rounding_minutes].some((v) => !Number.isFinite(n(v)) || n(v) < 0)
+      || n(f.rounding_minutes) < 1) {
+      toast.error('Rates and minutes must be positive numbers (rounding at least 1)')
+      return
+    }
+    save.mutate({
+      enabled: f.enabled,
+      in_shift: { add_to_pay: f.add_in_shift },
+      overtime: {
+        enabled: f.ot_enabled,
+        rate_mode: f.rate_mode,
+        hourly_rate: n(f.hourly_rate),
+        multiplier: n(f.multiplier),
+        before_shift: f.before_shift,
+        min_minutes: Math.floor(n(f.min_minutes)),
+        rounding_minutes: Math.floor(n(f.rounding_minutes)),
+      },
+    })
+  }
+
+  const Check = ({ id, label, hint, k }) => (
+    <label htmlFor={id} className="flex items-start gap-2 text-sm">
+      <input id={id} type="checkbox" className="mt-1" checked={!!f[k]} onChange={(e) => set(k, e.target.checked)} />
+      <span>
+        <span className="font-medium">{label}</span>
+        {hint && <span className="block text-xs text-gray-500">{hint}</span>}
+      </span>
+    </label>
+  )
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Service time pay rules (overtime)</CardTitle>
+        <CardDescription>
+          Pays staff for the time they spend on services outside their shift. Work inside the shift is valued at
+          wage ÷ shift hours (e.g. ₹600 ÷ 10 h = ₹60/h). Work after the shift is paid at the overtime rate,
+          prorated to the minute (50 min at ₹100/h = ₹83.33). Uses the real Started → Completed time of each service.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading || !f ? (
+          <Spinner />
+        ) : (
+          <>
+            <Check id="stp-enabled" k="enabled" label="Turn on service time pay" hint="Adds the amounts below to net pay in the payroll report." />
+            <Check id="stp-inshift" k="add_in_shift" label="Also add in-shift service time to pay" hint="Leave off if the daily/monthly wage already covers the shift." />
+            <Check id="stp-ot" k="ot_enabled" label="Pay overtime for service time outside the shift" />
+            <div className="grid gap-4 sm:grid-cols-2 max-w-2xl">
+              <div className="space-y-2">
+                <Label htmlFor="stp-mode">Overtime rate</Label>
+                <select
+                  id="stp-mode"
+                  className="w-full h-10 px-3 border rounded-md bg-white text-sm"
+                  value={f.rate_mode}
+                  onChange={(e) => set('rate_mode', e.target.value)}
+                >
+                  <option value="fixed">Fixed ₹ per hour</option>
+                  <option value="multiplier">Multiple of the normal hourly rate</option>
+                </select>
+              </div>
+              {f.rate_mode === 'fixed' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="stp-rate">Overtime ₹ per hour</Label>
+                  <Input id="stp-rate" type="number" min="0" step="0.01" value={f.hourly_rate} onChange={(e) => set('hourly_rate', e.target.value)} />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="stp-mult">Multiplier (×)</Label>
+                  <Input id="stp-mult" type="number" min="0" step="0.05" value={f.multiplier} onChange={(e) => set('multiplier', e.target.value)} />
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="stp-min">Ignore overtime shorter than (min/day)</Label>
+                <Input id="stp-min" type="number" min="0" value={f.min_minutes} onChange={(e) => set('min_minutes', e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="stp-round">Round overtime down to (minutes)</Label>
+                <Input id="stp-round" type="number" min="1" value={f.rounding_minutes} onChange={(e) => set('rounding_minutes', e.target.value)} />
+              </div>
+            </div>
+            <Check id="stp-before" k="before_shift" label="Count work before the shift starts as overtime too" />
+            <p className="text-xs text-gray-500">Each employee can have their own overtime ₹/hour in the Wages tab.</p>
+            <Button onClick={handleSave} disabled={save.isPending}>
+              {save.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save service time rules
+            </Button>
+          </>
         )}
       </CardContent>
     </Card>
@@ -178,15 +399,21 @@ function WagesTab({ branchId }) {
   const current = (e) => edits[e.employee_id] || {
     pay_type: e.pay_type || '',
     amount: e.wage_amount == null ? '' : String(e.wage_amount),
+    overtime: e.overtime_rate == null ? '' : String(e.overtime_rate),
   }
   const setField = (e, key, value) =>
     setEdits((prev) => ({ ...prev, [e.employee_id]: { ...current(e), [key]: value } }))
 
   const handleSave = (e) => {
-    const { pay_type, amount } = current(e)
+    const { pay_type, amount, overtime } = current(e)
     const hasAmount = amount !== ''
+    const overtime_rate = overtime === '' ? null : Number(overtime)
+    if (overtime_rate != null && (!Number.isFinite(overtime_rate) || overtime_rate < 0)) {
+      toast.error('Overtime rate must be a positive amount, or empty to use the default')
+      return
+    }
     if (!pay_type && !hasAmount) {
-      saveMutation.mutate({ id: e.employee_id, payload: { pay_type: null, wage_amount: null } })
+      saveMutation.mutate({ id: e.employee_id, payload: { pay_type: null, wage_amount: null, overtime_rate } })
       return
     }
     const wage = Number(amount)
@@ -194,7 +421,7 @@ function WagesTab({ branchId }) {
       toast.error('Choose a pay type and an amount, or clear both')
       return
     }
-    saveMutation.mutate({ id: e.employee_id, payload: { pay_type, wage_amount: wage } })
+    saveMutation.mutate({ id: e.employee_id, payload: { pay_type, wage_amount: wage, overtime_rate } })
   }
 
   return (
@@ -202,7 +429,8 @@ function WagesTab({ branchId }) {
       <CardHeader>
         <CardTitle className="text-lg">Employee wages</CardTitle>
         <CardDescription>
-          Set a daily or monthly wage per employee. Clear both fields to remove a wage.
+          Set a daily or monthly wage per employee. Clear both fields to remove a wage. Overtime ₹/hour overrides the
+          default overtime rate for that person; leave it empty to use the default.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -222,6 +450,7 @@ function WagesTab({ branchId }) {
                 <TableHead>Role</TableHead>
                 <TableHead>Pay type</TableHead>
                 <TableHead>Amount (₹)</TableHead>
+                <TableHead>Overtime ₹/hour</TableHead>
                 <TableHead className="w-[100px]" />
               </TableRow>
             </TableHeader>
@@ -258,6 +487,18 @@ function WagesTab({ branchId }) {
                         className="w-32"
                         value={row.amount}
                         onChange={(ev) => setField(e, 'amount', ev.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        aria-label={`Overtime rate for ${e.full_name}`}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="w-32"
+                        placeholder="Default"
+                        value={row.overtime}
+                        onChange={(ev) => setField(e, 'overtime', ev.target.value)}
                       />
                     </TableCell>
                     <TableCell>
@@ -428,11 +669,18 @@ export default function PayrollPage() {
       <Tabs defaultValue="report">
         <TabsList>
           <TabsTrigger value="report">Report</TabsTrigger>
+          <TabsTrigger value="service-time">Service time</TabsTrigger>
           <TabsTrigger value="wages">Wages</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="report">
           <ReportTab branchId={branchId} month={month} />
+        </TabsContent>
+        <TabsContent value="service-time">
+          <ServiceTimeRulesCard />
+          <div className="mt-6">
+            <ServiceTimeTab branchId={branchId} month={month} />
+          </div>
         </TabsContent>
         <TabsContent value="wages">
           <WagesTab branchId={branchId} />

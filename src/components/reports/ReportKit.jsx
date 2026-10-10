@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, ArrowDownRight, ArrowUpRight, ChevronDown, Download, FileSpreadsheet, FileText, Minus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { exportToCSV, exportToExcel, exportToPDF } from '@/lib/export-utils'
 
 function cssColor(name, fallback) {
@@ -185,6 +185,54 @@ export function ExportMenu({ rows, filename, title, summary = [] }) {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+/** Plain table rows: scalar fields only, one level of nested objects flattened as parent_child. */
+export function flatRows(rows) {
+  return (rows || []).map((r) => {
+    const out = {}
+    Object.entries(r || {}).forEach(([k, v]) => {
+      if (v == null || typeof v !== 'object') out[k] = v
+      else if (!Array.isArray(v)) Object.entries(v).forEach(([k2, v2]) => { if (v2 == null || typeof v2 !== 'object') out[`${k}_${k2}`] = v2 })
+    })
+    return out
+  })
+}
+
+/** One button that exports every table of a report. sets = [{ label, rows, filename }] */
+export function ExportAllMenu({ sets, title }) {
+  const usable = (sets || []).map((x) => ({ ...x, rows: flatRows(x.rows) })).filter((x) => x.rows.length > 0)
+  if (usable.length === 0) return null
+  return (
+    <div className="flex justify-end">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Download className="mr-2 h-4 w-4" />
+            Export report
+            <ChevronDown className="ml-1 h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="max-h-96 overflow-y-auto">
+          {usable.map((x, i) => (
+            <div key={x.filename}>
+              {i > 0 && <DropdownMenuSeparator />}
+              <DropdownMenuLabel className="text-xs text-muted-foreground">{x.label}</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => exportToCSV(x.rows, x.filename)}>
+                <FileText className="mr-2 h-4 w-4" /> CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportToExcel(x.rows, x.filename, { title: x.label })}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportToPDF(x.rows, x.filename, { title: `${title || ''} ${x.label}`.trim() })}>
+                <FileText className="mr-2 h-4 w-4" /> Print / PDF
+              </DropdownMenuItem>
+            </div>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   )
 }
 

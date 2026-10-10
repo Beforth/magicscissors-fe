@@ -7,8 +7,6 @@ import { useFilterParams, buildReturnTo } from '@/hooks/useFilterParams'
 import { branchService } from '@/services/branch.service'
 import { userService } from '@/services/user.service'
 import { incentiveService } from '@/services/incentive.service'
-import { employeeIncentiveService } from '@/services/employeeIncentive.service'
-import StaffIncentivesSection, { monthYearFromDate, monthLabel } from '@/components/StaffIncentivesSection'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -98,14 +96,6 @@ function StaffPerformancePage() {
   const effectiveStart = filterMode === 'single' ? singleDate : startDate
   const effectiveEnd = filterMode === 'single' ? singleDate : endDate
 
-  const staffIncentivePeriod = useMemo(() => monthYearFromDate(effectiveEnd), [effectiveEnd])
-  const spansMultipleMonths = useMemo(() => {
-    const start = monthYearFromDate(effectiveStart)
-    const end = monthYearFromDate(effectiveEnd)
-    if (!start || !end) return false
-    return start.year !== end.year || start.month !== end.month
-  }, [effectiveStart, effectiveEnd])
-
   const { data: performanceData, isLoading } = useQuery({
     queryKey: ['staff-performance', effectiveStart, effectiveEnd, effectiveBranch, selectedEmployee, matrixPage, matrixPageSize],
     queryFn: () =>
@@ -144,32 +134,6 @@ function StaffPerformancePage() {
     enabled: canSeeFinancials && !!effectiveStart && !!effectiveEnd,
   })
 
-  const { data: staffIncentiveData } = useQuery({
-    queryKey: ['employee-incentives', {
-      year: staffIncentivePeriod?.year,
-      month: staffIncentivePeriod?.month,
-      branchId: effectiveBranch || null,
-    }],
-    queryFn: () =>
-      employeeIncentiveService.list({
-        year: staffIncentivePeriod.year,
-        month: staffIncentivePeriod.month,
-        ...(effectiveBranch ? { branchId: effectiveBranch } : {}),
-      }),
-    enabled: canSeeFinancials && !!staffIncentivePeriod,
-  })
-  const staffIncentiveRows = Array.isArray(staffIncentiveData?.data) ? staffIncentiveData.data : []
-  const staffIncentiveByEmployee = useMemo(() => {
-    const map = new Map()
-    for (const row of staffIncentiveRows) {
-      map.set(row.employee_id, row)
-    }
-    return map
-  }, [staffIncentiveRows])
-  const staffIncentiveTotal = useMemo(
-    () => staffIncentiveRows.reduce((s, r) => s + Number(r.total_incentive || 0), 0),
-    [staffIncentiveRows]
-  )
   const incentiveReport = incentiveReportData?.data || incentiveReportData || {}
   const incentiveByEmployeeAll = incentiveReport.by_employee || []
 
@@ -213,9 +177,8 @@ function StaffPerformancePage() {
       earnings: employees.reduce((s, e) => s + (e.revenue_generated - (e.product_incentives || 0)), 0),
       productSales: employees.reduce((s, e) => s + (e.product_sales || 0), 0),
       productIncentives: employees.reduce((s, e) => s + (e.product_incentives || 0), 0),
-      staffIncentives: staffIncentiveRows.reduce((s, r) => s + Number(r.total_incentive || 0), 0),
     }
-  }, [employees, staffIncentiveRows])
+  }, [employees])
 
   // For single day + selected employee: that day's services sorted by time
   const singleDayServicesByTime = useMemo(() => {
@@ -875,23 +838,6 @@ function StaffPerformancePage() {
                         </div>
                       </CardContent>
                     </Card>
-                    <Card
-                      className="cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
-                      onClick={() => document.getElementById('staff-incentives')?.scrollIntoView({ behavior: 'smooth' })}
-                    >
-                      <CardContent className="pt-5 pb-4">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                          <IndianRupee className="h-4 w-4 text-primary" />
-                          <span className="text-xs font-medium">Staff Incentive</span>
-                        </div>
-                        <div className="text-2xl font-bold text-primary">
-                          {formatCurrency(staffIncentiveByEmployee.get(activeEmployee.employee_id)?.total_incentive || 0)}
-                        </div>
-                        {staffIncentivePeriod && (
-                          <span className="text-xs text-muted-foreground">{monthLabel(staffIncentivePeriod.year, staffIncentivePeriod.month)}</span>
-                        )}
-                      </CardContent>
-                    </Card>
                   </>
                 )}
               </div>
@@ -1125,18 +1071,6 @@ function StaffPerformancePage() {
                           <div className="text-2xl font-bold text-green-600">{formatCurrency(totals.productIncentives || incentiveSummary.total_incentive || 0)}</div>
                         </CardContent>
                       </Card>
-                      <Card
-                        className="cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
-                        onClick={() => document.getElementById('staff-incentives')?.scrollIntoView({ behavior: 'smooth' })}
-                      >
-                        <CardContent className="pt-5 pb-4 text-center">
-                          <div className="text-xs text-muted-foreground mb-1">Staff Incentives</div>
-                          <div className="text-2xl font-bold text-primary">{formatCurrency(totals.staffIncentives || staffIncentiveTotal || 0)}</div>
-                          {staffIncentivePeriod && (
-                            <div className="text-xs text-muted-foreground mt-0.5">{monthLabel(staffIncentivePeriod.year, staffIncentivePeriod.month)}</div>
-                          )}
-                        </CardContent>
-                      </Card>
                     </>
                   )}
                 </div>
@@ -1167,7 +1101,6 @@ function StaffPerformancePage() {
                           <>
                             <TableHead className="text-right">Product Sales</TableHead>
                             <TableHead className="text-right">Product Incentives</TableHead>
-                            <TableHead className="text-right">Staff Incentive</TableHead>
                           </>
                         )}
                       </TableRow>
@@ -1207,11 +1140,6 @@ function StaffPerformancePage() {
                               </TableCell>
                               <TableCell className="text-right font-medium text-green-600">
                                 {e.product_incentives ? formatCurrency(e.product_incentives) : '—'}
-                              </TableCell>
-                              <TableCell className="text-right font-medium text-primary">
-                                {staffIncentiveByEmployee.has(e.employee_id)
-                                  ? formatCurrency(staffIncentiveByEmployee.get(e.employee_id).total_incentive)
-                                  : '—'}
                               </TableCell>
                             </>
                           )}
@@ -1257,7 +1185,7 @@ function StaffPerformancePage() {
                   No completed service data for the selected time range.
                 </p>
                 <p className="text-gray-400 text-center text-sm mt-2">
-                  Try a wider date range or another branch. Staff incentive totals for the month are shown below.
+                  Try a wider date range or another branch.
                 </p>
               </CardContent>
             </Card>
@@ -1351,23 +1279,6 @@ function StaffPerformancePage() {
               )}
             </CardContent>
           </Card>}
-
-          {canSeeFinancials && staffIncentivePeriod && (
-            <StaffIncentivesSection
-              id="staff-incentives"
-              embedded
-              year={staffIncentivePeriod.year}
-              month={staffIncentivePeriod.month}
-              branchId={effectiveBranch}
-              employeeId={activeEmployeeId || selectedEmployee || ''}
-              showOwnerActions={isOwner}
-              multiMonthNote={
-                spansMultipleMonths
-                  ? `Staff incentives are calculated per calendar month. Showing ${monthLabel(staffIncentivePeriod.year, staffIncentivePeriod.month)} (month of the range end date).`
-                  : undefined
-              }
-            />
-          )}
         </div>
       )}
     </div>

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { formatCurrency } from '@/lib/utils'
 import { reportsService } from '@/services/reports.service'
-import { DataTable, Empty, ExportMenu, Kpi, Panel, ReportError, ReportLoading, ShareBar } from './ReportKit'
+import { DataTable, Empty, ExportMenu, Kpi, Panel, ReportError, ReportLoading, ShareBar, ExportAllMenu } from './ReportKit'
 
 export default function StaffReport({ from, to, branchId }) {
   const { data, isLoading, error, refetch } = useQuery({
@@ -18,6 +18,9 @@ export default function StaffReport({ from, to, branchId }) {
 
   return (
     <div className="space-y-4">
+      <ExportAllMenu title="Staff" sets={[
+        { label: 'Staff', rows: data.staff, filename: `staff-${from}-to-${to}` },
+      ]} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Staff credited" value={t.staff} />
         <Kpi label="Services done" value={t.services} />

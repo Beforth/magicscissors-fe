@@ -49,7 +49,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { exportToCSV, exportToExcel, exportToPDF } from '@/lib/export-utils'
+import { ExportAllMenu } from './ReportKit'
 import {
   RevenueAreaChart,
   RevenueBarChart,
@@ -58,7 +58,6 @@ import {
   SimplePieChart,
   SimpleBarChart,
 } from '@/components/charts'
-import StaffIncentivesReport from '@/components/StaffIncentivesReport'
 
 
 function LegacyReports({ activeReport, selectedBranch = '', startDate, endDate }) {
@@ -168,39 +167,44 @@ function LegacyReports({ activeReport, selectedBranch = '', startDate, endDate }
   const whTransfers = whTransfersData?.data || []
   const snapshot = snapshotData?.data || []
 
-  // Export button component with dropdown
-  const ExportButton = ({ data, filename, title, summaryCards = [] }) => {
-    if (!data || data.length === 0) return null
-
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-            <ChevronDown className="h-4 w-4 ml-1" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => exportToCSV(data, filename)}>
-            <FileText className="h-4 w-4 mr-2" />
-            Export as CSV
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => exportToExcel(data, filename, { title })}>
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Export as Excel
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => exportToPDF(data, filename, { title, summaryCards })}>
-            <FileText className="h-4 w-4 mr-2" />
-            Print / PDF
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    )
-  }
+  // Everything a legacy report shows, ready to export (CSV / Excel / PDF).
+  const exportSets = (() => {
+    switch (activeReport) {
+      case 'inventory':
+        return [
+          { label: 'Stock value by category', rows: inventory?.by_category, filename: 'inventory-by-category' },
+          { label: 'Low stock items', rows: inventory?.low_stock_items, filename: 'inventory-low-stock' },
+        ]
+      case 'backbar-consumption':
+        if (consumptionTab === 'wastage') {
+          return [
+            { label: 'Wastage by product', rows: consumptionWastage?.by_product, filename: 'backbar-wastage-by-product' },
+            { label: 'Wastage details', rows: consumptionWastage?.rows, filename: 'backbar-wastage' },
+          ]
+        }
+        if (consumptionTab === 'lifecycle') return [{ label: 'Bottle lifecycle', rows: consumptionLifecycle?.rows, filename: 'backbar-bottle-lifecycle' }]
+        return [{ label: 'Usage by service', rows: consumptionUsage?.rows, filename: 'backbar-usage' }]
+      case 'service-liability':
+        return [{ label: 'Bills with pending services', rows: liability.bills, filename: 'service-liability' }]
+      case 'supplier-credit':
+        return [{ label: 'Supplier credit', rows: supplierCredit.suppliers, filename: 'supplier-credit' }]
+      case 'wh-stock':
+        return [{ label: 'Warehouse stock', rows: whStock, filename: 'warehouse-stock' }]
+      case 'wh-purchases':
+        return [{ label: 'Warehouse purchases', rows: whPurchases, filename: 'warehouse-purchases' }]
+      case 'wh-transfers':
+        return [{ label: 'Transfers out', rows: whTransfers, filename: 'warehouse-transfers-out' }]
+      case 'stock-snapshot':
+        return [{ label: 'Stock value snapshot', rows: snapshot, filename: 'stock-value-snapshot' }]
+      default:
+        return []
+    }
+  })()
 
   return (
     <div className="space-y-6">
+      <ExportAllMenu sets={exportSets} title="Report" />
+
       {/* Inventory Report */}
       {activeReport === 'inventory' && (
         <div className="space-y-6">
@@ -888,11 +892,6 @@ function LegacyReports({ activeReport, selectedBranch = '', startDate, endDate }
             )}
           </CardContent>
         </Card>
-      )}
-
-      {/* ─── Staff incentives (Feature 5) ──────────────────────────────── */}
-      {activeReport === 'staff-incentives' && (
-        <StaffIncentivesReport />
       )}
     </div>
   )

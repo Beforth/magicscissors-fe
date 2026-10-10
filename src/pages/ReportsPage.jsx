@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowRightLeft, BadgeIndianRupee, BarChart3, BoxesIcon, Droplets, Landmark, Package, Scissors, Star, TrendingDown, TrendingUp, Users, Warehouse, Wallet,
+  ArrowRightLeft, BadgeIndianRupee, BarChart3, BoxesIcon, Droplets, Landmark, Package, Scissors, Star, TrendingDown, Users, Warehouse, Wallet,
 } from 'lucide-react'
 import { branchService } from '@/services/branch.service'
 import { Empty, Panel } from '@/components/reports/ReportKit'
@@ -25,7 +25,6 @@ const REPORTS = [
   { id: 'pl', group: 'Sales', label: 'Profit & loss', hint: 'Revenue against expenses', icon: Landmark, roles: OWNER, range: true, branch: 'optional', Comp: ProfitLossReport },
   { id: 'customers', group: 'People', label: 'Customers', hint: 'New, returning, win-back list', icon: Users, roles: MGR, range: true, branch: 'optional', Comp: CustomersReport },
   { id: 'staff', group: 'People', label: 'Staff', hint: 'Services and revenue per employee', icon: Star, roles: MGR, range: true, branch: 'optional', Comp: StaffReport },
-  { id: 'staff-incentives', group: 'People', label: 'Staff incentives', hint: 'Monthly incentive payouts', icon: TrendingUp, roles: MGR, range: false, branch: 'none', legacy: true },
   { id: 'catalog', group: 'Catalog', label: 'Services & products', hint: 'What sells, what is slowing', icon: Scissors, roles: MGR, range: true, branch: 'optional', Comp: CatalogReport },
   { id: 'inventory', group: 'Stock', label: 'Stock levels', hint: 'Low stock and expiring items', icon: Package, roles: MGR, range: false, branch: 'none', legacy: true },
   { id: 'stock-snapshot', group: 'Stock', label: 'Stock value', hint: 'Value of stock at every location', icon: BoxesIcon, roles: OWNER, range: false, branch: 'none', legacy: true },
@@ -90,7 +89,7 @@ export default function ReportsPage() {
 
       <div className="grid gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]">
         {/* Report picker */}
-        <nav aria-label="Reports" className="lg:sticky lg:top-4 lg:self-start">
+        <nav aria-label="Reports" className="lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
           <label className="block lg:hidden">
             <span className="sr-only">Report</span>
             <select value={active.id} onChange={(e) => set({ r: e.target.value, branch: '' })} className="h-10 w-full rounded-md border bg-background px-3 text-sm font-medium">
