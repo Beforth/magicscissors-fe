@@ -63,6 +63,7 @@ const initialFormData = {
   aadhar_number: '',
   pan_number: '',
   base_salary: '',
+  pay_type: '',
   bank_account_number: '',
   bank_name: '',
   bank_ifsc: '',
@@ -99,6 +100,7 @@ const PATCHABLE_FIELDS = [
   'aadhar_number',
   'pan_number',
   'base_salary',
+  'pay_type',
   'bank_account_number',
   'bank_name',
   'bank_ifsc',
@@ -120,10 +122,14 @@ function normalizeFieldValue(field, value) {
   return String(value).trim()
 }
 
-function buildStaffPatchPayload(current, original) {
+const SALARY_FIELDS = ['base_salary', 'pay_type']
+
+function buildStaffPatchPayload(current, original, canEditSalary) {
   const patch = {}
 
   for (const field of PATCHABLE_FIELDS) {
+    // Backend returns 403 if a non-owner/developer sends salary keys at all
+    if (!canEditSalary && SALARY_FIELDS.includes(field)) continue
     const currentValue = normalizeFieldValue(field, current[field])
     const originalValue = normalizeFieldValue(field, original[field])
     if (JSON.stringify(currentValue) !== JSON.stringify(originalValue)) {
@@ -263,6 +269,7 @@ function StaffFormPage() {
         aadhar_number: staff.employee_details?.aadhar_number || '',
         pan_number: staff.employee_details?.pan_number || '',
         base_salary: staff.employee_details?.base_salary ?? '',
+        pay_type: staff.employee_details?.pay_type || staff.pay_type || '',
         bank_account_number: staff.employee_details?.bank_account_number || '',
         bank_name: staff.employee_details?.bank_name || '',
         bank_ifsc: staff.employee_details?.bank_ifsc || '',
@@ -384,7 +391,7 @@ function StaffFormPage() {
         return
       }
 
-      const data = buildStaffPatchPayload(formData, originalFormData)
+      const data = buildStaffPatchPayload(formData, originalFormData, isOwner)
       if (Object.keys(data).length === 0) {
         toast.info('No changes to save')
         return
@@ -394,11 +401,15 @@ function StaffFormPage() {
       return
     }
 
-    createMutation.mutate({
-      ...formData,
-      gender: formData.gender || null,
-      base_salary: formData.base_salary ? parseFloat(formData.base_salary) : null,
-    })
+    const createData = { ...formData, gender: formData.gender || null }
+    if (isOwner) {
+      createData.base_salary = formData.base_salary ? parseFloat(formData.base_salary) : null
+      createData.pay_type = formData.pay_type || null
+    } else {
+      delete createData.base_salary
+      delete createData.pay_type
+    }
+    createMutation.mutate(createData)
   }
 
   const resetAssetForm = () => {
@@ -728,17 +739,34 @@ function StaffFormPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="base_salary">Monthly Salary (&#8377;) *</Label>
-                    <Input
-                      id="base_salary"
-                      type="number"
-                      value={formData.base_salary}
-                      onChange={(e) => handleChange('base_salary', e.target.value)}
-                      placeholder="25000"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Stored on the employee record. Payroll uses the wage set on the Payroll page.
-                    </p>
+                    <Label htmlFor="base_salary">Salary (&#8377;)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="base_salary"
+                        type="number"
+                        value={formData.base_salary}
+                        onChange={(e) => handleChange('base_salary', e.target.value)}
+                        placeholder="25000"
+                        disabled={!isOwner}
+                      />
+                      <select
+                        id="pay_type"
+                        aria-label="Pay type"
+                        className="h-10 px-3 border rounded-md disabled:opacity-50"
+                        value={formData.pay_type}
+                        onChange={(e) => handleChange('pay_type', e.target.value)}
+                        disabled={!isOwner}
+                      >
+                        <option value="">Not set</option>
+                        <option value="daily">Daily</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                    {!isOwner && (
+                      <p className="text-xs text-muted-foreground">
+                        Only the owner or developer can change salary
+                      </p>
+                    )}
                   </div>
                 </div>
 

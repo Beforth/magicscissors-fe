@@ -42,6 +42,7 @@ const initialFormData = {
   aadhar_number: '',
   pan_number: '',
   base_salary: '',
+  pay_type: '',
   bank_account_number: '',
   bank_name: '',
   bank_ifsc: '',
@@ -87,6 +88,7 @@ function StaffModal({ open, onOpenChange, staff = null }) {
         aadhar_number: staff.employee_details?.aadhar_number || '',
         pan_number: staff.employee_details?.pan_number || '',
         base_salary: staff.employee_details?.base_salary || '',
+        pay_type: staff.employee_details?.pay_type || staff.pay_type || '',
         bank_account_number: staff.employee_details?.bank_account_number || '',
         bank_name: staff.employee_details?.bank_name || '',
         bank_ifsc: staff.employee_details?.bank_ifsc || '',
@@ -153,9 +155,14 @@ function StaffModal({ open, onOpenChange, staff = null }) {
       return
     }
 
-    const data = {
-      ...formData,
-      base_salary: formData.base_salary ? parseFloat(formData.base_salary) : null,
+    const data = { ...formData }
+    // Backend returns 403 if a non-owner/developer sends salary keys at all
+    if (isOwner) {
+      data.base_salary = formData.base_salary ? parseFloat(formData.base_salary) : null
+      data.pay_type = formData.pay_type || null
+    } else {
+      delete data.base_salary
+      delete data.pay_type
     }
 
     // Remove password if empty (for edits)
@@ -373,14 +380,34 @@ function StaffModal({ open, onOpenChange, staff = null }) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="base_salary">Base Salary (₹)</Label>
-                  <Input
-                    id="base_salary"
-                    type="number"
-                    value={formData.base_salary}
-                    onChange={(e) => handleChange('base_salary', e.target.value)}
-                    placeholder="25000"
-                  />
+                  <Label htmlFor="base_salary">Salary (₹)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="base_salary"
+                      type="number"
+                      value={formData.base_salary}
+                      onChange={(e) => handleChange('base_salary', e.target.value)}
+                      placeholder="25000"
+                      disabled={!isOwner}
+                    />
+                    <select
+                      id="pay_type"
+                      aria-label="Pay type"
+                      className="h-10 px-3 border rounded-md disabled:opacity-50"
+                      value={formData.pay_type}
+                      onChange={(e) => handleChange('pay_type', e.target.value)}
+                      disabled={!isOwner}
+                    >
+                      <option value="">Not set</option>
+                      <option value="daily">Daily</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                  {!isOwner && (
+                    <p className="text-xs text-muted-foreground">
+                      Only the owner or developer can change salary
+                    </p>
+                  )}
                 </div>
               </div>
 

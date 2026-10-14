@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -371,7 +371,7 @@ function ServiceTimeRulesCard() {
 
 function WagesTab({ branchId }) {
   const queryClient = useQueryClient()
-  // Unsaved edits keyed by employee_id: { pay_type: '' | 'daily' | 'monthly', amount: string }
+  // Unsaved overtime-rate edits keyed by employee_id: { overtime: string }
   const [edits, setEdits] = useState({})
 
   const { data: res, isLoading, isError, error } = useQuery({
@@ -397,31 +397,19 @@ function WagesTab({ branchId }) {
   })
 
   const current = (e) => edits[e.employee_id] || {
-    pay_type: e.pay_type || '',
-    amount: e.wage_amount == null ? '' : String(e.wage_amount),
     overtime: e.overtime_rate == null ? '' : String(e.overtime_rate),
   }
-  const setField = (e, key, value) =>
-    setEdits((prev) => ({ ...prev, [e.employee_id]: { ...current(e), [key]: value } }))
+  const setOvertime = (e, value) =>
+    setEdits((prev) => ({ ...prev, [e.employee_id]: { overtime: value } }))
 
   const handleSave = (e) => {
-    const { pay_type, amount, overtime } = current(e)
-    const hasAmount = amount !== ''
+    const { overtime } = current(e)
     const overtime_rate = overtime === '' ? null : Number(overtime)
     if (overtime_rate != null && (!Number.isFinite(overtime_rate) || overtime_rate < 0)) {
       toast.error('Overtime rate must be a positive amount, or empty to use the default')
       return
     }
-    if (!pay_type && !hasAmount) {
-      saveMutation.mutate({ id: e.employee_id, payload: { pay_type: null, wage_amount: null, overtime_rate } })
-      return
-    }
-    const wage = Number(amount)
-    if (!pay_type || !hasAmount || !Number.isFinite(wage) || wage < 0) {
-      toast.error('Choose a pay type and an amount, or clear both')
-      return
-    }
-    saveMutation.mutate({ id: e.employee_id, payload: { pay_type, wage_amount: wage, overtime_rate } })
+    saveMutation.mutate({ id: e.employee_id, payload: { overtime_rate } })
   }
 
   return (
@@ -429,8 +417,8 @@ function WagesTab({ branchId }) {
       <CardHeader>
         <CardTitle className="text-lg">Employee wages</CardTitle>
         <CardDescription>
-          Set a daily or monthly wage per employee. Clear both fields to remove a wage. Overtime ₹/hour overrides the
-          default overtime rate for that person; leave it empty to use the default.
+          Pay type and amount are set on the staff form. Overtime ₹/hour overrides the default overtime rate for
+          that person; leave it empty to use the default.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -466,28 +454,15 @@ function WagesTab({ branchId }) {
                       {e.employee_code && <div className="text-xs text-gray-500">{e.employee_code}</div>}
                     </TableCell>
                     <TableCell className="capitalize">{e.role}</TableCell>
+                    <TableCell>{PAY_TYPE_LABEL[e.pay_type] || '—'}</TableCell>
                     <TableCell>
-                      <select
-                        aria-label={`Pay type for ${e.full_name}`}
-                        className="h-10 px-3 border rounded-md bg-white text-sm"
-                        value={row.pay_type}
-                        onChange={(ev) => setField(e, 'pay_type', ev.target.value)}
+                      <div>{formatMoney(e.wage_amount)}</div>
+                      <Link
+                        to={`/staff/${e.employee_id}/edit`}
+                        className="text-xs text-primary hover:underline"
                       >
-                        <option value="">—</option>
-                        <option value="daily">Daily</option>
-                        <option value="monthly">Monthly</option>
-                      </select>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        aria-label={`Amount for ${e.full_name}`}
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        className="w-32"
-                        value={row.amount}
-                        onChange={(ev) => setField(e, 'amount', ev.target.value)}
-                      />
+                        Edit on the staff form
+                      </Link>
                     </TableCell>
                     <TableCell>
                       <Input
@@ -498,7 +473,7 @@ function WagesTab({ branchId }) {
                         className="w-32"
                         placeholder="Default"
                         value={row.overtime}
-                        onChange={(ev) => setField(e, 'overtime', ev.target.value)}
+                        onChange={(ev) => setOvertime(e, ev.target.value)}
                       />
                     </TableCell>
                     <TableCell>
