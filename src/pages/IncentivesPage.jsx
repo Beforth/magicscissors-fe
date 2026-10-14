@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { incentiveService } from '@/services/incentive.service'
 import { branchService } from '@/services/branch.service'
+import { serviceService } from '@/services/service.service'
 import { formatMoney, PAY_TYPE_LABEL } from '@/lib/payroll'
 import { WEEK_DAYS, PAY_TYPES } from '@/lib/incentiveRules'
 import RuleFormModal from '@/components/incentives/RuleFormModal'
@@ -20,6 +21,7 @@ const lbl = (pairs, v) => pairs[v] || v
 
 const PERIOD = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' }
 const APPLIES = Object.fromEntries(PAY_TYPES)
+const RTYPE = { revenue: 'Revenue %', service_rates: 'Per-service' }
 const WINDOW = { all: 'Any time', in_shift: 'During shift', after_shift: 'After shift', before_shift: 'Before shift' }
 const BASIS = { whole: 'Whole amount', excess: 'Excess' }
 
@@ -27,6 +29,17 @@ function thresholdText(r) {
   if (r.threshold_type === 'fixed') return formatMoney(r.threshold_value)
   if (r.threshold_type === 'salary_multiple') return `${r.threshold_value} × salary`
   return 'None'
+}
+
+const rateText = (l) => (l.rate_type === 'fixed' ? formatMoney(l.value) : `${Number(l.value)}%`)
+
+// id -> name lookups from the services/categories lists (falls back to the id)
+function useNameLookup() {
+  const { data: svcRes } = useQuery({ queryKey: ['services', 'active'], queryFn: () => serviceService.getServices({ is_active: 'true' }) })
+  const { data: catRes } = useQuery({ queryKey: ['service-categories'], queryFn: () => serviceService.getCategories() })
+  const svc = new Map((svcRes?.data || []).map((s) => [s.service_id, s.service_name]))
+  const cat = new Map((catRes?.data || []).map((c) => [c.category_id, c.name]))
+  return (l) => (l.kind === 'category' ? cat : svc).get(l.id) || l.id
 }
 
 function Spinner() {
@@ -75,6 +88,7 @@ function RulesCard() {
     queryFn: incentiveService.listRules,
   })
   const rules = res?.data || []
+  const nameOf = useNameLookup()
 
   const done = (msg) => {
     toast.success(msg)
@@ -112,7 +126,7 @@ function RulesCard() {
           <div>
             <CardTitle className="text-lg">Incentive rules</CardTitle>
             <CardDescription>
-              Each rule pays a percentage of matching service revenue. Every setting can be changed at any time; changes
+              Each rule pays a percentage of matching service revenue, or per-service rates for incentive-based staff. Every setting can be changed at any time; changes
               apply to the whole month shown below (past payroll figures included).
             </CardDescription>
           </div>
@@ -137,6 +151,7 @@ function RulesCard() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Period</TableHead>
                 <TableHead>Applies to</TableHead>
                 <TableHead>Window</TableHead>
@@ -154,12 +169,19 @@ function RulesCard() {
                     <div className="font-medium">{r.name}</div>
                     {r.exclude_from_other_rules && <div className="text-xs text-gray-500">Excludes from later rules</div>}
                   </TableCell>
-                  <TableCell>{lbl(PERIOD, r.period)}</TableCell>
+                  <TableCell>{lbl(RTYPE, r.rule_type || 'revenue')}</TableCell>
+                  <TableCell>{r.rule_type === 'service_rates' ? '—' : lbl(PERIOD, r.period)}</TableCell>
                   <TableCell>{lbl(APPLIES, r.pay_types)}</TableCell>
                   <TableCell>{lbl(WINDOW, r.service_window)}</TableCell>
-                  <TableCell>{thresholdText(r)}</TableCell>
-                  <TableCell>{lbl(BASIS, r.payout_basis)}</TableCell>
-                  <TableCell className="text-right">{r.rate_percent}%</TableCell>
+                  <TableCell>{r.rule_type === 'service_rates' ? '—' : thresholdText(r)}</TableCell>
+                  <TableCell>{r.rule_type === 'service_rates' ? '—' : lbl(BASIS, r.payout_basis)}</TableCell>
+                  <TableCell className="text-right">
+                    {r.rule_type === 'service_rates' ? (
+                      <span title={(r.service_rates || []).map((l) => `${nameOf(l)}: ${rateText(l)}`).join('; ')}>
+                        {(r.service_rates || []).length} {(r.service_rates || []).length === 1 ? 'line' : 'lines'}
+                      </span>
+                    ) : `${r.rate_percent}%`}
+                  </TableCell>
                   <TableCell>
                     <input
                       type="checkbox"
@@ -215,6 +237,7 @@ function ResultsCard() {
     enabled: !!branchId && !!month,
   })
   const employees = res?.data?.employees || []
+  const nameOf = useNameLookup()
   const grand = employees.reduce((t, e) => t + Number(e.total_incentive || 0), 0)
 
   return (
@@ -293,6 +316,36 @@ function ResultsCard() {
                           <TableCell colSpan={3} className="pl-8 text-sm font-medium">{rule.rule_name}</TableCell>
                           <TableCell className="text-right text-sm font-medium">{formatMoney(rule.payout)}</TableCell>
                         </TableRow>
+                        {(rule.lines || []).length > 0 && (
+                          <TableRow>
+                            <TableCell colSpan={4} className="pl-12">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="h-8 text-xs">Service / category</TableHead>
+                                    <TableHead className="h-8 text-xs text-right">Services done</TableHead>
+                                    <TableHead className="h-8 text-xs text-right">Revenue</TableHead>
+                                    <TableHead className="h-8 text-xs text-right">Rate</TableHead>
+                                    <TableHead className="h-8 text-xs text-right">Payout</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {rule.lines.map((l) => (
+                                    <TableRow key={`${rule.rule_id}-${l.kind}-${l.id}`}>
+                                      <TableCell className="py-1 text-xs">
+                                        {nameOf(l)}{l.kind === 'category' && <span className="text-gray-500"> (category)</span>}
+                                      </TableCell>
+                                      <TableCell className="py-1 text-xs text-right">{l.count}</TableCell>
+                                      <TableCell className="py-1 text-xs text-right">{formatMoney(l.revenue)}</TableCell>
+                                      <TableCell className="py-1 text-xs text-right">{rateText(l)}</TableCell>
+                                      <TableCell className="py-1 text-xs text-right">{formatMoney(l.payout)}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </TableCell>
+                          </TableRow>
+                        )}
                         {(rule.periods || []).map((p) => (
                           <TableRow key={`${rule.rule_id}-${p.key}`}>
                             <TableCell colSpan={3} className="pl-12 text-xs text-gray-600">

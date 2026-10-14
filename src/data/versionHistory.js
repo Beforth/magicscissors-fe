@@ -18,6 +18,7 @@ export const versionHistory = [
         items: [
           'Each rule sets the period, who it applies to, the service time window, an optional threshold, payout basis and rate',
           'Services can be filtered by service AND category',
+          'New "Per-service rates" rule type for incentive-based staff: a % or fixed ₹ amount for each service or category, with a choice of how fixed amounts are paid when staff share a service',
           'Enable, edit or delete any rule at any time, and choose which weekday the week starts on',
           "Results show each employee's total with a per-rule, per-period breakdown and warnings",
         ],
