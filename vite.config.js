@@ -45,6 +45,8 @@ export default defineConfig({
     },
   },
   server: {
+    // '::' listens on IPv6 and IPv4, so both localhost and 127.0.0.1 work (the default was IPv6-only here)
+    host: '::',
     allowedHosts: [
       'unavailable-winner-owns-remote.trycloudflare.com',
       '.trycloudflare.com',
