@@ -14,7 +14,7 @@ export default function StaffReport({ from, to, branchId }) {
 
   const t = data.totals
   const max = Math.max(1, ...data.staff.map((s) => s.revenue))
-  const exportRows = data.staff.map((s) => ({ name: s.name, services: s.services, customers: s.customers, revenue: Math.round(s.revenue), avg_per_service: Math.round(s.avg_per_service), star_points: s.stars, product_sales: Math.round(s.product_sales), product_incentive: Math.round(s.product_incentive) }))
+  const exportRows = data.staff.map((s) => ({ name: s.name, services: s.services, customers: s.customers, revenue: Math.round(s.revenue), avg_per_service: Math.round(s.avg_per_service), star_points: s.stars }))
 
   return (
     <div className="space-y-4">
@@ -52,9 +52,8 @@ export default function StaffReport({ from, to, branchId }) {
               { key: 'bar', label: '', sortValue: (r) => r.revenue, render: (r) => <div className="w-28"><ShareBar value={r.revenue} max={max} className="bg-emerald-500" /></div> },
               { key: 'avg_per_service', label: 'Avg / service', align: 'right', render: (r) => formatCurrency(Math.round(r.avg_per_service)) },
               { key: 'stars', label: 'Stars', align: 'right' },
-              { key: 'product_incentive', label: 'Product incentive', align: 'right', render: (r) => (r.product_incentive ? formatCurrency(Math.round(r.product_incentive)) : '-') },
             ]}
-            footer={{ name: 'Total', services: t.services, revenue: formatCurrency(Math.round(t.revenue)), product_incentive: formatCurrency(Math.round(t.incentive)) }}
+            footer={{ name: 'Total', services: t.services, revenue: formatCurrency(Math.round(t.revenue)) }}
           />
         )}
       </Panel>

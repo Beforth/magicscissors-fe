@@ -585,7 +585,7 @@ function StaffFormPage() {
                       <option value="other">Other</option>
                     </select>
                     <p className="text-xs text-muted-foreground">
-                      Required for female employee incentive rules (early arrival / late departure).
+                      Employee gender.
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -737,7 +737,7 @@ function StaffFormPage() {
                       placeholder="25000"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Used for staff incentive calculation. Target = salary × 0.95 × 5.
+                      Stored on the employee record. Payroll uses the wage set on the Payroll page.
                     </p>
                   </div>
                 </div>

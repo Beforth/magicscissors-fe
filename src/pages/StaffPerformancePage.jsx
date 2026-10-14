@@ -6,7 +6,6 @@ import { reportsService } from '@/services/reports.service'
 import { useFilterParams, buildReturnTo } from '@/hooks/useFilterParams'
 import { branchService } from '@/services/branch.service'
 import { userService } from '@/services/user.service'
-import { incentiveService } from '@/services/incentive.service'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -71,7 +70,6 @@ function StaffPerformancePage() {
   const [goalValue, setGoalValue] = useState('')
   const [matrixPage, setMatrixPage] = useState(1)
   const [matrixPageSize, setMatrixPageSize] = useState(10)
-  const [expandedIncentiveEmp, setExpandedIncentiveEmp] = useState(null)
   const [expandedBills, setExpandedBills] = useState(new Set())
 
   const { data: branchesData } = useQuery({
@@ -122,21 +120,6 @@ function StaffPerformancePage() {
     },
   })
 
-  // Incentive report query — reuses the same date range & branch filters
-  const { data: incentiveReportData, isLoading: incentiveLoading } = useQuery({
-    queryKey: ['incentive-report', { start: effectiveStart, end: effectiveEnd, employee: selectedEmployee, branch: effectiveBranch }],
-    queryFn: () => incentiveService.getReport({
-      start_date: effectiveStart || undefined,
-      end_date: effectiveEnd || undefined,
-      employee_id: selectedEmployee || undefined,
-      branch_id: effectiveBranch || undefined,
-    }),
-    enabled: canSeeFinancials && !!effectiveStart && !!effectiveEnd,
-  })
-
-  const incentiveReport = incentiveReportData?.data || incentiveReportData || {}
-  const incentiveByEmployeeAll = incentiveReport.by_employee || []
-
   const handleBranchChange = (branchId) => {
     setFilters({ branch: branchId, employee: '' })
     setActiveEmployeeId(null)
@@ -153,30 +136,14 @@ function StaffPerformancePage() {
     return employees.find((e) => e.employee_id === activeEmployeeId) || null
   }, [activeEmployeeId, employees])
 
-  // Filter incentive data by selected employee pill
-  const incentiveByEmployee = useMemo(() => {
-    if (!activeEmployeeId) return incentiveByEmployeeAll
-    return incentiveByEmployeeAll.filter((e) => e.employee_id === activeEmployeeId)
-  }, [activeEmployeeId, incentiveByEmployeeAll])
-
-  const incentiveSummary = useMemo(() => {
-    if (!activeEmployeeId) return incentiveReport.summary || {}
-    return {
-      total_sales: incentiveByEmployee.reduce((s, e) => s + (e.total_sales || 0), 0),
-      total_incentive: incentiveByEmployee.reduce((s, e) => s + (e.total_incentive || 0), 0),
-      record_count: incentiveByEmployee.reduce((s, e) => s + (e.records?.length || 0), 0),
-    }
-  }, [activeEmployeeId, incentiveByEmployee, incentiveReport])
-
   // Compute totals for overview
   const totals = useMemo(() => {
     if (!employees.length) return null
     return {
       services: employees.reduce((s, e) => s + e.services_completed, 0),
       stars: employees.reduce((s, e) => s + e.star_points, 0),
-      earnings: employees.reduce((s, e) => s + (e.revenue_generated - (e.product_incentives || 0)), 0),
+      earnings: employees.reduce((s, e) => s + e.revenue_generated, 0),
       productSales: employees.reduce((s, e) => s + (e.product_sales || 0), 0),
-      productIncentives: employees.reduce((s, e) => s + (e.product_incentives || 0), 0),
     }
   }, [employees])
 
@@ -470,7 +437,7 @@ function StaffPerformancePage() {
                   </span>
                   {canSeeFinancials && (
                     <span className="text-xs opacity-80">
-                      {formatCurrency(emp.revenue_generated - (emp.product_incentives || 0))}
+                      {formatCurrencyemp.revenue_generated}
                     </span>
                   )}
                 </button>
@@ -537,7 +504,7 @@ function StaffPerformancePage() {
                           </div>
                           {canSeeFinancials && (
                             <div className="text-xs font-semibold text-green-600 mt-0.5">
-                              {formatCurrency(emp.revenue_generated - (emp.product_incentives || 0))}
+                              {formatCurrencyemp.revenue_generated}
                             </div>
                           )}
                         </TableHead>
@@ -809,7 +776,7 @@ function StaffPerformancePage() {
                         <IndianRupee className="h-4 w-4" />
                         <span className="text-xs font-medium">Service Earnings</span>
                       </div>
-                      <div className="text-2xl font-bold">{formatCurrency(activeEmployee.revenue_generated - (activeEmployee.product_incentives || 0))}</div>
+                      <div className="text-2xl font-bold">{formatCurrencyactiveEmployee.revenue_generated}</div>
                     </CardContent>
                   </Card>
                 )}
@@ -822,20 +789,6 @@ function StaffPerformancePage() {
                           <span className="text-xs font-medium">Product Sales</span>
                         </div>
                         <div className="text-2xl font-bold">{formatCurrency(activeEmployee.product_sales || 0)}</div>
-                      </CardContent>
-                    </Card>
-                    <Card
-                      className="cursor-pointer hover:ring-2 hover:ring-green-200 transition-all"
-                      onClick={() => document.getElementById('product-incentives')?.scrollIntoView({ behavior: 'smooth' })}
-                    >
-                      <CardContent className="pt-5 pb-4">
-                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                          <TrendingUp className="h-4 w-4 text-green-600" />
-                          <span className="text-xs font-medium">Product Incentives</span>
-                        </div>
-                        <div className="text-2xl font-bold text-green-600">
-                          {formatCurrency(activeEmployee.product_incentives || (incentiveByEmployee.find(e => e.employee_id === activeEmployee.employee_id))?.total_incentive || 0)}
-                        </div>
                       </CardContent>
                     </Card>
                   </>
@@ -895,7 +848,6 @@ function StaffPerformancePage() {
                                 {isProduct ? (
                                   <div>
                                     <div className="font-medium">{formatCurrency(s.sale_amount)}</div>
-                                    <div className="text-xs text-green-600">→ {formatCurrency(s.earnings)} incentive</div>
                                   </div>
                                 ) : (
                                   <span className="font-medium">{formatCurrency(s.earnings)}</span>
@@ -917,7 +869,7 @@ function StaffPerformancePage() {
                           <TableCell></TableCell>
                           {canSeeFinancials && (
                             <TableCell className="text-right">
-                              {formatCurrency(activeEmployee.revenue_generated - (activeEmployee.product_incentives || 0))}
+                              {formatCurrencyactiveEmployee.revenue_generated}
                             </TableCell>
                           )}
                           <TableCell className="text-right">
@@ -1001,7 +953,7 @@ function StaffPerformancePage() {
                           </TableCell>
                           {canSeeFinancials && (
                             <TableCell className="text-right">
-                              {formatCurrency(activeEmployee.revenue_generated - (activeEmployee.product_incentives || 0))}
+                              {formatCurrencyactiveEmployee.revenue_generated}
                             </TableCell>
                           )}
                         </TableRow>
@@ -1062,15 +1014,6 @@ function StaffPerformancePage() {
                           <div className="text-2xl font-bold">{formatCurrency(totals.productSales)}</div>
                         </CardContent>
                       </Card>
-                      <Card
-                        className="cursor-pointer hover:ring-2 hover:ring-green-200 transition-all"
-                        onClick={() => document.getElementById('product-incentives')?.scrollIntoView({ behavior: 'smooth' })}
-                      >
-                        <CardContent className="pt-5 pb-4 text-center">
-                          <div className="text-xs text-muted-foreground mb-1">Product Incentives</div>
-                          <div className="text-2xl font-bold text-green-600">{formatCurrency(totals.productIncentives || incentiveSummary.total_incentive || 0)}</div>
-                        </CardContent>
-                      </Card>
                     </>
                   )}
                 </div>
@@ -1100,7 +1043,6 @@ function StaffPerformancePage() {
                         {canSeeFinancials && (
                           <>
                             <TableHead className="text-right">Product Sales</TableHead>
-                            <TableHead className="text-right">Product Incentives</TableHead>
                           </>
                         )}
                       </TableRow>
@@ -1130,16 +1072,13 @@ function StaffPerformancePage() {
                           </TableCell>
                           {canSeeFinancials && showServiceEarningsCard && (
                             <TableCell className="text-right font-bold">
-                              {formatCurrency(e.revenue_generated - (e.product_incentives || 0))}
+                              {formatCurrencye.revenue_generated}
                             </TableCell>
                           )}
                           {canSeeFinancials && (
                             <>
                               <TableCell className="text-right">
                                 {e.product_sales ? formatCurrency(e.product_sales) : '—'}
-                              </TableCell>
-                              <TableCell className="text-right font-medium text-green-600">
-                                {e.product_incentives ? formatCurrency(e.product_incentives) : '—'}
                               </TableCell>
                             </>
                           )}
@@ -1162,7 +1101,7 @@ function StaffPerformancePage() {
                     <MultiBarChart
                       data={employees.slice(0, 15).map((e) => ({
                         employee_name: e.employee_name,
-                        ...(showServiceEarningsCard ? { service_earnings: e.revenue_generated - (e.product_incentives || 0) } : {}),
+                        ...(showServiceEarningsCard ? { service_earnings: e.revenue_generated } : {}),
                         product_sales: e.product_sales || 0,
                       }))}
                       bars={[
@@ -1191,94 +1130,6 @@ function StaffPerformancePage() {
             </Card>
           )}
 
-          {/* Product Incentive Report (owners only) */}
-          {canSeeFinancials && <Card id="product-incentives">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <IndianRupee className="h-4 w-4" />
-                Product Incentives
-              </CardTitle>
-              <CardDescription>
-                Product sale incentive earnings for the selected period
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {incentiveLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-                </div>
-              ) : incentiveByEmployee.length === 0 ? (
-                <p className="text-center text-gray-500 py-6 text-sm">No incentive data for this period</p>
-              ) : (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-gray-50 rounded-lg p-3 text-center">
-                      <p className="text-xs text-gray-500">Total Sales</p>
-                      <p className="text-lg font-bold">{formatCurrency(incentiveSummary.total_sales || 0)}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3 text-center">
-                      <p className="text-xs text-gray-500">Total Incentive</p>
-                      <p className="text-lg font-bold text-green-600">{formatCurrency(incentiveSummary.total_incentive || 0)}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3 text-center">
-                      <p className="text-xs text-gray-500">Records</p>
-                      <p className="text-lg font-bold">{incentiveSummary.record_count || 0}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    {incentiveByEmployee.map((emp) => (
-                      <div key={emp.employee_id} className="border rounded-lg">
-                        <button
-                          className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
-                          onClick={() => setExpandedIncentiveEmp(expandedIncentiveEmp === emp.employee_id ? null : emp.employee_id)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <ChevronDown className={`h-4 w-4 transition-transform ${expandedIncentiveEmp === emp.employee_id ? '' : '-rotate-90'}`} />
-                            <span className="font-medium">{emp.employee_name}</span>
-                          </div>
-                          <div className="flex gap-4 text-sm">
-                            <span>Sales: <span className="font-semibold">{formatCurrency(emp.total_sales)}</span></span>
-                            <span>Incentive: <span className="font-semibold text-green-600">{formatCurrency(emp.total_incentive)}</span></span>
-                          </div>
-                        </button>
-                        {expandedIncentiveEmp === emp.employee_id && (
-                          <div className="border-t">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Bill #</TableHead>
-                                  <TableHead>Date</TableHead>
-                                  <TableHead>Product</TableHead>
-                                  <TableHead className="text-right">Sale</TableHead>
-                                  <TableHead className="text-right">%</TableHead>
-                                  <TableHead className="text-right">Incentive</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {(emp.records || []).map((r) => (
-                                  <TableRow key={r.incentive_id}>
-                                    <TableCell className="text-sm">{r.bill_number}</TableCell>
-                                    <TableCell className="text-sm">
-                                      {r.bill_date ? new Date(r.bill_date).toLocaleDateString('en-IN', { timeZone: 'UTC', day: '2-digit', month: 'short' }) : '—'}
-                                    </TableCell>
-                                    <TableCell>{r.product_name}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(r.sale_amount)}</TableCell>
-                                    <TableCell className="text-right">{r.percentage}%</TableCell>
-                                    <TableCell className="text-right font-medium text-green-600">{formatCurrency(r.incentive_amount)}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>}
         </div>
       )}
     </div>

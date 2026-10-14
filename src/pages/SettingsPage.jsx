@@ -3,21 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { settingsService } from '@/services/settings.service'
-import { incentiveService } from '@/services/incentive.service'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import {
   Settings,
   Building2,
@@ -28,10 +18,6 @@ import {
   Loader2,
   Save,
   RotateCcw,
-  TrendingUp,
-  Plus,
-  Pencil,
-  Trash2,
   ListChecks,
   CheckCircle2,
   Circle,
@@ -41,8 +27,6 @@ import {
   MapPin,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import IncentiveConfigModal from '@/components/modals/IncentiveConfigModal'
-import StaffIncentiveConfig from '@/components/StaffIncentiveConfig'
 import AttendanceApiKeysPanel from '@/components/settings/AttendanceApiKeysPanel'
 import GeofencePanel from '@/components/settings/GeofencePanel'
 
@@ -243,10 +227,6 @@ function SettingsPage() {
   const [hasChanges, setHasChanges] = useState(false)
   const [activeTab, setActiveTab] = useState('setup')
 
-  // Incentive state
-  const [incentiveModalOpen, setIncentiveModalOpen] = useState(false)
-  const [editConfig, setEditConfig] = useState(null)
-
   // Fetch settings
   const { data, isLoading, error } = useQuery({
     queryKey: ['settings'],
@@ -262,23 +242,6 @@ function SettingsPage() {
   const setupStatus = setupStatusData?.data || null
 
   const settings = data?.data || {}
-
-  // Incentive queries
-  const { data: incentiveConfigsData, isLoading: configsLoading } = useQuery({
-    queryKey: ['incentive-configs', user?.branchId],
-    queryFn: () => incentiveService.getConfigs({ branch_id: user?.branchId }),
-    enabled: activeTab === 'incentives',
-  })
-  const configs = incentiveConfigsData?.data || []
-
-  const deleteConfigMutation = useMutation({
-    mutationFn: (id) => incentiveService.deleteConfig(id),
-    onSuccess: () => {
-      toast.success('Config deleted')
-      queryClient.invalidateQueries({ queryKey: ['incentive-configs'] })
-    },
-    onError: (err) => toast.error(err.response?.data?.error?.message || 'Failed'),
-  })
 
   // Initialize form data when settings load
   useEffect(() => {
@@ -424,14 +387,6 @@ function SettingsPage() {
           <TabsTrigger value="employees" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Employees</span>
-          </TabsTrigger>
-          <TabsTrigger value="incentives" className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Incentives</span>
-          </TabsTrigger>
-          <TabsTrigger value="staff-incentives" className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Staff Incentives</span>
           </TabsTrigger>
           {isOwner && (
             <TabsTrigger value="attendance-api" className="flex items-center gap-2">
@@ -860,90 +815,6 @@ function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Incentives */}
-        <TabsContent value="incentives">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5" />
-                      Incentive Rules
-                    </CardTitle>
-                    <CardDescription>Configure product sale incentive percentages per category. View the incentive report on the Staff Performance page.</CardDescription>
-                  </div>
-                  <Button size="sm" onClick={() => { setEditConfig(null); setIncentiveModalOpen(true) }}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Rule
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {configsLoading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-                  </div>
-                ) : configs.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">No incentive rules configured</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Percentage</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="w-[80px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {configs.map((c) => (
-                        <TableRow key={c.config_id}>
-                          <TableCell className="font-medium">{c.product_category_name || 'All Categories'}</TableCell>
-                          <TableCell><span className="text-lg font-semibold">{c.percentage}%</span></TableCell>
-                          <TableCell>
-                            <Badge variant={c.is_default ? 'default' : 'outline'}>
-                              {c.is_default ? 'Default' : 'Category-specific'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={c.is_active ? 'default' : 'secondary'}>
-                              {c.is_active ? 'Active' : 'Inactive'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button size="sm" variant="ghost" onClick={() => { setEditConfig(c); setIncentiveModalOpen(true) }}>
-                                <Pencil className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="ghost" className="text-red-600" onClick={() => {
-                                if (window.confirm('Delete this rule?')) deleteConfigMutation.mutate(c.config_id)
-                              }}>
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-
-            <IncentiveConfigModal
-              open={incentiveModalOpen}
-              onOpenChange={(open) => { setIncentiveModalOpen(open); if (!open) setEditConfig(null) }}
-              editConfig={editConfig}
-            />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="staff-incentives">
-          <StaffIncentiveConfig />
         </TabsContent>
 
         {isOwner && (
