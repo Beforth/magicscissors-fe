@@ -7,7 +7,7 @@ import { incentiveService } from '@/services/incentive.service'
 import { branchService } from '@/services/branch.service'
 import { serviceService } from '@/services/service.service'
 import { formatMoney, PAY_TYPE_LABEL } from '@/lib/payroll'
-import { WEEK_DAYS, PAY_TYPES } from '@/lib/incentiveRules'
+import { PAY_TYPES } from '@/lib/incentiveRules'
 import RuleFormModal from '@/components/incentives/RuleFormModal'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,13 @@ import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ChevronDown, ChevronRight, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 
-const errMsg = (err, fallback) => err?.response?.data?.error?.message || err?.message || fallback
+const errMsg = (err, fallback) => {
+  const fields = err?.response?.data?.error?.details?.fields
+  if (Array.isArray(fields) && fields.length > 0) {
+    return fields.map((f) => f.message).join('; ')
+  }
+  return err?.response?.data?.error?.message || err?.message || fallback
+}
 const lbl = (pairs, v) => pairs[v] || v
 
 const PERIOD = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' }
@@ -46,36 +52,6 @@ function Spinner() {
   return (
     <div className="flex justify-center py-8">
       <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-    </div>
-  )
-}
-
-function WeekStartCard() {
-  const queryClient = useQueryClient()
-  const { data: res } = useQuery({ queryKey: ['incentive-settings'], queryFn: incentiveService.getSettings })
-  const save = useMutation({
-    mutationFn: (week_start) => incentiveService.setSettings({ week_start }),
-    onSuccess: () => {
-      toast.success('Week start saved')
-      queryClient.invalidateQueries({ queryKey: ['incentive-settings'] })
-      queryClient.invalidateQueries({ queryKey: ['incentive-report'] })
-    },
-    onError: (err) => toast.error(errMsg(err, 'Failed to save week start')),
-  })
-  const value = res?.data?.week_start
-
-  return (
-    <div className="flex items-center gap-2">
-      <Label htmlFor="inc-week" className="text-sm">Week starts on</Label>
-      <select
-        id="inc-week"
-        className="h-9 px-3 border rounded-md bg-white text-sm"
-        value={value ?? ''}
-        disabled={value === undefined || save.isPending}
-        onChange={(e) => save.mutate(Number(e.target.value))}
-      >
-        {WEEK_DAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}
-      </select>
     </div>
   )
 }
@@ -131,7 +107,6 @@ function RulesCard() {
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <WeekStartCard />
             <Button size="sm" onClick={() => setModal({ open: true, rule: null })}>
               <Plus className="h-4 w-4 mr-1" />
               Add rule
