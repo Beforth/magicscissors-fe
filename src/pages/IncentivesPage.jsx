@@ -5,8 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { incentiveService } from '@/services/incentive.service'
 import { branchService } from '@/services/branch.service'
-import { formatMoney } from '@/lib/payroll'
-import { WEEK_DAYS } from '@/lib/incentiveRules'
+import { formatMoney, PAY_TYPE_LABEL } from '@/lib/payroll'
+import { WEEK_DAYS, PAY_TYPES } from '@/lib/incentiveRules'
 import RuleFormModal from '@/components/incentives/RuleFormModal'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,7 @@ const errMsg = (err, fallback) => err?.response?.data?.error?.message || err?.me
 const lbl = (pairs, v) => pairs[v] || v
 
 const PERIOD = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' }
-const APPLIES = { both: 'All staff', monthly: 'Monthly-paid', daily: 'Daily-paid' }
+const APPLIES = Object.fromEntries(PAY_TYPES)
 const WINDOW = { all: 'Any time', in_shift: 'During shift', after_shift: 'After shift', before_shift: 'Before shift' }
 const BASIS = { whole: 'Whole amount', excess: 'Excess' }
 
@@ -278,7 +278,7 @@ function ResultsCard() {
                           <div key={w} className="text-xs text-amber-600 pl-5">{w}</div>
                         ))}
                       </TableCell>
-                      <TableCell>{e.pay_type ? lbl({ daily: 'Daily', monthly: 'Monthly' }, e.pay_type) : '—'}</TableCell>
+                      <TableCell>{e.pay_type ? lbl(PAY_TYPE_LABEL, e.pay_type) : '—'}</TableCell>
                       <TableCell className="text-right">{e.base_salary == null ? '—' : formatMoney(e.base_salary)}</TableCell>
                       <TableCell className="text-right font-medium">{formatMoney(e.total_incentive)}</TableCell>
                     </TableRow>

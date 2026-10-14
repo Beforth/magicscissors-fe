@@ -365,7 +365,12 @@ function StaffFormPage() {
   // --- Handlers ---
 
   const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+      // Incentive-based staff have no wage: clear any salary when that type is picked
+      ...(field === 'pay_type' && value === 'incentive' ? { base_salary: '' } : {}),
+    }))
   }
 
   const handleSubmit = (e) => {
@@ -748,8 +753,8 @@ function StaffFormPage() {
                         type="number"
                         value={formData.base_salary}
                         onChange={(e) => handleChange('base_salary', e.target.value)}
-                        placeholder="25000"
-                        disabled={!isOwner}
+                        placeholder={formData.pay_type === 'incentive' ? 'No wage' : '25000'}
+                        disabled={!isOwner || formData.pay_type === 'incentive'}
                       />
                       <select
                         id="pay_type"
@@ -762,8 +767,14 @@ function StaffFormPage() {
                         <option value="">—</option>
                         <option value="daily">Daily</option>
                         <option value="monthly">Monthly</option>
+                        <option value="incentive">Incentive based</option>
                       </select>
                     </div>
+                    {formData.pay_type === 'incentive' && (
+                      <p className="text-xs text-muted-foreground">
+                        Incentive-based staff have no wage; they are paid only through incentive rules
+                      </p>
+                    )}
                     {!isOwner && (
                       <p className="text-xs text-muted-foreground">
                         Only the owner or developer can change salary

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { buildRulesPayload } from '../src/lib/shiftRules.js'
-import { payrollTotals, reportCsvRows, formatMoney } from '../src/lib/payroll.js'
+import { PAY_TYPE_LABEL, payrollTotals, reportCsvRows, formatMoney } from '../src/lib/payroll.js'
 
 const ok = (r) => { assert.equal(r.ok, true, r.error); return r.value }
 const bad = (r) => { assert.equal(r.ok, false); return r.error }
@@ -45,6 +45,14 @@ assert.equal(csv[1].pay_type, '—')
 assert.equal(csv[1].warnings, 'No wage set')
 assert.equal(csv[0].incentive, 75)
 assert.equal(csv[1].incentive, 0)
+const inc = reportCsvRows([{ employee_id: 'c', full_name: 'C', employee_code: 'E3', pay_type: 'incentive', wage_amount: null, days_worked: 5, half_days: 0, hours_worked: 40, late_deduction_hours: 0, gross: 0, late_deduction_amount: 0, incentive: 1200, net_pay: 1200, warnings: [] }])[0]
+assert.equal(inc.pay_type, 'Incentive based')
+assert.equal(inc.wage_amount, '')
+assert.equal(inc.gross, 0)
+assert.equal(inc.net_pay, 1200)
+assert.equal(PAY_TYPE_LABEL.incentive, 'Incentive based')
+assert.equal(PAY_TYPE_LABEL.daily, 'Daily')
+assert.equal(payrollTotals([...rows, { incentive: 1200, net_pay: 1200 }]).net_pay, 1650)
 assert.equal(formatMoney(1234.5), '₹1,234.50')
 assert.equal(formatMoney(0), '₹0.00')
 assert.equal(formatMoney(null), '—')

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { emptyRule, validateRule } from '../src/lib/incentiveRules.js'
+import { PAY_TYPES, emptyRule, validateRule } from '../src/lib/incentiveRules.js'
 
 const rule = (o) => ({ ...emptyRule(), name: 'R', ...o })
 
@@ -15,6 +15,16 @@ assert.equal(validateRule(rule({
   name: 'After-shift 20%', period: 'daily', pay_types: 'both', service_window: 'after_shift',
   threshold_type: 'none', threshold_value: null, rate_percent: 20, exclude_from_other_rules: true,
 })), null)
+
+// incentive-based staff and all staff
+assert.equal(validateRule(rule({ pay_types: 'incentive', period: 'monthly', threshold_type: 'none', rate_percent: 40 })), null)
+assert.equal(validateRule(rule({ pay_types: 'all', period: 'monthly', threshold_type: 'none', rate_percent: 10 })), null)
+assert.equal(validateRule(rule({ pay_types: 'incentive', threshold_type: 'fixed', threshold_value: 1000 })), null)
+for (const pay_types of ['incentive', 'all'])
+  assert.match(validateRule(rule({ period: 'monthly', pay_types, threshold_type: 'salary_multiple', threshold_value: 1 })), /monthly-paid/i)
+assert.match(validateRule(rule({ pay_types: 'bogus' })), /applies/i)
+assert.match(validateRule(rule({ pay_types: '' })), /applies/i)
+assert.deepEqual(PAY_TYPES.map(([v]) => v), ['monthly', 'daily', 'both', 'incentive', 'all'])
 
 // rejections
 for (const pay_types of ['both', 'daily'])

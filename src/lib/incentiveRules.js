@@ -1,7 +1,13 @@
 // Pure helpers for incentive rules; mirrors magicscissors-be/src/validators/incentiveRule.validator.js.
 
 export const PERIODS = [['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly']]
-export const PAY_TYPES = [['both', 'All staff'], ['monthly', 'Monthly-paid only'], ['daily', 'Daily-paid only']]
+export const PAY_TYPES = [
+  ['monthly', 'Monthly staff'],
+  ['daily', 'Daily staff'],
+  ['both', 'Monthly + daily staff'],
+  ['incentive', 'Incentive-based staff'],
+  ['all', 'All staff'],
+]
 export const WINDOWS = [['all', 'Any time'], ['in_shift', 'During shift'], ['after_shift', 'After shift'], ['before_shift', 'Before shift']]
 export const THRESHOLDS = [['none', 'No threshold'], ['fixed', 'Fixed amount'], ['salary_multiple', 'Multiple of salary']]
 export const BASES = [['whole', 'Whole amount'], ['excess', 'Excess over threshold']]
@@ -33,11 +39,12 @@ export function validateRule(rule) {
   if (String(r.name).trim().length > 100) return 'Name must be at most 100 characters'
   const rate = Number(r.rate_percent)
   if (blank(r.rate_percent) || !Number.isFinite(rate) || rate < 0 || rate > 100) return 'Rate must be between 0 and 100'
+  if (!PAY_TYPES.some(([v]) => v === r.pay_types)) return 'Applies to must be one of the listed staff groups'
   if (r.threshold_type === 'salary_multiple' && r.period !== 'monthly') {
     return 'A salary-multiple threshold is only allowed for monthly rules'
   }
   if (r.threshold_type === 'salary_multiple' && r.pay_types !== 'monthly') {
-    return 'A salary-multiple threshold is only allowed for monthly-paid staff'
+    return 'A salary-multiple threshold is only allowed for monthly-paid staff (Applies to: Monthly staff)'
   }
   if (r.threshold_type === 'fixed' && blank(r.threshold_value)) return 'Threshold amount is required for a fixed threshold'
   if (r.threshold_type !== 'none' && !blank(r.threshold_value)) {

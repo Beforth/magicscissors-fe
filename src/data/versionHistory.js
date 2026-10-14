@@ -10,6 +10,7 @@ export const versionHistory = [
       'Rules can use daily, weekly or monthly totals, a service time window, service and category filters, and thresholds',
       'Incentive column added to the Payroll report and CSV export; it is included in net pay',
       'One salary and pay type per employee on the staff form',
+      'New "Incentive based" pay type for commission-only staff: no wage, paid only through incentive rules',
     ],
     details: [
       {
@@ -26,6 +27,7 @@ export const versionHistory = [
         items: [
           'Payroll report shows an Incentive column and includes it in net pay',
           'Staff form has a single salary and pay type per employee',
+          'Incentive-based staff have no wage and are paid only by incentive rules that apply to them',
         ],
       },
     ],

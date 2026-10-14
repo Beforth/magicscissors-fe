@@ -8,7 +8,7 @@ export function payrollTotals(rows) {
   return totals
 }
 
-const PAY_TYPE_LABEL = { daily: 'Daily', monthly: 'Monthly' }
+export const PAY_TYPE_LABEL = { daily: 'Daily', monthly: 'Monthly', incentive: 'Incentive based' }
 
 export function reportCsvRows(rows) {
   return (rows || []).map((r) => ({

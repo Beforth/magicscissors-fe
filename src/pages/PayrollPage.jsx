@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { payrollService } from '@/services/payroll.service'
 import { branchService } from '@/services/branch.service'
-import { payrollTotals, reportCsvRows, formatMoney } from '@/lib/payroll'
+import { PAY_TYPE_LABEL, payrollTotals, reportCsvRows, formatMoney } from '@/lib/payroll'
 import { exportToCSV } from '@/lib/export-utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -30,7 +30,6 @@ const CSV_HEADERS = [
   'Code', 'Employee', 'Pay type', 'Wage', 'Days worked', 'Half days',
   'Hours worked', 'Late deducted (hours)', 'Gross', 'Late deduction', 'Late fine (₹)', 'Incentive', 'Net pay', 'Warnings',
 ]
-const PAY_TYPE_LABEL = { daily: 'Daily', monthly: 'Monthly' }
 const errMsg = (err, fallback) => err?.response?.data?.error?.message || err?.message || fallback
 
 function Spinner() {
@@ -119,7 +118,7 @@ function ReportTab({ branchId, month }) {
                     ))}
                   </TableCell>
                   <TableCell>{PAY_TYPE_LABEL[r.pay_type] || '—'}</TableCell>
-                  <TableCell className="text-right">{formatMoney(r.wage_amount)}</TableCell>
+                  <TableCell className="text-right">{r.pay_type === 'incentive' ? '—' : formatMoney(r.wage_amount)}</TableCell>
                   <TableCell className="text-right">{r.days_worked}</TableCell>
                   <TableCell className="text-right">{r.half_days}</TableCell>
                   <TableCell className="text-right">{r.hours_worked}</TableCell>
@@ -459,7 +458,8 @@ function WagesTab({ branchId }) {
                     <TableCell className="capitalize">{e.role}</TableCell>
                     <TableCell>{PAY_TYPE_LABEL[e.pay_type] || '—'}</TableCell>
                     <TableCell>
-                      <div>{formatMoney(e.wage_amount)}</div>
+                      <div>{e.pay_type === 'incentive' ? '—' : formatMoney(e.wage_amount)}</div>
+                      {e.pay_type === 'incentive' && <div className="text-xs text-gray-500">Not paid overtime — incentive only</div>}
                       <Link
                         to={`/staff/${e.employee_id}/edit`}
                         className="text-xs text-primary hover:underline"
@@ -474,13 +474,15 @@ function WagesTab({ branchId }) {
                         min="0"
                         step="0.01"
                         className="w-32"
-                        placeholder="Default"
+                        placeholder={e.pay_type === 'incentive' ? '—' : 'Default'}
+                        disabled={e.pay_type === 'incentive'}
+                        title={e.pay_type === 'incentive' ? 'Not paid overtime — incentive only' : undefined}
                         value={row.overtime}
                         onChange={(ev) => setOvertime(e, ev.target.value)}
                       />
                     </TableCell>
                     <TableCell>
-                      <Button size="sm" onClick={() => handleSave(e)} disabled={saving}>
+                      <Button size="sm" onClick={() => handleSave(e)} disabled={saving || e.pay_type === 'incentive'}>
                         {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
                         Save
                       </Button>
