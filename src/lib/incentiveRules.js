@@ -36,6 +36,9 @@ export function validateRule(rule) {
   if (r.threshold_type === 'salary_multiple' && r.period !== 'monthly') {
     return 'A salary-multiple threshold is only allowed for monthly rules'
   }
+  if (r.threshold_type === 'salary_multiple' && r.pay_types !== 'monthly') {
+    return 'A salary-multiple threshold is only allowed for monthly-paid staff'
+  }
   if (r.threshold_type === 'fixed' && blank(r.threshold_value)) return 'Threshold amount is required for a fixed threshold'
   if (r.threshold_type !== 'none' && !blank(r.threshold_value)) {
     const t = Number(r.threshold_value)

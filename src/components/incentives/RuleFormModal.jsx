@@ -103,7 +103,11 @@ export default function RuleFormModal({ open, rule, onClose, onSave, saving }) {
               </select>
             </Field>
             <Field id="ir-pay" label="Applies to">
-              <select id="ir-pay" className={selectCls} value={f.pay_types} onChange={(e) => set('pay_types', e.target.value)}>
+              <select id="ir-pay" className={selectCls} value={f.pay_types} onChange={(e) => setF((p) => ({
+                ...p,
+                pay_types: e.target.value,
+                threshold_type: e.target.value !== 'monthly' && p.threshold_type === 'salary_multiple' ? 'none' : p.threshold_type,
+              }))}>
                 {PAY_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </Field>
@@ -148,7 +152,7 @@ export default function RuleFormModal({ open, rule, onClose, onSave, saving }) {
                 value={f.threshold_type}
                 onChange={(e) => setF((p) => ({ ...p, threshold_type: e.target.value, threshold_value: e.target.value === 'none' ? '' : p.threshold_value }))}
               >
-                {THRESHOLDS.filter(([v]) => v !== 'salary_multiple' || f.period === 'monthly').map(([v, l]) => (
+                {THRESHOLDS.filter(([v]) => v !== 'salary_multiple' || (f.period === 'monthly' && f.pay_types === 'monthly')).map(([v, l]) => (
                   <option key={v} value={v}>{l}</option>
                 ))}
               </select>
@@ -157,7 +161,7 @@ export default function RuleFormModal({ open, rule, onClose, onSave, saving }) {
               <Field
                 id="ir-thrv"
                 label={f.threshold_type === 'fixed' ? 'Threshold (₹)' : 'Times monthly salary'}
-                hint={f.threshold_type === 'salary_multiple' ? 'e.g. 1 = revenue must reach one month of salary.' : undefined}
+                hint={f.threshold_type === 'salary_multiple' ? 'e.g. 1 = revenue must reach one month of salary. Only for monthly-paid staff.' : undefined}
               >
                 <Input id="ir-thrv" type="number" min="0" step="0.01" value={f.threshold_value ?? ''} onChange={(e) => set('threshold_value', e.target.value)} />
               </Field>

@@ -17,6 +17,9 @@ assert.equal(validateRule(rule({
 })), null)
 
 // rejections
+for (const pay_types of ['both', 'daily'])
+  assert.match(validateRule(rule({ period: 'monthly', pay_types, threshold_type: 'salary_multiple', threshold_value: 1 })), /monthly-paid/i)
+assert.match(validateRule(rule({ period: 'weekly', pay_types: 'monthly', threshold_type: 'salary_multiple', threshold_value: 1 })), /monthly/i)
 assert.match(validateRule(rule({ period: 'weekly', threshold_type: 'salary_multiple', threshold_value: 1 })), /monthly/i)
 assert.match(validateRule(rule({ rate_percent: 101 })), /rate/i)
 assert.match(validateRule(rule({ rate_percent: -1 })), /rate/i)
