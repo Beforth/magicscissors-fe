@@ -398,7 +398,7 @@ function StaffModal({ open, onOpenChange, staff = null }) {
                       onChange={(e) => handleChange('pay_type', e.target.value)}
                       disabled={!isOwner}
                     >
-                      <option value="">Not set</option>
+                      <option value="">—</option>
                       <option value="daily">Daily</option>
                       <option value="monthly">Monthly</option>
                     </select>

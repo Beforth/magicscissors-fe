@@ -135,6 +135,8 @@ function buildStaffPatchPayload(current, original, canEditSalary) {
     if (JSON.stringify(currentValue) !== JSON.stringify(originalValue)) {
       if (field === 'base_salary') {
         patch[field] = current.base_salary ? parseFloat(current.base_salary) : null
+      } else if (field === 'pay_type') {
+        patch[field] = current.pay_type || null
       } else if (field === 'email') {
         patch[field] = current.email?.trim() || null
       } else {
@@ -757,7 +759,7 @@ function StaffFormPage() {
                         onChange={(e) => handleChange('pay_type', e.target.value)}
                         disabled={!isOwner}
                       >
-                        <option value="">Not set</option>
+                        <option value="">—</option>
                         <option value="daily">Daily</option>
                         <option value="monthly">Monthly</option>
                       </select>
