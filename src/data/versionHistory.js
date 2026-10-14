@@ -1,6 +1,35 @@
-export const CURRENT_VERSION = 'v2.12.0'
+export const CURRENT_VERSION = 'v2.13.0'
 
 export const versionHistory = [
+  {
+    version: 'v2.13.0',
+    date: 'Oct 2026',
+    title: 'Dynamic Incentives',
+    highlights: [
+      'New owner-only Incentives page: build your own incentive rules and edit or delete them any time',
+      'Rules can use daily, weekly or monthly totals, a service time window, service and category filters, and thresholds',
+      'Incentive column added to the Payroll report and CSV export; it is included in net pay',
+      'One salary and pay type per employee on the staff form',
+    ],
+    details: [
+      {
+        section: 'Incentives',
+        items: [
+          'Each rule sets the period, who it applies to, the service time window, an optional threshold, payout basis and rate',
+          'Services can be filtered by service AND category',
+          'Enable, edit or delete any rule at any time, and choose which weekday the week starts on',
+          "Results show each employee's total with a per-rule, per-period breakdown and warnings",
+        ],
+      },
+      {
+        section: 'Payroll & Staff',
+        items: [
+          'Payroll report shows an Incentive column and includes it in net pay',
+          'Staff form has a single salary and pay type per employee',
+        ],
+      },
+    ],
+  },
   {
     version: 'v2.12.0',
     date: 'Oct 2026',

@@ -24,11 +24,11 @@ import { Download, Loader2 } from 'lucide-react'
 
 const CSV_COLUMNS = [
   'employee_code', 'full_name', 'pay_type', 'wage_amount', 'days_worked', 'half_days',
-  'hours_worked', 'late_deduction_hours', 'gross', 'late_deduction_amount', 'late_fine_amount', 'net_pay', 'warnings',
+  'hours_worked', 'late_deduction_hours', 'gross', 'late_deduction_amount', 'late_fine_amount', 'incentive', 'net_pay', 'warnings',
 ]
 const CSV_HEADERS = [
   'Code', 'Employee', 'Pay type', 'Wage', 'Days worked', 'Half days',
-  'Hours worked', 'Late deducted (hours)', 'Gross', 'Late deduction', 'Late fine (₹)', 'Net pay', 'Warnings',
+  'Hours worked', 'Late deducted (hours)', 'Gross', 'Late deduction', 'Late fine (₹)', 'Incentive', 'Net pay', 'Warnings',
 ]
 const PAY_TYPE_LABEL = { daily: 'Daily', monthly: 'Monthly' }
 const errMsg = (err, fallback) => err?.response?.data?.error?.message || err?.message || fallback
@@ -104,6 +104,7 @@ function ReportTab({ branchId, month }) {
                 <TableHead className="text-right">Late deduction</TableHead>
                 <TableHead className="text-right">Late fine (₹)</TableHead>
                 {hasServiceTime && <TableHead className="text-right">Overtime</TableHead>}
+                <TableHead className="text-right">Incentive</TableHead>
                 <TableHead className="text-right">Net pay</TableHead>
               </TableRow>
             </TableHeader>
@@ -132,6 +133,7 @@ function ReportTab({ branchId, month }) {
                       <div className="text-xs text-gray-500">{r.service_time?.overtime_minutes || 0} min</div>
                     </TableCell>
                   )}
+                  <TableCell className="text-right">{formatMoney(r.incentive ?? 0)}</TableCell>
                   <TableCell className="text-right font-medium">{formatMoney(r.net_pay)}</TableCell>
                 </TableRow>
               ))}
@@ -151,6 +153,7 @@ function ReportTab({ branchId, month }) {
                     {formatMoney(rows.reduce((t, r) => t + (r.service_time_pay || 0), 0))}
                   </TableCell>
                 )}
+                <TableCell className="text-right">{formatMoney(totals.incentive)}</TableCell>
                 <TableCell className="text-right">{formatMoney(totals.net_pay)}</TableCell>
               </TableRow>
             </TableBody>

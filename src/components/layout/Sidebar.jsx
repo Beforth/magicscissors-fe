@@ -9,6 +9,7 @@ import { CURRENT_VERSION } from '@/data/versionHistory'
 import {
   LayoutDashboard,
   IndianRupee,
+  Award,
   Users,
   Receipt,
   Scissors,
@@ -95,6 +96,7 @@ export const getNavItemsByRole = (role) => {
     { title: 'My Attendance',    href: '/my-attendance',    icon: MapPin,        roles: ['employee','manager','cashier'] },
     { title: 'Staff Performance',href: '/staff-performance',icon: TrendingUp,    roles: ['owner','developer','manager','cashier'] },
     { title: 'Payroll',          href: '/payroll',          icon: IndianRupee,   roles: ['owner'] },
+    { title: 'Incentives',       href: '/incentives',       icon: Award,         roles: ['owner'] },
     { title: 'Branches',         href: '/branches',         icon: Building2,     roles: ['owner','developer'] },
     { title: 'Jobs',             href: '/jobs',             icon: Activity,      roles: ['owner','developer'] },
     { title: 'Machines',         href: '/machines',         icon: Cpu,           roles: ['owner','developer'] },
