@@ -437,7 +437,7 @@ function StaffPerformancePage() {
                   </span>
                   {canSeeFinancials && (
                     <span className="text-xs opacity-80">
-                      {formatCurrencyemp.revenue_generated}
+                      {formatCurrency(emp.revenue_generated)}
                     </span>
                   )}
                 </button>
@@ -504,7 +504,7 @@ function StaffPerformancePage() {
                           </div>
                           {canSeeFinancials && (
                             <div className="text-xs font-semibold text-green-600 mt-0.5">
-                              {formatCurrencyemp.revenue_generated}
+                              {formatCurrency(emp.revenue_generated)}
                             </div>
                           )}
                         </TableHead>
@@ -776,7 +776,7 @@ function StaffPerformancePage() {
                         <IndianRupee className="h-4 w-4" />
                         <span className="text-xs font-medium">Service Earnings</span>
                       </div>
-                      <div className="text-2xl font-bold">{formatCurrencyactiveEmployee.revenue_generated}</div>
+                      <div className="text-2xl font-bold">{formatCurrency(activeEmployee.revenue_generated)}</div>
                     </CardContent>
                   </Card>
                 )}
@@ -869,7 +869,7 @@ function StaffPerformancePage() {
                           <TableCell></TableCell>
                           {canSeeFinancials && (
                             <TableCell className="text-right">
-                              {formatCurrencyactiveEmployee.revenue_generated}
+                              {formatCurrency(activeEmployee.revenue_generated)}
                             </TableCell>
                           )}
                           <TableCell className="text-right">
@@ -953,7 +953,7 @@ function StaffPerformancePage() {
                           </TableCell>
                           {canSeeFinancials && (
                             <TableCell className="text-right">
-                              {formatCurrencyactiveEmployee.revenue_generated}
+                              {formatCurrency(activeEmployee.revenue_generated)}
                             </TableCell>
                           )}
                         </TableRow>
@@ -1072,7 +1072,7 @@ function StaffPerformancePage() {
                           </TableCell>
                           {canSeeFinancials && showServiceEarningsCard && (
                             <TableCell className="text-right font-bold">
-                              {formatCurrencye.revenue_generated}
+                              {formatCurrency(e.revenue_generated)}
                             </TableCell>
                           )}
                           {canSeeFinancials && (
