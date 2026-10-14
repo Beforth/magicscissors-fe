@@ -4,23 +4,24 @@ export const versionHistory = [
   {
     version: 'v2.13.0',
     date: 'Oct 2026',
-    title: 'Dynamic Incentives',
+    title: 'Simple Incentives',
     highlights: [
-      'New owner-only Incentives page: build your own incentive rules and edit or delete them any time',
-      'Rules can use daily, weekly or monthly totals, a service time window, service and category filters, and thresholds',
+      'New owner-only Incentives page: one checkbox and four simple boxes, the same for all branches',
+      'Monthly earnings, Before shift, After shift and Incentive-based staff, each with a plain explanation',
+      'Choose to pay only the highest incentive, or add them all together',
       'Incentive column added to the Payroll report and CSV export; it is included in net pay',
-      'One salary and pay type per employee on the staff form',
-      'New "Incentive based" pay type for commission-only staff: no wage, paid only through incentive rules',
+      'New "Incentive based" pay type for commission-only staff: no wage, paid a percent of their services',
+      'The old overtime / service time pay is gone from Payroll and Shifts; Before shift and After shift incentives replace it',
     ],
     details: [
       {
         section: 'Incentives',
         items: [
-          'Each rule sets the period, who it applies to, the service time window, an optional threshold, payout basis and rate',
-          'Services can be filtered by service AND category',
-          'New "Per-service rates" rule type for incentive-based staff: a % or fixed ₹ amount for each service or category, with a choice of how fixed amounts are paid when staff share a service',
-          'Enable, edit or delete any rule at any time, and choose which weekday the week starts on',
-          "Results show each employee's total with a per-rule, per-period breakdown and warnings",
+          'Monthly earnings: staff on a monthly salary get a percent of all their earnings once the month reaches an amount you set (and is above their salary)',
+          'Before shift / After shift: extra pay as a percent of each service, or rupees per hour, for services outside the shift',
+          'Incentive-based staff: one percent of every service they complete',
+          'One Save button; every value can be changed at any time',
+          "Results show each employee's three amounts, what is paid and which one applied, with warnings",
         ],
       },
       {
@@ -28,7 +29,7 @@ export const versionHistory = [
         items: [
           'Payroll report shows an Incentive column and includes it in net pay',
           'Staff form has a single salary and pay type per employee',
-          'Incentive-based staff have no wage and are paid only by incentive rules that apply to them',
+          'The Service time tab, the overtime column in Wages and the overtime section in the shift form were removed',
         ],
       },
     ],
