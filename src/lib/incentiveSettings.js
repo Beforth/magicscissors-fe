@@ -21,6 +21,16 @@ export function defaultRuleName(kind, existingCount) {
   return existingCount > 0 ? `${title} ${existingCount + 1}` : title
 }
 
+// Before/After shift rules have no name box: the name is the title, numbered by position ("After shift 2").
+// A saved custom name (not the default pattern) is kept as it is.
+export function shiftRuleName(kind, name, index) {
+  const title = SCOPED_KINDS[kind].title
+  const saved = typeof name === 'string' ? name.trim() : ''
+  const isDefault = saved === title || (saved.startsWith(`${title} `) && /^[0-9]+$/.test(saved.slice(title.length + 1)))
+  if (saved && !isDefault) return saved
+  return defaultRuleName(kind, index)
+}
+
 // A fresh card for the form (numbers as strings so inputs can be blank while typing)
 export function newScopedRule(kind, id, name) {
   const base = { id, name, branch_id: null, employee_ids: [] }

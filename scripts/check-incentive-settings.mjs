@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   defaultSettings, validateSettings, newCustomRule, newScopedRule, defaultRuleName, topPerformers, reportCsv, WHO_OPTIONS,
-  MAX_RULES_PER_KIND,
+  MAX_RULES_PER_KIND, shiftRuleName,
 } from '../src/lib/incentiveSettings.js'
 
 const B1 = '11111111-1111-4111-8111-111111111111'
@@ -96,6 +96,11 @@ assert.equal(defaultRuleName('monthly', 0), 'Monthly earnings')
 assert.equal(defaultRuleName('before_shift', 0), 'Before shift')
 assert.equal(defaultRuleName('after_shift', 1), 'After shift 2')
 assert.equal(defaultRuleName('after_shift', 2), 'After shift 3')
+assert.equal(shiftRuleName('after_shift', 'After shift 2', 0), 'After shift')
+assert.equal(shiftRuleName('after_shift', 'After shift', 2), 'After shift 3')
+assert.equal(shiftRuleName('before_shift', '', 1), 'Before shift 2')
+assert.equal(shiftRuleName('after_shift', 'Weekend bonus', 1), 'Weekend bonus')
+assert.equal(shiftRuleName('after_shift', 'Before shift', 0), 'Before shift')
 
 // settings without custom_rules still validate
 const old = full(); delete old.custom_rules
