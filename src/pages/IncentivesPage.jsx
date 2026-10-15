@@ -183,58 +183,23 @@ function ShiftFields({ id, rule, onChange }) {
   )
 }
 
-function StaffPicker({ id, items, selected, onChange }) {
-  const [search, setSearch] = useState('')
-  const shownItems = items.filter((it) => it.label.toLowerCase().includes(search.trim().toLowerCase()))
-  const toggle = (value) => onChange(selected.includes(value) ? selected.filter((x) => x !== value) : [...selected, value])
+// Name (and a note when a rule saved earlier is limited to some staff / a branch)
+function ScopeFields({ pre, rule, onChange }) {
+  const limited = !!rule.branch_id || rule.employee_ids.length > 0
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <Label htmlFor={`${id}-search`} className="text-xs font-medium text-foreground">Staff</Label>
-        <span className="flex items-center gap-2 text-xs text-muted-foreground">
-          {selected.length === 0 ? 'Everyone eligible' : `${selected.length} picked`}
-          {selected.length > 0 && (
-            <button type="button" className="text-primary hover:underline" onClick={() => onChange([])}>Everyone eligible</button>
-          )}
-        </span>
+    <div className="space-y-3">
+      <div className="space-y-1.5 w-full sm:w-64">
+        <Label htmlFor={`${pre}-name`} className="text-xs font-medium text-foreground">Name</Label>
+        <Input id={`${pre}-name`} maxLength={60} value={rule.name} onChange={(e) => onChange({ name: e.target.value })} />
       </div>
-      <Input id={`${id}-search`} placeholder="Search staff" value={search} onChange={(e) => setSearch(e.target.value)} />
-      <div id={id} className="max-h-40 overflow-y-auto rounded-md border bg-background p-1">
-        {shownItems.length === 0 && <p className="p-2 text-xs text-muted-foreground">No staff found.</p>}
-        {shownItems.map((it) => (
-          <label key={it.value} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent">
-            <input type="checkbox" className="h-4 w-4 accent-primary" checked={selected.includes(it.value)} onChange={() => toggle(it.value)} />
-            <span className="truncate">{it.label}</span>
-          </label>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// Name, Branch and Staff: shared by Monthly, Before shift and After shift cards
-function ScopeFields({ pre, rule, branches, staff, onChange }) {
-  const knownBranch = !rule.branch_id || branches.some((b) => b.branch_id === rule.branch_id)
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="space-y-1.5 w-full sm:w-64">
-          <Label htmlFor={`${pre}-name`} className="text-xs font-medium text-foreground">Name</Label>
-          <Input id={`${pre}-name`} maxLength={60} value={rule.name} onChange={(e) => onChange({ name: e.target.value })} />
+      {limited && (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground">This rule is limited to specific staff/branch (set earlier)</p>
+          <Button type="button" size="sm" variant="outline" onClick={() => onChange({ branch_id: null, employee_ids: [] })}>
+            Make it apply to everyone
+          </Button>
         </div>
-        <div className="space-y-1.5 w-full sm:w-56">
-          <Label htmlFor={`${pre}-branch`} className="text-xs font-medium text-foreground">Branch</Label>
-          <select
-            id={`${pre}-branch`} className={SELECT_CLASS} value={rule.branch_id || ''}
-            onChange={(e) => onChange({ branch_id: e.target.value || null })}
-          >
-            <option value="">All branches</option>
-            {!knownBranch && <option value={rule.branch_id}>Other branch</option>}
-            {branches.map((b) => <option key={b.branch_id} value={b.branch_id}>{b.name}</option>)}
-          </select>
-        </div>
-      </div>
-      <StaffPicker id={`${pre}-staff`} items={staff} selected={rule.employee_ids} onChange={(v) => onChange({ employee_ids: v })} />
+      )}
       <p className="text-xs text-muted-foreground">{SCOPE_HINT}</p>
     </div>
   )
@@ -394,7 +359,7 @@ function AddRuleDialog({ open, onOpenChange, counts, customCount, onPick, onPick
           <>
             <DialogHeader>
               <DialogTitle>What kind of rule?</DialogTitle>
-              <DialogDescription>Pick one. You can add the same kind of rule again, for different staff or a different branch.</DialogDescription>
+              <DialogDescription>Pick one. You can add the same kind of rule again with different numbers.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-2">
               {RULE_KEYS.map((k) => (
@@ -439,7 +404,7 @@ function AddRuleDialog({ open, onOpenChange, counts, customCount, onPick, onPick
 
 const FORM_KEY = { monthly: 'monthly_rules', before_shift: 'before_shift_rules', after_shift: 'after_shift_rules' }
 
-function ScopedRuleCard({ kind, rule, index, branches, staff, onChange, onRemove }) {
+function ScopedRuleCard({ kind, rule, index, onChange, onRemove }) {
   const base = RULES[kind]
   const title = rule.name.trim() || `${base.title} ${index + 1}`
   const cardRule = { ...base, title, removeLabel: title }
@@ -448,7 +413,7 @@ function ScopedRuleCard({ kind, rule, index, branches, staff, onChange, onRemove
   return (
     <RuleCard rule={cardRule} onRemove={onRemove}>
       <div className="space-y-4">
-        <ScopeFields pre={pre} rule={rule} branches={branches} staff={staff} onChange={onChange} />
+        <ScopeFields pre={pre} rule={rule} onChange={onChange} />
         {kind === 'monthly' ? (
           <div className="space-y-3 border-t pt-4">
             {rule.tiers.length > 0 && (
@@ -547,27 +512,14 @@ function SettingsSection({ addOpen, setAddOpen }) {
     queryKey: ['incentive-employees'],
     queryFn: () => userService.getUsers({ role: 'employee,manager,cashier', limit: 500 }),
   })
-  const { data: branchesRes } = useQuery({
-    queryKey: ['branches', 'active'],
-    queryFn: () => branchService.getBranches({ is_active: 'true' }),
-  })
-  const branches = branchesRes?.data || []
-  const { salaries, monthlyStaff, otherStaff } = useMemo(() => {
+  const salaries = useMemo(() => {
     const found = new Set()
-    const monthly = []
-    const other = []
     for (const u of usersRes?.data || []) {
       const d = u.employee_details
-      const item = { value: u.user_id, label: u.full_name || 'Unnamed' }
       const n = Number(d?.base_salary)
-      if (d?.pay_type === 'monthly') {
-        monthly.push(item)
-        if (Number.isFinite(n) && n > 0) found.add(n)
-      }
-      if (d?.pay_type !== 'incentive') other.push(item)
+      if (d?.pay_type === 'monthly' && Number.isFinite(n) && n > 0) found.add(n)
     }
-    const byLabel = (a, b) => a.label.localeCompare(b.label)
-    return { salaries: [...found].sort((a, b) => a - b), monthlyStaff: monthly.sort(byLabel), otherStaff: other.sort(byLabel) }
+    return [...found].sort((a, b) => a - b)
   }, [usersRes])
   const { data: servicesRes } = useQuery({
     queryKey: ['incentive-services'],
@@ -614,7 +566,7 @@ function SettingsSection({ addOpen, setAddOpen }) {
     after_shift: form.after_shift_rules.length,
   }
 
-  // Every press adds a NEW card (the same rule can be added many times, e.g. for different staff or branches).
+  // Every press adds a NEW card (the same rule kind can be added many times).
   const addRule = (k) => {
     const key = FORM_KEY[k]
     if (form[key].length >= MAX_RULES_PER_KIND) return
@@ -667,7 +619,7 @@ function SettingsSection({ addOpen, setAddOpen }) {
 
       {RULE_KEYS.flatMap((k) => form[FORM_KEY[k]].map((r, i) => (
         <ScopedRuleCard
-          key={r.id} kind={k} rule={r} index={i} branches={branches} staff={k === 'monthly' ? monthlyStaff : otherStaff}
+          key={r.id} kind={k} rule={r} index={i}
           onChange={(patch) => setRule(k, r.id, patch)} onRemove={() => removeRule(k, r.id)}
         />
       )))}
@@ -1051,7 +1003,7 @@ export default function IncentivesPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Incentives</h1>
-          <p className="text-muted-foreground">Extra pay for staff, based on the services they complete. Each rule can be for all branches or just one.</p>
+          <p className="text-muted-foreground">Extra pay for staff, based on the services they complete. Rules apply to everyone who qualifies, in all branches.</p>
         </div>
         <Button onClick={() => setAddOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
