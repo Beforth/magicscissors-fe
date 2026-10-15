@@ -20,7 +20,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import MonthReport from '@/components/attendance/MonthReport'
 import { Kbd } from '@/components/ui/kbd'
 import { Link } from 'react-router-dom'
-import { formatDeduction, formatLate as formatLateMin, describeCheckIn } from '@/lib/attendanceDay'
+import { formatDeduction, formatLate as formatLateMin } from '@/lib/attendanceDay'
 import PunchMeta from '@/components/attendance/PunchMeta'
 import { attendanceService } from '@/services/attendance.service'
 import { branchService } from '@/services/branch.service'
@@ -84,22 +84,6 @@ function getLateLabel(emp) {
   if (lateMin <= 0) return null
   return formatLate(lateMin / 60)
 }
-
-const CHECK_IN_BADGE = { success: 'success', warning: 'warning', destructive: 'destructive', muted: 'outline' }
-
-/** Early / on time / late (grace or fine) / no-shift status under the check-in time. */
-function CheckInStatus({ emp }) {
-  const st = describeCheckIn(emp)
-  if (!st) return null
-  return (
-    <div className="mt-1 space-y-0.5 font-sans">
-      <Badge variant={CHECK_IN_BADGE[st.tone]} className="whitespace-nowrap">{st.label}</Badge>
-      {st.detail && <div className={`text-[11px] ${st.tone === 'destructive' ? 'text-destructive' : 'text-muted-foreground'}`}>{st.detail}</div>}
-    </div>
-  )
-}
-
-const shiftLine = (shift) => `${shift.name} ${shift.start_time}–${shift.end_time}${shift.grace_period != null ? ` · grace ${shift.grace_period}m` : ''}`
 
 const toYearMonth = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 
@@ -774,7 +758,7 @@ export default function AttendancePage() {
                             <div className="text-xs text-muted-foreground font-mono">
                               {emp.employee_code}
                               {emp.shift ? (
-                                <span className="ml-2">{shiftLine(emp.shift)}</span>
+                                <span className="ml-2">{emp.shift.name} {emp.shift.start_time}–{emp.shift.end_time}</span>
                               ) : emp.penalty_rule === 'legacy' ? (
                                 <span className="ml-2" title="No shift assigned today, so the profile shift and the standard late rule are used">profile shift {emp.shift_start}–{emp.shift_end}</span>
                               ) : (
@@ -793,7 +777,6 @@ export default function AttendancePage() {
                           <TableCell className="font-mono text-xs">
                             {formatTimeStored(emp.check_in)}
                             <PunchMeta meta={emp.check_in_meta} />
-                            <CheckInStatus emp={emp} />
                           </TableCell>
                           <TableCell className="font-mono text-xs">
                             {formatTimeStored(emp.check_out)}
@@ -1219,9 +1202,7 @@ export default function AttendancePage() {
                         <div className="font-medium">{emp.full_name}</div>
                         <div className="text-xs text-muted-foreground font-mono">
                           {emp.employee_code}
-                          {emp.shift ? (
-                            <span className="ml-2">{shiftLine(emp.shift)}</span>
-                          ) : emp.shift_start && emp.shift_end && !emp.has_flexible_timing && (
+                          {emp.shift_start && emp.shift_end && !emp.has_flexible_timing && (
                             <span className="ml-2">shift {emp.shift_start}–{emp.shift_end}</span>
                           )}
                         </div>
@@ -1231,10 +1212,7 @@ export default function AttendancePage() {
                           <Icon className="h-3 w-3 mr-1 inline" />{meta.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {formatTimeStored(emp.check_in)}
-                        <CheckInStatus emp={emp} />
-                      </TableCell>
+                      <TableCell className="font-mono text-xs">{formatTimeStored(emp.check_in)}</TableCell>
                       <TableCell className="font-mono text-xs">{formatTimeStored(emp.check_out)}</TableCell>
                       <TableCell>{emp.total_break_minutes}m</TableCell>
                       <TableCell>{emp.working_hours != null ? `${emp.working_hours}h` : '—'}</TableCell>
