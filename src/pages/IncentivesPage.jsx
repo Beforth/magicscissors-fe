@@ -41,8 +41,8 @@ const APPLIED_LABEL = {
 }
 
 const WHEN_BADGE = {
-  before_shift: { label: 'Before shift', variant: 'warning' },
-  after_shift: { label: 'After shift', variant: 'info' },
+  before_shift: { label: 'Before shift', variant: 'info' },
+  after_shift: { label: 'After shift', variant: 'warning' },
   normal: { label: 'Normal', variant: 'secondary' },
 }
 
@@ -58,12 +58,18 @@ const CUSTOM_STYLES = {
     title: 'Per service',
     icon: Scissors,
     tint: 'bg-success/10 text-success',
+    accent: 'border-l-success',
+    badge: 'success',
+    example: 'Example: 5% of every colouring service',
     pick: 'Pay a percent or a fixed amount for chosen services.',
   },
   target: {
     title: 'Target',
     icon: Target,
     tint: 'bg-warning/10 text-warning',
+    accent: 'border-l-warning',
+    badge: 'warning',
+    example: 'Example: ₹1,00,000 earned in a month → 3% of everything',
     pick: 'Pay a percent of all earnings once a monthly target is reached.',
   },
 }
@@ -77,20 +83,29 @@ const RULES = {
     title: 'Monthly earnings',
     icon: CalendarDays,
     tint: 'bg-primary/10 text-primary',
+    accent: 'border-l-primary',
+    badge: 'default',
+    example: 'Example: ₹50,000 earned → 20% of everything',
     pick: 'Extra percent when an employee earns a set amount in a month.',
     help: 'Set a row for each salary. When an employee has that salary and their earnings for the month reach the earned amount, they get the percent of all their earnings.',
   },
   before_shift: {
     title: 'Before shift',
     icon: Sunrise,
-    tint: 'bg-warning/10 text-warning',
+    tint: 'bg-info/10 text-info',
+    accent: 'border-l-info',
+    badge: 'info',
+    example: 'Example: 10% of each service that starts before the shift',
     pick: 'Extra pay for services that start before the shift starts.',
     help: "Services that start before the employee's shift starts earn extra. For monthly and daily staff.",
   },
   after_shift: {
     title: 'After shift',
     icon: Sunset,
-    tint: 'bg-info/10 text-info',
+    tint: 'bg-warning/10 text-warning',
+    accent: 'border-l-warning',
+    badge: 'warning',
+    example: 'Example: 10% of each service that starts after the shift',
     pick: 'Extra pay for services that start after the shift ends.',
     help: "Services that start after the employee's shift ends earn extra. For monthly and daily staff.",
   },
@@ -150,16 +165,20 @@ function RuleCard({ kind, rule: custom, onRemove, children }) {
   const rule = custom || RULES[kind]
   const Icon = rule.icon
   return (
-    <Card>
-      <CardHeader>
+    <Card className={cn('overflow-hidden border-l-4 transition-shadow hover:shadow-md', rule.accent)}>
+      <CardHeader className="border-b bg-muted/30">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
-            <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-lg', rule.tint)}>
+            <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-xl', rule.tint)}>
               <Icon className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <CardTitle className="text-lg">{rule.title}</CardTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-lg">{rule.title}</CardTitle>
+                {rule.kindLabel && <Badge variant={rule.badge}>{rule.kindLabel}</Badge>}
+              </div>
               <CardDescription className="mt-1">{rule.help}</CardDescription>
+              {rule.example && <p className="mt-1 text-xs italic text-muted-foreground">{rule.example}</p>}
             </div>
           </div>
           <Button type="button" size="sm" variant="ghost" aria-label={`Remove ${custom?.removeLabel || rule.title}`} onClick={onRemove}>
@@ -167,8 +186,18 @@ function RuleCard({ kind, rule: custom, onRemove, children }) {
           </Button>
         </div>
       </CardHeader>
-      <CardContent>{children}</CardContent>
+      <CardContent className="pt-6">{children}</CardContent>
     </Card>
+  )
+}
+
+// Number box with a unit (rupee or percent) inside it
+function UnitInput({ unit, className, ...props }) {
+  return (
+    <div className={cn('relative', className)}>
+      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">{unit}</span>
+      <Input type="number" min="0" step="any" className="pr-8" {...props} />
+    </div>
   )
 }
 
@@ -176,9 +205,9 @@ function ShiftFields({ id, rule, onChange }) {
   return (
     <div className="space-y-1.5 w-full sm:w-48">
       <Label htmlFor={`${id}-value`} className="text-xs font-medium text-foreground">Percent (%) of each service</Label>
-      <Input
-        id={`${id}-value`}
-        type="number" min="0" max="100" step="any"
+      <UnitInput
+        id={`${id}-value`} unit="%"
+        max="100"
         value={rule.percent}
         onChange={(e) => onChange({ percent: e.target.value })}
       />
@@ -190,6 +219,7 @@ function ShiftFields({ id, rule, onChange }) {
 // A note when a rule saved earlier is limited to some staff / a branch)
 function ScopeFields({ rule, showHint, onChange }) {
   const limited = !!rule.branch_id || rule.employee_ids.length > 0
+  if (!limited && !showHint) return null
   return (
     <div className="space-y-3">
       {limited && (
@@ -239,6 +269,10 @@ function CustomRuleCard({ rule, index, services, categories, onChange, onRemove 
     icon: style.icon,
     tint: style.tint,
     removeLabel: `custom rule ${index + 1}`,
+    accent: style.accent,
+    badge: style.badge,
+    example: style.example,
+    kindLabel: `Custom · ${style.title}`,
     help: rule.kind === 'target'
       ? 'If the employee’s earnings for the month reach the target below, they get this percent of all their earnings.'
       : 'Pays for each completed service that matches. Leave both lists empty to match every service; if you pick both, a service must match both.',
@@ -322,23 +356,24 @@ function CustomRuleCard({ rule, index, services, categories, onChange, onRemove 
   )
 }
 
-function RuleOption({ icon: Icon, tint, title, text, disabled, badge, onClick }) {
+function RuleOption({ icon: Icon, tint, title, text, example, disabled, badge, onClick }) {
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'flex items-center gap-3 rounded-lg border bg-background p-3 text-left transition-colors',
-        disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-ring',
+        'flex items-center gap-4 rounded-xl border bg-background p-4 text-left shadow-sm transition-all',
+        disabled ? 'opacity-50 cursor-not-allowed' : 'hover:-translate-y-0.5 hover:bg-accent hover:border-primary/40 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring',
       )}
     >
-      <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-lg', tint)}>
-        <Icon className="h-5 w-5" />
+      <span className={cn('grid h-12 w-12 shrink-0 place-items-center rounded-xl', tint)}>
+        <Icon className="h-6 w-6" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-foreground">{title}</span>
         <span className="block text-xs text-muted-foreground">{text}</span>
+        {example && <span className="mt-0.5 block text-xs italic text-muted-foreground/80">{example}</span>}
       </span>
       {badge && <Badge variant="secondary">{badge}</Badge>}
     </button>
@@ -364,7 +399,7 @@ function AddRuleDialog({ open, onOpenChange, counts, customCount, onPick, onPick
             <div className="grid gap-2">
               {RULE_KEYS.map((k) => (
                 <RuleOption
-                  key={k} icon={RULES[k].icon} tint={RULES[k].tint} title={RULES[k].title} text={RULES[k].pick}
+                  key={k} icon={RULES[k].icon} tint={RULES[k].tint} title={RULES[k].title} text={RULES[k].pick} example={RULES[k].example}
                   disabled={counts[k] >= MAX_RULES_PER_KIND} badge={counts[k] >= MAX_RULES_PER_KIND ? `Limit of ${MAX_RULES_PER_KIND} reached` : null}
                   onClick={() => onPick(k)}
                 />
@@ -386,7 +421,7 @@ function AddRuleDialog({ open, onOpenChange, counts, customCount, onPick, onPick
             <div className="grid gap-2">
               {Object.entries(CUSTOM_STYLES).map(([k, st]) => (
                 <RuleOption
-                  key={k} icon={st.icon} tint={st.tint} title={st.title} text={st.pick}
+                  key={k} icon={st.icon} tint={st.tint} title={st.title} text={st.pick} example={st.example}
                   onClick={() => { setStep('kind'); onPickCustom(k) }}
                 />
               ))}
@@ -417,6 +452,7 @@ function ScopedRuleCard({ kind, rule, index, onChange, onRemove }) {
         {kind === 'monthly' ? (
           <div className="space-y-3 border-t pt-4">
             {rule.tiers.length > 0 && (
+              <div className="overflow-x-auto rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -428,27 +464,27 @@ function ScopedRuleCard({ kind, rule, index, onChange, onRemove }) {
                 </TableHeader>
                 <TableBody>
                   {rule.tiers.map((t, i) => (
-                    <TableRow key={i}>
+                    <TableRow key={i} className="transition-colors even:bg-muted/20 hover:bg-accent/50">
                       <TableCell>
-                        <Input
+                        <UnitInput
                           aria-label={`Salary, row ${i + 1}`}
-                          type="number" min="0" step="any" className="w-36" list="inc-salary-list"
+                          unit="₹" className="w-40" list="inc-salary-list"
                           value={t.salary}
                           onChange={(e) => setTier(i, { salary: e.target.value })}
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
+                        <UnitInput
                           aria-label={`Earned amount, row ${i + 1}`}
-                          type="number" min="0" step="any" className="w-40"
+                          unit="₹" className="w-44"
                           value={t.earned_amount}
                           onChange={(e) => setTier(i, { earned_amount: e.target.value })}
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
+                        <UnitInput
                           aria-label={`Percent, row ${i + 1}`}
-                          type="number" min="0" max="100" step="any" className="w-28"
+                          unit="%" max="100" className="w-28"
                           value={t.percent}
                           onChange={(e) => setTier(i, { percent: e.target.value })}
                         />
@@ -465,10 +501,11 @@ function ScopedRuleCard({ kind, rule, index, onChange, onRemove }) {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
             <div className="flex flex-wrap items-center gap-3">
               <Button
-                type="button" size="sm" variant="outline"
+                type="button" size="sm" variant="outline" className="rounded-full"
                 disabled={rule.tiers.length >= MAX_MONTHLY_TIERS}
                 onClick={() => onChange({ tiers: [...rule.tiers, { salary: '', earned_amount: '', percent: '' }] })}
               >
@@ -490,7 +527,7 @@ function ScopedRuleCard({ kind, rule, index, onChange, onRemove }) {
             </label>
           </div>
         ) : (
-          <div className="border-t pt-4">
+          <div>
             <ShiftFields id={pre} rule={rule} onChange={onChange} />
           </div>
         )}
@@ -632,12 +669,19 @@ function SettingsSection({ addOpen, setAddOpen }) {
         />
       ))}
 
-      <div className="flex items-center gap-3">
+      <div
+        className={cn(
+          'sticky bottom-20 z-20 md:bottom-3 flex flex-wrap items-center gap-3 rounded-xl border bg-card/95 px-4 py-3 shadow-lg backdrop-blur transition-colors',
+          dirty && 'border-warning/40',
+        )}
+      >
         <Button onClick={handleSave} disabled={!dirty || save.isPending}>
           {save.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           Save
         </Button>
-        {dirty && <span className="text-xs text-muted-foreground">You have unsaved changes.</span>}
+        {dirty
+          ? <span className="text-sm text-warning">You have unsaved changes.</span>
+          : <span className="text-xs text-muted-foreground">All changes saved.</span>}
       </div>
 
       <AddRuleDialog
@@ -650,9 +694,9 @@ function SettingsSection({ addOpen, setAddOpen }) {
 
 function SummaryTile({ icon: Icon, tint, label, value, sub }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border bg-background p-3">
-      <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-lg', tint)}>
-        <Icon className="h-4 w-4" />
+    <div className="flex items-center gap-3 rounded-xl border bg-gradient-to-br from-muted/40 to-background p-4 shadow-sm">
+      <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-xl', tint)}>
+        <Icon className="h-5 w-5" />
       </span>
       <div className="min-w-0">
         <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
@@ -664,6 +708,17 @@ function SummaryTile({ icon: Icon, tint, label, value, sub }) {
 }
 
 const fmtDate = (d) => (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d.slice(8)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : d || '—')
+
+const initials = (name) => String(name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?'
+const PAY_BADGE = { monthly: 'default', daily: 'info', incentive: 'success', hourly: 'warning' }
+
+function Avatar({ name, className }) {
+  return (
+    <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-semibold text-primary', className)}>
+      {initials(name)}
+    </span>
+  )
+}
 
 function RankBadge({ rank, className }) {
   return (
@@ -677,13 +732,16 @@ function RankBadge({ rank, className }) {
   )
 }
 
+const PODIUM_HEIGHT = { 1: 'sm:pt-6', 2: 'sm:pt-3', 3: 'sm:pt-1' }
+
 function TopPerformers({ list }) {
+  const order = list.length === 3 ? [list[1], list[0], list[2]] : list
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardContent className="p-4">
         <div className="flex items-center gap-2 mb-3">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-warning/10 text-warning">
-            <Trophy className="h-4 w-4" />
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-warning/10 text-warning">
+            <Trophy className="h-5 w-5" />
           </span>
           <div>
             <p className="text-sm font-semibold text-foreground">Top performers</p>
@@ -693,14 +751,21 @@ function TopPerformers({ list }) {
         {list.length === 0 ? (
           <p className="text-sm text-muted-foreground">No earnings yet this month.</p>
         ) : (
-          <ol className="grid gap-2 sm:grid-cols-3">
-            {list.map((e) => (
-              <li key={e.employee_id} className="flex items-center gap-3 rounded-lg border bg-background p-3">
-                <RankBadge rank={e.rank} />
-                <span className="min-w-0 flex-1">
+          <ol className="grid items-end gap-2 sm:grid-cols-3">
+            {order.map((e) => (
+              <li
+                key={e.employee_id}
+                className={cn(
+                  'flex items-center gap-3 rounded-xl border p-3 transition-shadow hover:shadow-md sm:flex-col sm:text-center sm:pb-4',
+                  e.rank === 1 ? 'bg-warning/10 border-warning/30' : 'bg-background', PODIUM_HEIGHT[e.rank],
+                )}
+              >
+                <Avatar name={e.full_name} className={cn(e.rank === 1 && 'h-10 w-10 bg-warning/20 text-warning')} />
+                <span className="min-w-0 flex-1 sm:flex-none">
                   <span className="block truncate text-sm font-medium text-foreground">{e.full_name}</span>
                   <span className="block text-xs text-muted-foreground tabular-nums">{formatMoney(e.earnings)}</span>
                 </span>
+                <RankBadge rank={e.rank} />
               </li>
             ))}
           </ol>
@@ -725,7 +790,7 @@ function EmployeeDetail({ e }) {
   const services = e.services || []
   const applied = appliedText(e)
   return (
-    <div className="space-y-3 py-2">
+    <div className="space-y-3 rounded-xl border bg-background p-3 shadow-inner sm:p-4">
       <div className="flex flex-wrap gap-2">
         <Amount label="Earnings" value={money(e.earnings)} />
         <Amount label="Services" value={e.services_count ?? '—'} />
@@ -755,6 +820,7 @@ function EmployeeDetail({ e }) {
       {services.length === 0 ? (
         <p className="text-sm text-muted-foreground">No services to show.</p>
       ) : (
+        <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -782,6 +848,7 @@ function EmployeeDetail({ e }) {
             })}
           </TableBody>
         </Table>
+        </div>
       )}
     </div>
   )
@@ -882,7 +949,7 @@ function ResultsCard() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <Wallet className="h-5 w-5" />
+                <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary"><Wallet className="h-5 w-5" /></span>
                 Results
               </CardTitle>
               <CardDescription className="mt-1.5">
@@ -904,8 +971,11 @@ function ResultsCard() {
             <p className="text-center text-destructive py-8">{errMsg(error, 'Failed to load incentives')}</p>
           ) : employees.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
-              <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
-              <p>No employees to report for this branch.</p>
+              <span className="mx-auto mb-3 grid h-16 w-16 place-items-center rounded-2xl bg-muted">
+                <Users className="h-8 w-8 opacity-50" />
+              </span>
+              <p className="font-medium text-foreground">No employees to report for this branch.</p>
+              <p className="text-sm">Pick another branch or month above.</p>
             </div>
           ) : (
             <>
@@ -933,7 +1003,7 @@ function ResultsCard() {
                     const applied = appliedText(e)
                     return (
                       <Fragment key={e.employee_id}>
-                        <TableRow className="cursor-pointer" onClick={() => toggle(e.employee_id)}>
+                        <TableRow className="cursor-pointer transition-colors hover:bg-accent/50" onClick={() => toggle(e.employee_id)}>
                           <TableCell>
                             <button
                               type="button"
@@ -947,6 +1017,7 @@ function ResultsCard() {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2 font-medium">
+                              <Avatar name={e.full_name} />
                               {e.full_name}
                               {rank && <RankBadge rank={rank} />}
                             </div>
@@ -954,7 +1025,9 @@ function ResultsCard() {
                               <div key={w} className="text-xs text-warning">{w}</div>
                             ))}
                           </TableCell>
-                          <TableCell>{e.pay_type ? PAY_TYPE_LABEL[e.pay_type] || e.pay_type : '—'}</TableCell>
+                          <TableCell>
+                            {e.pay_type ? <Badge variant={PAY_BADGE[e.pay_type] || 'secondary'}>{PAY_TYPE_LABEL[e.pay_type] || e.pay_type}</Badge> : '—'}
+                          </TableCell>
                           <TableCell className="text-right">
                             {money(salary)}
                           </TableCell>
@@ -964,12 +1037,12 @@ function ResultsCard() {
                           <TableCell className="text-right">{money(e.before_shift_incentive)}</TableCell>
                           <TableCell className="text-right">{money(e.after_shift_incentive)}</TableCell>
                           <TableCell className="text-right">
-                            <div className="font-medium">{money(e.paid_incentive)}</div>
+                            <div className="text-base font-bold text-primary tabular-nums">{money(e.paid_incentive)}</div>
                             {applied && <div className="mt-0.5 text-xs text-muted-foreground">{applied}</div>}
                           </TableCell>
                         </TableRow>
                         {isOpen && (
-                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                          <TableRow className="bg-muted/40 hover:bg-muted/40">
                             <TableCell colSpan={10}><EmployeeDetail e={e} /></TableCell>
                           </TableRow>
                         )}
@@ -1000,15 +1073,31 @@ export default function IncentivesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Incentives</h1>
-          <p className="text-muted-foreground">Extra pay for staff, based on the services they complete. Rules apply to everyone who qualifies, in all branches.</p>
+      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-card to-card p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-4">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+              <Award className="h-6 w-6" />
+            </span>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Incentives</h1>
+              <p className="mt-1 text-muted-foreground">Extra pay for staff, based on the services they complete. Rules apply to everyone who qualifies, in all branches.</p>
+            </div>
+          </div>
+          <Button onClick={() => setAddOpen(true)} className="shrink-0 shadow-sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Add rule
+          </Button>
         </div>
-        <Button onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add rule
-        </Button>
+        <ul className="mt-4 flex flex-wrap gap-2">
+          {[...RULE_KEYS.map((k) => ({ key: k, title: RULES[k].title, icon: RULES[k].icon, tint: RULES[k].tint })),
+            { key: 'custom', title: 'Custom', icon: Sparkles, tint: 'bg-success/10 text-success' }].map((c) => (
+              <li key={c.key} className="flex items-center gap-1.5 rounded-full border bg-background/70 py-1 pl-1 pr-3 text-xs font-medium text-foreground">
+                <span className={cn('grid h-5 w-5 place-items-center rounded-full', c.tint)}><c.icon className="h-3 w-3" /></span>
+                {c.title}
+              </li>
+          ))}
+        </ul>
       </div>
 
       <SettingsSection addOpen={addOpen} setAddOpen={setAddOpen} />
