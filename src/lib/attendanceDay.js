@@ -87,3 +87,33 @@ export function summarizeMonth(records) {
     noShiftDays: rows.filter((r) => r.check_in && !r.shift).length,
   }
 }
+
+/**
+ * Short check-in verdict shown next to the check-in time.
+ * Returns null when there is no check-in, else { tone, label, detail }.
+ * tone: 'success' | 'warning' | 'destructive' | 'muted'. Older backends without
+ * early_minutes simply never show "Early".
+ */
+export function describeCheckIn(record) {
+  if (!record || !record.check_in) return null
+  const legacy = record.penalty_rule === 'legacy'
+  if (!record.shift && !legacy) {
+    return { tone: 'muted', label: 'No shift assigned', detail: 'Assign one on the Shifts page.' }
+  }
+  const early = Number(record.early_minutes) || 0
+  const late = Number(record.late_minutes) || 0
+  if (early > 0) return { tone: 'success', label: `Early by ${formatHours(early / 60)}`, detail: null }
+  if (late > 0) {
+    const hours = Number(record.late_penalty_hours) || 0
+    const amount = Number(record.late_penalty_amount) || 0
+    if (hours > 0 || amount > 0) {
+      const parts = []
+      if (amount > 0) parts.push(`${formatRupees(amount)} fine`)
+      if (hours > 0) parts.push(`${formatHours(hours)} deducted`)
+      return { tone: 'destructive', label: `Late ${formatHours(late / 60)}`, detail: parts.join(' + ') }
+    }
+    const grace = legacy ? 15 : record.shift.grace_period
+    return { tone: 'warning', label: `Late ${formatHours(late / 60)} — within grace (${grace}m)`, detail: null }
+  }
+  return { tone: 'success', label: 'On time', detail: null }
+}
