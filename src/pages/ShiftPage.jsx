@@ -46,6 +46,43 @@ const initialShiftForm = {
   half_day_min_hours: '',
 }
 
+const initialOt = { mode: 'default', rate_mode: 'fixed', hourly_rate: '100', multiplier: '1.5', before_shift: false, min_minutes: '0', rounding_minutes: '1' }
+
+function otFromShift(r) {
+  if (!r) return initialOt
+  return {
+    mode: r.enabled === false ? 'off' : 'custom',
+    rate_mode: r.rate_mode || 'fixed',
+    hourly_rate: String(r.hourly_rate ?? 100),
+    multiplier: String(r.multiplier ?? 1.5),
+    before_shift: Boolean(r.before_shift),
+    min_minutes: String(r.min_minutes ?? 0),
+    rounding_minutes: String(r.rounding_minutes ?? 1),
+  }
+}
+
+/** null = follow the payroll-wide rule; otherwise a per-shift override (or enabled:false for no overtime). */
+function otToPayload(ot) {
+  if (ot.mode === 'default') return { ok: true, value: null }
+  if (ot.mode === 'off') return { ok: true, value: { enabled: false } }
+  const n = (v) => Number(v)
+  if ([ot.hourly_rate, ot.multiplier, ot.min_minutes, ot.rounding_minutes].some((v) => !Number.isFinite(n(v)) || n(v) < 0) || n(ot.rounding_minutes) < 1) {
+    return { ok: false, error: 'Overtime rates and minutes must be positive numbers (rounding at least 1)' }
+  }
+  return {
+    ok: true,
+    value: {
+      enabled: true,
+      rate_mode: ot.rate_mode,
+      hourly_rate: n(ot.hourly_rate),
+      multiplier: n(ot.multiplier),
+      before_shift: ot.before_shift,
+      min_minutes: Math.floor(n(ot.min_minutes)),
+      rounding_minutes: Math.floor(n(ot.rounding_minutes)),
+    },
+  }
+}
+
 const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/
 
 const toYearMonth = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -66,6 +103,7 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
   const isEditing = !!shift
   const [form, setForm] = useState(initialShiftForm)
   const [tiers, setTiers] = useState([])
+  const [ot, setOt] = useState(initialOt)
   const [saving, setSaving] = useState(false)
   const { user } = useSelector((s) => s.auth)
   const canEditRules = user?.role === 'owner'
@@ -81,6 +119,7 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
         half_day_late_after_min: shift.half_day_late_after_min == null ? '' : String(shift.half_day_late_after_min),
         half_day_min_hours: shift.half_day_min_hours == null ? '' : String(shift.half_day_min_hours),
       })
+      setOt(otFromShift(shift.overtime_rule))
       setTiers((shift.late_tiers || []).map((t) => (
         t.deduct_hours == null && t.deduct_amount != null
           ? { after_min: String(t.after_min), kind: 'amount', value: String(t.deduct_amount) }
@@ -89,6 +128,7 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
     } else {
       setForm(initialShiftForm)
       setTiers([])
+      setOt(initialOt)
     }
   }, [shift, open])
 
@@ -121,6 +161,9 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
       })
       if (!built.ok) { toast.error(built.error); return }
       rules = built.value
+      const otp = otToPayload(ot)
+      if (!otp.ok) { toast.error(otp.error); return }
+      rules.overtime_rule = otp.value
     }
     const base = Object.fromEntries(Object.entries(form).filter(([k]) => !k.startsWith('half_day')))
     const payload = { ...base, grace_period: grace, ...rules }
@@ -311,6 +354,64 @@ function ShiftModal({ open, onOpenChange, shift = null, onSuccess }) {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">Leave blank to turn a rule off</p>
+              </div>
+
+              <div className="space-y-3 rounded-md border p-3">
+                <div>
+                  <Label htmlFor="ot_mode" className="text-sm font-medium">Overtime for service work after this shift</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Time on services outside the shift is paid per minute (e.g. 50 min at ₹100/h = ₹83.33). Needs “Service time pay” switched on in Payroll.
+                  </p>
+                </div>
+                <select
+                  id="ot_mode"
+                  className="w-full h-10 px-3 border rounded-md bg-white text-sm"
+                  value={ot.mode}
+                  onChange={(e) => setOt((o) => ({ ...o, mode: e.target.value }))}
+                >
+                  <option value="default">Use the payroll default rule</option>
+                  <option value="custom">Custom rule for this shift</option>
+                  <option value="off">No overtime for this shift</option>
+                </select>
+                {ot.mode === 'custom' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="ot_rate_mode" className="text-xs">Rate type</Label>
+                      <select
+                        id="ot_rate_mode"
+                        className="w-full h-10 px-3 border rounded-md bg-white text-sm"
+                        value={ot.rate_mode}
+                        onChange={(e) => setOt((o) => ({ ...o, rate_mode: e.target.value }))}
+                      >
+                        <option value="fixed">Fixed ₹ per hour</option>
+                        <option value="multiplier">× normal hourly rate</option>
+                      </select>
+                    </div>
+                    {ot.rate_mode === 'fixed' ? (
+                      <div className="space-y-1">
+                        <Label htmlFor="ot_rate" className="text-xs">Overtime ₹ per hour</Label>
+                        <Input id="ot_rate" type="number" min="0" step="0.01" value={ot.hourly_rate} onChange={(e) => setOt((o) => ({ ...o, hourly_rate: e.target.value }))} />
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <Label htmlFor="ot_mult" className="text-xs">Multiplier (×)</Label>
+                        <Input id="ot_mult" type="number" min="0" step="0.05" value={ot.multiplier} onChange={(e) => setOt((o) => ({ ...o, multiplier: e.target.value }))} />
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      <Label htmlFor="ot_min" className="text-xs">Ignore overtime shorter than (min/day)</Label>
+                      <Input id="ot_min" type="number" min="0" value={ot.min_minutes} onChange={(e) => setOt((o) => ({ ...o, min_minutes: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="ot_round" className="text-xs">Round down to (minutes)</Label>
+                      <Input id="ot_round" type="number" min="1" value={ot.rounding_minutes} onChange={(e) => setOt((o) => ({ ...o, rounding_minutes: e.target.value }))} />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                      <input type="checkbox" checked={ot.before_shift} onChange={(e) => setOt((o) => ({ ...o, before_shift: e.target.checked }))} />
+                      Count work before the shift starts as overtime too
+                    </label>
+                  </div>
+                )}
               </div>
             </>
           ) : (
