@@ -10,7 +10,8 @@ import { serviceService } from '@/services/service.service'
 import { formatMoney, PAY_TYPE_LABEL } from '@/lib/payroll'
 import { downloadBlob } from '@/lib/export-utils'
 import {
-  defaultSettings, validateSettings, newCustomRule, topPerformers, reportCsv, WHO_OPTIONS, MAX_CUSTOM_RULES, MAX_MONTHLY_TIERS,
+  defaultSettings, validateSettings, newCustomRule, newScopedRule, defaultRuleName, topPerformers, reportCsv, WHO_OPTIONS,
+  MAX_CUSTOM_RULES, MAX_MONTHLY_TIERS, MAX_RULES_PER_KIND,
 } from '@/lib/incentiveSettings'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -95,6 +96,7 @@ const RULES = {
   },
 }
 const RULE_KEYS = Object.keys(RULES)
+const SCOPE_HINT = 'If two rules apply to the same person, both are paid.'
 
 function Spinner() {
   return (
@@ -105,13 +107,17 @@ function Spinner() {
 }
 
 // Server settings -> editable form state (numbers as strings so inputs can be blank while typing)
+const scopeForm = (r) => ({ id: r.id, name: r.name ?? '', branch_id: r.branch_id ?? null, employee_ids: [...(r.employee_ids || [])] })
 const toForm = (s) => ({
-  pick_highest: !!s.pick_highest,
-  monthly_tiers: (s.monthly_tiers || []).map((t) => ({
-    salary: String(t.salary ?? ''), earned_amount: String(t.earned_amount), percent: String(t.percent),
+  monthly_rules: (s.monthly_rules || []).map((r) => ({
+    ...scopeForm(r),
+    pick_highest: !!r.pick_highest,
+    tiers: (r.tiers || []).map((t) => ({
+      salary: String(t.salary ?? ''), earned_amount: String(t.earned_amount), percent: String(t.percent),
+    })),
   })),
-  before_shift: { value: String(s.before_shift?.value ?? 0) },
-  after_shift: { value: String(s.after_shift?.value ?? 0) },
+  before_shift_rules: (s.before_shift_rules || []).map((r) => ({ ...scopeForm(r), percent: String(r.percent ?? 0) })),
+  after_shift_rules: (s.after_shift_rules || []).map((r) => ({ ...scopeForm(r), percent: String(r.percent ?? 0) })),
   custom_rules: (s.custom_rules || []).map((r) => (r.kind === 'target'
     ? { ...r, earned_amount: String(r.earned_amount), percent: String(r.percent) }
     : { ...r, service_ids: [...(r.service_ids || [])], category_ids: [...(r.category_ids || [])], value: String(r.value) })),
@@ -119,24 +125,21 @@ const toForm = (s) => ({
 
 const num = (v) => (v === '' ? NaN : Number(v))
 
+const scopePayload = (r) => ({ id: r.id, name: r.name.trim(), branch_id: r.branch_id || null, employee_ids: r.employee_ids })
 const toPayload = (f) => ({
-  pick_highest: f.pick_highest,
-  monthly_tiers: f.monthly_tiers.map((t) => ({ salary: num(t.salary), earned_amount: num(t.earned_amount), percent: num(t.percent) })),
-  before_shift: { value: num(f.before_shift.value) },
-  after_shift: { value: num(f.after_shift.value) },
+  monthly_rules: f.monthly_rules.map((r) => ({
+    ...scopePayload(r),
+    pick_highest: r.pick_highest,
+    tiers: r.tiers.map((t) => ({ salary: num(t.salary), earned_amount: num(t.earned_amount), percent: num(t.percent) })),
+  })),
+  before_shift_rules: f.before_shift_rules.map((r) => ({ ...scopePayload(r), percent: num(r.percent) })),
+  after_shift_rules: f.after_shift_rules.map((r) => ({ ...scopePayload(r), percent: num(r.percent) })),
   custom_rules: f.custom_rules.map((r) => (r.kind === 'target'
     ? { id: r.id, kind: 'target', name: r.name.trim(), who: r.who, earned_amount: num(r.earned_amount), percent: num(r.percent) }
     : {
       id: r.id, kind: 'per_service', name: r.name.trim(), who: r.who, service_ids: r.service_ids,
       category_ids: r.category_ids, pay_as: r.pay_as, value: num(r.value),
     })),
-})
-
-// Which rule cards the saved settings contain something for
-const hasRule = (s) => ({
-  monthly: (s.monthly_tiers || []).length > 0,
-  before_shift: Number(s.before_shift?.value) > 0,
-  after_shift: Number(s.after_shift?.value) > 0,
 })
 
 function RuleCard({ kind, rule: custom, onRemove, children }) {
@@ -165,17 +168,74 @@ function RuleCard({ kind, rule: custom, onRemove, children }) {
   )
 }
 
-function ShiftFields({ id, box, onChange }) {
+function ShiftFields({ id, rule, onChange }) {
   return (
     <div className="space-y-1.5 w-full sm:w-48">
       <Label htmlFor={`${id}-value`} className="text-xs font-medium text-foreground">Percent (%) of each service</Label>
       <Input
         id={`${id}-value`}
         type="number" min="0" max="100" step="any"
-        value={box.value}
-        onChange={(e) => onChange({ ...box, value: e.target.value })}
+        value={rule.percent}
+        onChange={(e) => onChange({ percent: e.target.value })}
       />
-      <p className="text-xs text-muted-foreground">0 = off. Not paid to incentive-based staff.</p>
+      <p className="text-xs text-muted-foreground">0 = pays nothing. Not paid to incentive-based staff.</p>
+    </div>
+  )
+}
+
+function StaffPicker({ id, items, selected, onChange }) {
+  const [search, setSearch] = useState('')
+  const shownItems = items.filter((it) => it.label.toLowerCase().includes(search.trim().toLowerCase()))
+  const toggle = (value) => onChange(selected.includes(value) ? selected.filter((x) => x !== value) : [...selected, value])
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor={`${id}-search`} className="text-xs font-medium text-foreground">Staff</Label>
+        <span className="flex items-center gap-2 text-xs text-muted-foreground">
+          {selected.length === 0 ? 'Everyone eligible' : `${selected.length} picked`}
+          {selected.length > 0 && (
+            <button type="button" className="text-primary hover:underline" onClick={() => onChange([])}>Everyone eligible</button>
+          )}
+        </span>
+      </div>
+      <Input id={`${id}-search`} placeholder="Search staff" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div id={id} className="max-h-40 overflow-y-auto rounded-md border bg-background p-1">
+        {shownItems.length === 0 && <p className="p-2 text-xs text-muted-foreground">No staff found.</p>}
+        {shownItems.map((it) => (
+          <label key={it.value} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent">
+            <input type="checkbox" className="h-4 w-4 accent-primary" checked={selected.includes(it.value)} onChange={() => toggle(it.value)} />
+            <span className="truncate">{it.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Name, Branch and Staff: shared by Monthly, Before shift and After shift cards
+function ScopeFields({ pre, rule, branches, staff, onChange }) {
+  const knownBranch = !rule.branch_id || branches.some((b) => b.branch_id === rule.branch_id)
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="space-y-1.5 w-full sm:w-64">
+          <Label htmlFor={`${pre}-name`} className="text-xs font-medium text-foreground">Name</Label>
+          <Input id={`${pre}-name`} maxLength={60} value={rule.name} onChange={(e) => onChange({ name: e.target.value })} />
+        </div>
+        <div className="space-y-1.5 w-full sm:w-56">
+          <Label htmlFor={`${pre}-branch`} className="text-xs font-medium text-foreground">Branch</Label>
+          <select
+            id={`${pre}-branch`} className={SELECT_CLASS} value={rule.branch_id || ''}
+            onChange={(e) => onChange({ branch_id: e.target.value || null })}
+          >
+            <option value="">All branches</option>
+            {!knownBranch && <option value={rule.branch_id}>Other branch</option>}
+            {branches.map((b) => <option key={b.branch_id} value={b.branch_id}>{b.name}</option>)}
+          </select>
+        </div>
+      </div>
+      <StaffPicker id={`${pre}-staff`} items={staff} selected={rule.employee_ids} onChange={(v) => onChange({ employee_ids: v })} />
+      <p className="text-xs text-muted-foreground">{SCOPE_HINT}</p>
     </div>
   )
 }
@@ -320,7 +380,7 @@ function RuleOption({ icon: Icon, tint, title, text, disabled, badge, onClick })
   )
 }
 
-function AddRuleDialog({ open, onOpenChange, shown, customCount, onPick, onPickCustom }) {
+function AddRuleDialog({ open, onOpenChange, counts, customCount, onPick, onPickCustom }) {
   const [step, setStep] = useState('kind')
   const full = customCount >= MAX_CUSTOM_RULES
   const handleOpenChange = (o) => {
@@ -334,13 +394,13 @@ function AddRuleDialog({ open, onOpenChange, shown, customCount, onPick, onPickC
           <>
             <DialogHeader>
               <DialogTitle>What kind of rule?</DialogTitle>
-              <DialogDescription>Pick one. You can have one of each ready-made rule, and as many of your own as you like.</DialogDescription>
+              <DialogDescription>Pick one. You can add the same kind of rule again, for different staff or a different branch.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-2">
               {RULE_KEYS.map((k) => (
                 <RuleOption
                   key={k} icon={RULES[k].icon} tint={RULES[k].tint} title={RULES[k].title} text={RULES[k].pick}
-                  disabled={shown.includes(k)} badge={shown.includes(k) ? 'Already added' : null}
+                  disabled={counts[k] >= MAX_RULES_PER_KIND} badge={counts[k] >= MAX_RULES_PER_KIND ? `Limit of ${MAX_RULES_PER_KIND} reached` : null}
                   onClick={() => onPick(k)}
                 />
               ))}
@@ -377,125 +437,21 @@ function AddRuleDialog({ open, onOpenChange, shown, customCount, onPick, onPickC
   )
 }
 
-function SettingsSection({ addOpen, setAddOpen }) {
-  const queryClient = useQueryClient()
-  const { data: res, isLoading, isError, error } = useQuery({
-    queryKey: ['incentive-settings'],
-    queryFn: incentiveService.getSettings,
-  })
-  const [form, setForm] = useState(() => toForm(defaultSettings()))
-  const [shown, setShown] = useState([])
-  const [saved, setSaved] = useState(null) // JSON of the last loaded/saved form
+const FORM_KEY = { monthly: 'monthly_rules', before_shift: 'before_shift_rules', after_shift: 'after_shift_rules' }
 
-  const { data: usersRes } = useQuery({
-    queryKey: ['incentive-employees'],
-    queryFn: () => userService.getUsers({ role: 'employee,manager,cashier', limit: 500 }),
-  })
-  const salaries = useMemo(() => {
-    const found = new Set()
-    for (const u of usersRes?.data || []) {
-      const d = u.employee_details
-      const n = Number(d?.base_salary)
-      if (d?.pay_type === 'monthly' && Number.isFinite(n) && n > 0) found.add(n)
-    }
-    return [...found].sort((a, b) => a - b)
-  }, [usersRes])
-  const { data: servicesRes } = useQuery({
-    queryKey: ['incentive-services'],
-    queryFn: () => serviceService.getServices({ limit: 500 }),
-  })
-  const { data: categoriesRes } = useQuery({
-    queryKey: ['service-categories'],
-    queryFn: () => serviceService.getCategories(),
-  })
-  const serviceItems = useMemo(
-    () => (servicesRes?.data || []).map((x) => ({ value: x.service_id, label: x.service_name })),
-    [servicesRes],
-  )
-  const categoryItems = useMemo(
-    () => (categoriesRes?.data || []).map((c) => ({ value: c.category_id, label: c.name })),
-    [categoriesRes],
-  )
-
-  useEffect(() => {
-    if (res?.data) {
-      const f = toForm(res.data)
-      setForm(f)
-      setSaved(JSON.stringify(f))
-      const has = hasRule(res.data)
-      setShown(RULE_KEYS.filter((k) => has[k]))
-    }
-  }, [res])
-
-  const save = useMutation({
-    mutationFn: (payload) => incentiveService.saveSettings(payload),
-    onSuccess: () => {
-      toast.success('Incentive settings saved')
-      setSaved(JSON.stringify(form))
-      queryClient.invalidateQueries({ queryKey: ['incentive-settings'] })
-      queryClient.invalidateQueries({ queryKey: ['incentive-report'] })
-      queryClient.invalidateQueries({ queryKey: ['payroll-report'] })
-    },
-    onError: (err) => toast.error(errMsg(err, 'Failed to save settings')),
-  })
-
-  const dirty = saved !== null && JSON.stringify(form) !== saved
-  const set = (patch) => setForm((f) => ({ ...f, ...patch }))
-  const setTier = (i, patch) => set({ monthly_tiers: form.monthly_tiers.map((t, k) => (k === i ? { ...t, ...patch } : t)) })
-
-  // A card that is off the page always has its default (off) values, so the form matches what is shown.
-  const addRule = (k) => {
-    setShown((s) => (s.includes(k) ? s : [...s, k]))
-    if (k === 'monthly' && form.monthly_tiers.length === 0) set({ monthly_tiers: [{ salary: '', earned_amount: '', percent: '' }] })
-    setAddOpen(false)
-  }
-  const addCustom = (kind) => {
-    if (form.custom_rules.length >= MAX_CUSTOM_RULES) return
-    set({ custom_rules: [...form.custom_rules, newCustomRule(kind, crypto.randomUUID())] })
-    setAddOpen(false)
-  }
-  const setCustom = (id, patch) => set({ custom_rules: form.custom_rules.map((r) => (r.id === id ? { ...r, ...patch } : r)) })
-  const removeRule = (k) => {
-    setShown((s) => s.filter((x) => x !== k))
-    const d = toForm(defaultSettings())
-    if (k === 'monthly') set({ monthly_tiers: d.monthly_tiers, pick_highest: d.pick_highest })
-    if (k === 'before_shift') set({ before_shift: d.before_shift })
-    if (k === 'after_shift') set({ after_shift: d.after_shift })
-  }
-
-  const handleSave = () => {
-    const payload = toPayload(form)
-    const problem = validateSettings(payload)
-    if (problem) {
-      toast.error(problem)
-      return
-    }
-    save.mutate(payload)
-  }
-
-  if (isLoading) return <Spinner />
-  if (isError) return <p className="text-center text-destructive py-8">{errMsg(error, 'Failed to load settings')}</p>
-
+function ScopedRuleCard({ kind, rule, index, branches, staff, onChange, onRemove }) {
+  const base = RULES[kind]
+  const title = rule.name.trim() || `${base.title} ${index + 1}`
+  const cardRule = { ...base, title, removeLabel: title }
+  const pre = `${kind}-${rule.id}`
+  const setTier = (i, patch) => onChange({ tiers: rule.tiers.map((t, k) => (k === i ? { ...t, ...patch } : t)) })
   return (
-    <div className="space-y-4">
-      {shown.length === 0 && form.custom_rules.length === 0 && (
-        <Card>
-          <CardContent className="text-center py-10 text-muted-foreground">
-            <Award className="h-12 w-12 mx-auto mb-3 opacity-20" />
-            <p className="font-medium text-foreground">No incentive rules yet</p>
-            <p className="text-sm">Click Add rule to create one.</p>
-            <Button className="mt-4" onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add rule
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {shown.includes('monthly') && (
-        <RuleCard kind="monthly" onRemove={() => removeRule('monthly')}>
-          <div className="space-y-3">
-            {form.monthly_tiers.length > 0 && (
+    <RuleCard rule={cardRule} onRemove={onRemove}>
+      <div className="space-y-4">
+        <ScopeFields pre={pre} rule={rule} branches={branches} staff={staff} onChange={onChange} />
+        {kind === 'monthly' ? (
+          <div className="space-y-3 border-t pt-4">
+            {rule.tiers.length > 0 && (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -506,7 +462,7 @@ function SettingsSection({ addOpen, setAddOpen }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {form.monthly_tiers.map((t, i) => (
+                  {rule.tiers.map((t, i) => (
                     <TableRow key={i}>
                       <TableCell>
                         <Input
@@ -535,7 +491,7 @@ function SettingsSection({ addOpen, setAddOpen }) {
                       <TableCell>
                         <Button
                           type="button" size="sm" variant="ghost" aria-label={`Remove row ${i + 1}`}
-                          onClick={() => set({ monthly_tiers: form.monthly_tiers.filter((_, k) => k !== i) })}
+                          onClick={() => onChange({ tiers: rule.tiers.filter((_, k) => k !== i) })}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -545,14 +501,11 @@ function SettingsSection({ addOpen, setAddOpen }) {
                 </TableBody>
               </Table>
             )}
-            <datalist id="inc-salary-list">
-              {salaries.map((n) => <option key={n} value={n} />)}
-            </datalist>
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 type="button" size="sm" variant="outline"
-                disabled={form.monthly_tiers.length >= MAX_MONTHLY_TIERS}
-                onClick={() => set({ monthly_tiers: [...form.monthly_tiers, { salary: '', earned_amount: '', percent: '' }] })}
+                disabled={rule.tiers.length >= MAX_MONTHLY_TIERS}
+                onClick={() => onChange({ tiers: [...rule.tiers, { salary: '', earned_amount: '', percent: '' }] })}
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add row
@@ -563,28 +516,161 @@ function SettingsSection({ addOpen, setAddOpen }) {
               <input
                 type="checkbox"
                 className="mt-0.5 h-4 w-4 accent-primary"
-                checked={form.pick_highest}
-                onChange={(e) => set({ pick_highest: e.target.checked })}
+                checked={rule.pick_highest}
+                onChange={(e) => onChange({ pick_highest: e.target.checked })}
               />
               <span className="text-sm text-foreground">
                 Pay only the highest row (instead of adding the rows an employee qualifies for)
               </span>
             </label>
           </div>
-        </RuleCard>
+        ) : (
+          <div className="border-t pt-4">
+            <ShiftFields id={pre} rule={rule} onChange={onChange} />
+          </div>
+        )}
+      </div>
+    </RuleCard>
+  )
+}
+
+function SettingsSection({ addOpen, setAddOpen }) {
+  const queryClient = useQueryClient()
+  const { data: res, isLoading, isError, error } = useQuery({
+    queryKey: ['incentive-settings'],
+    queryFn: incentiveService.getSettings,
+  })
+  const [form, setForm] = useState(() => toForm(defaultSettings()))
+  const [saved, setSaved] = useState(null) // JSON of the last loaded/saved form
+
+  const { data: usersRes } = useQuery({
+    queryKey: ['incentive-employees'],
+    queryFn: () => userService.getUsers({ role: 'employee,manager,cashier', limit: 500 }),
+  })
+  const { data: branchesRes } = useQuery({
+    queryKey: ['branches', 'active'],
+    queryFn: () => branchService.getBranches({ is_active: 'true' }),
+  })
+  const branches = branchesRes?.data || []
+  const { salaries, monthlyStaff, otherStaff } = useMemo(() => {
+    const found = new Set()
+    const monthly = []
+    const other = []
+    for (const u of usersRes?.data || []) {
+      const d = u.employee_details
+      const item = { value: u.user_id, label: u.full_name || 'Unnamed' }
+      const n = Number(d?.base_salary)
+      if (d?.pay_type === 'monthly') {
+        monthly.push(item)
+        if (Number.isFinite(n) && n > 0) found.add(n)
+      }
+      if (d?.pay_type !== 'incentive') other.push(item)
+    }
+    const byLabel = (a, b) => a.label.localeCompare(b.label)
+    return { salaries: [...found].sort((a, b) => a - b), monthlyStaff: monthly.sort(byLabel), otherStaff: other.sort(byLabel) }
+  }, [usersRes])
+  const { data: servicesRes } = useQuery({
+    queryKey: ['incentive-services'],
+    queryFn: () => serviceService.getServices({ limit: 500 }),
+  })
+  const { data: categoriesRes } = useQuery({
+    queryKey: ['service-categories'],
+    queryFn: () => serviceService.getCategories(),
+  })
+  const serviceItems = useMemo(
+    () => (servicesRes?.data || []).map((x) => ({ value: x.service_id, label: x.service_name })),
+    [servicesRes],
+  )
+  const categoryItems = useMemo(
+    () => (categoriesRes?.data || []).map((c) => ({ value: c.category_id, label: c.name })),
+    [categoriesRes],
+  )
+
+  useEffect(() => {
+    if (res?.data) {
+      const f = toForm(res.data)
+      setForm(f)
+      setSaved(JSON.stringify(f))
+    }
+  }, [res])
+
+  const save = useMutation({
+    mutationFn: (payload) => incentiveService.saveSettings(payload),
+    onSuccess: () => {
+      toast.success('Incentive settings saved')
+      setSaved(JSON.stringify(form))
+      queryClient.invalidateQueries({ queryKey: ['incentive-settings'] })
+      queryClient.invalidateQueries({ queryKey: ['incentive-report'] })
+      queryClient.invalidateQueries({ queryKey: ['payroll-report'] })
+    },
+    onError: (err) => toast.error(errMsg(err, 'Failed to save settings')),
+  })
+
+  const dirty = saved !== null && JSON.stringify(form) !== saved
+  const set = (patch) => setForm((f) => ({ ...f, ...patch }))
+  const counts = {
+    monthly: form.monthly_rules.length,
+    before_shift: form.before_shift_rules.length,
+    after_shift: form.after_shift_rules.length,
+  }
+
+  // Every press adds a NEW card (the same rule can be added many times, e.g. for different staff or branches).
+  const addRule = (k) => {
+    const key = FORM_KEY[k]
+    if (form[key].length >= MAX_RULES_PER_KIND) return
+    set({ [key]: [...form[key], newScopedRule(k, crypto.randomUUID(), defaultRuleName(k, form[key].length))] })
+    setAddOpen(false)
+  }
+  const setRule = (k, id, patch) => set({ [FORM_KEY[k]]: form[FORM_KEY[k]].map((r) => (r.id === id ? { ...r, ...patch } : r)) })
+  const removeRule = (k, id) => set({ [FORM_KEY[k]]: form[FORM_KEY[k]].filter((r) => r.id !== id) })
+  const addCustom = (kind) => {
+    if (form.custom_rules.length >= MAX_CUSTOM_RULES) return
+    set({ custom_rules: [...form.custom_rules, newCustomRule(kind, crypto.randomUUID())] })
+    setAddOpen(false)
+  }
+  const setCustom = (id, patch) => set({ custom_rules: form.custom_rules.map((r) => (r.id === id ? { ...r, ...patch } : r)) })
+
+  const handleSave = () => {
+    const payload = toPayload(form)
+    const problem = validateSettings(payload)
+    if (problem) {
+      toast.error(problem)
+      return
+    }
+    save.mutate(payload)
+  }
+
+  if (isLoading) return <Spinner />
+  if (isError) return <p className="text-center text-destructive py-8">{errMsg(error, 'Failed to load settings')}</p>
+
+  const noRules = counts.monthly + counts.before_shift + counts.after_shift + form.custom_rules.length === 0
+
+  return (
+    <div className="space-y-4">
+      {noRules && (
+        <Card>
+          <CardContent className="text-center py-10 text-muted-foreground">
+            <Award className="h-12 w-12 mx-auto mb-3 opacity-20" />
+            <p className="font-medium text-foreground">No incentive rules yet</p>
+            <p className="text-sm">Click Add rule to create one.</p>
+            <Button className="mt-4" onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add rule
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
-      {shown.includes('before_shift') && (
-        <RuleCard kind="before_shift" onRemove={() => removeRule('before_shift')}>
-          <ShiftFields id="before" box={form.before_shift} onChange={(b) => set({ before_shift: b })} />
-        </RuleCard>
-      )}
+      <datalist id="inc-salary-list">
+        {salaries.map((n) => <option key={n} value={n} />)}
+      </datalist>
 
-      {shown.includes('after_shift') && (
-        <RuleCard kind="after_shift" onRemove={() => removeRule('after_shift')}>
-          <ShiftFields id="after" box={form.after_shift} onChange={(b) => set({ after_shift: b })} />
-        </RuleCard>
-      )}
+      {RULE_KEYS.flatMap((k) => form[FORM_KEY[k]].map((r, i) => (
+        <ScopedRuleCard
+          key={r.id} kind={k} rule={r} index={i} branches={branches} staff={k === 'monthly' ? monthlyStaff : otherStaff}
+          onChange={(patch) => setRule(k, r.id, patch)} onRemove={() => removeRule(k, r.id)}
+        />
+      )))}
 
       {form.custom_rules.map((r, i) => (
         <CustomRuleCard
@@ -603,7 +689,7 @@ function SettingsSection({ addOpen, setAddOpen }) {
       </div>
 
       <AddRuleDialog
-        open={addOpen} onOpenChange={setAddOpen} shown={shown}
+        open={addOpen} onOpenChange={setAddOpen} counts={counts}
         customCount={form.custom_rules.length} onPick={addRule} onPickCustom={addCustom}
       />
     </div>
@@ -704,6 +790,16 @@ function EmployeeDetail({ e }) {
       <p className="text-xs text-muted-foreground">
         {applied ? `Paid: ${applied}.` : 'Nothing paid.'}
       </p>
+      {Array.isArray(e.rule_amounts) && e.rule_amounts.length > 0 && (
+        <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          {e.rule_amounts.map((r) => (
+            <li key={r.id} className="flex items-baseline justify-between gap-3 border-b border-dashed py-0.5">
+              <span className="truncate text-muted-foreground">{r.name}</span>
+              <span className="font-medium tabular-nums text-foreground">{money(r.amount)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       {services.length === 0 ? (
         <p className="text-sm text-muted-foreground">No services to show.</p>
       ) : (
@@ -955,7 +1051,7 @@ export default function IncentivesPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Incentives</h1>
-          <p className="text-muted-foreground">Extra pay for staff, based on the services they complete. Same rules for all branches.</p>
+          <p className="text-muted-foreground">Extra pay for staff, based on the services they complete. Each rule can be for all branches or just one.</p>
         </div>
         <Button onClick={() => setAddOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />

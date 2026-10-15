@@ -1,50 +1,107 @@
 import assert from 'node:assert/strict'
-import { defaultSettings, validateSettings, newCustomRule, topPerformers, reportCsv, WHO_OPTIONS } from '../src/lib/incentiveSettings.js'
+import {
+  defaultSettings, validateSettings, newCustomRule, newScopedRule, defaultRuleName, topPerformers, reportCsv, WHO_OPTIONS,
+  MAX_RULES_PER_KIND,
+} from '../src/lib/incentiveSettings.js'
 
+const B1 = '11111111-1111-4111-8111-111111111111'
+const E1 = '22222222-2222-4222-8222-222222222222'
+const E2 = '33333333-3333-4333-8333-333333333333'
 const full = () => ({
-  pick_highest: true,
-  monthly_tiers: [{ salary: 15000, earned_amount: 50000, percent: 20 }, { salary: 15000, earned_amount: 80000, percent: 25 }],
-  before_shift: { value: 10 },
-  after_shift: { value: 12 },
+  monthly_rules: [{
+    id: 'm1', name: 'Monthly earnings', branch_id: null, employee_ids: [], pick_highest: true,
+    tiers: [{ salary: 15000, earned_amount: 50000, percent: 20 }, { salary: 15000, earned_amount: 80000, percent: 25 }],
+  }],
+  before_shift_rules: [{ id: 'b1', name: 'Before shift', branch_id: null, employee_ids: [], percent: 10 }],
+  after_shift_rules: [
+    { id: 'a1', name: 'After shift', branch_id: B1, employee_ids: [E1], percent: 12 },
+    { id: 'a2', name: 'After shift 2', branch_id: null, employee_ids: [E1, E2], percent: 5 },
+  ],
   custom_rules: [],
 })
 
-assert.deepEqual(defaultSettings(), {
-  pick_highest: false, monthly_tiers: [], before_shift: { value: 0 }, after_shift: { value: 0 }, custom_rules: [],
-})
+assert.deepEqual(defaultSettings(), { monthly_rules: [], before_shift_rules: [], after_shift_rules: [], custom_rules: [] })
 assert.notEqual(defaultSettings(), defaultSettings())
 assert.equal(validateSettings(defaultSettings()), null)
 assert.equal(validateSettings(full()), null)
 
 const err = (mut, re) => { const s = full(); mut(s); assert.match(validateSettings(s) || '', re) }
-err((s) => { s.monthly_tiers[0].percent = 101 }, /percent/i)
-err((s) => { s.monthly_tiers[0].percent = -1 }, /percent/i)
-err((s) => { s.monthly_tiers[1].earned_amount = 50000 }, /same/i)
-err((s) => { delete s.monthly_tiers[0].salary }, /salary/i)
-err((s) => { s.monthly_tiers[0].salary = '' }, /salary/i)
-err((s) => { s.monthly_tiers[0].salary = 0 }, /salary/i)
-err((s) => { s.monthly_tiers[0].salary = 100000000 }, /salary/i)
-err((s) => { s.monthly_tiers[0].earned_amount = -5 }, /earned/i)
-err((s) => { s.monthly_tiers[0].earned_amount = 0 }, /earned/i)
-err((s) => { s.monthly_tiers[0].earned_amount = 100000000 }, /earned/i)
-err((s) => { s.monthly_tiers[0].earned_amount = '' }, /earned/i)
-err((s) => { s.monthly_tiers = Array.from({ length: 41 }, (_, i) => ({ salary: 1, earned_amount: i + 1, percent: 1 })) }, /40/)
-err((s) => { s.before_shift.value = 101 }, /before shift/i)
-err((s) => { s.after_shift.value = 101 }, /after shift/i)
-err((s) => { s.after_shift.value = -1 }, /after shift/i)
-err((s) => { s.before_shift.value = '' }, /before shift/i)
+const tier0 = (s) => s.monthly_rules[0].tiers[0]
+err((s) => { tier0(s).percent = 101 }, /percent/i)
+err((s) => { tier0(s).percent = -1 }, /percent/i)
+err((s) => { s.monthly_rules[0].tiers[1].earned_amount = 50000 }, /same/i)
+err((s) => { delete tier0(s).salary }, /salary/i)
+err((s) => { tier0(s).salary = '' }, /salary/i)
+err((s) => { tier0(s).salary = 0 }, /salary/i)
+err((s) => { tier0(s).salary = 100000000 }, /salary/i)
+err((s) => { tier0(s).earned_amount = -5 }, /earned/i)
+err((s) => { tier0(s).earned_amount = 0 }, /earned/i)
+err((s) => { tier0(s).earned_amount = 100000000 }, /earned/i)
+err((s) => { tier0(s).earned_amount = '' }, /earned/i)
+err((s) => { s.monthly_rules[0].tiers = [] }, /row|tier/i)
+err((s) => { s.monthly_rules[0].tiers = Array.from({ length: 41 }, (_, i) => ({ salary: 1, earned_amount: i + 1, percent: 1 })) }, /40/)
+err((s) => { s.before_shift_rules[0].percent = 101 }, /before shift/i)
+err((s) => { s.after_shift_rules[0].percent = 101 }, /after shift/i)
+err((s) => { s.after_shift_rules[1].percent = -1 }, /after shift 2/i)
+err((s) => { s.before_shift_rules[0].percent = '' }, /before shift/i)
+// names
+err((s) => { s.monthly_rules[0].name = '' }, /name/i)
+err((s) => { s.monthly_rules[0].name = '   ' }, /name/i)
+err((s) => { s.after_shift_rules[0].name = 'x'.repeat(61) }, /name/i)
+// ids unique across ALL lists
+err((s) => { s.after_shift_rules[1].id = 'a1' }, /same id/i)
+err((s) => { s.before_shift_rules[0].id = 'm1' }, /same id/i)
+err((s) => { s.custom_rules = [{ ...newCustomRule('target', 'a1'), name: 'T', earned_amount: 5, percent: 1 }] }, /same id/i)
+// scope
+err((s) => { s.after_shift_rules[0].branch_id = 5 }, /branch/i)
+err((s) => { s.after_shift_rules[0].employee_ids = 'x' }, /staff|employee/i)
+err((s) => { s.after_shift_rules[0].employee_ids = Array.from({ length: 201 }, (_, i) => `e${i}`) }, /200/)
+err((s) => { s.after_shift_rules[0].pick_highest = true }, /unknown|not allowed|pick_highest/i)
+err((s) => { s.monthly_rules[0].extra = 1 }, /unknown|not allowed|extra/i)
+// legacy / unknown top-level keys
+err((s) => { s.pick_highest = true }, /unknown|not allowed|pick_highest/i)
+err((s) => { s.monthly_tiers = [] }, /unknown|not allowed|monthly_tiers/i)
+err((s) => { s.before_shift = { value: 1 } }, /unknown|not allowed|before_shift/i)
+err((s) => { s.after_shift = { value: 1 } }, /unknown|not allowed|after_shift/i)
 err((s) => { s.incentive_staff_percent = 30 }, /unknown|not allowed|incentive_staff_percent/i)
-err((s) => { s.salary_overrides = [] }, /unknown|not allowed|salary_overrides/i)
-err((s) => { s.before_shift.type = 'percent' }, /unknown|not allowed|type/i)
+// at most 20 of a kind (exactly 20 is fine)
+const many = (n, make) => Array.from({ length: n }, (_, i) => make(i))
+assert.equal(MAX_RULES_PER_KIND, 20)
+err((s) => { s.after_shift_rules = many(21, (i) => ({ id: `x${i}`, name: 'N', branch_id: null, employee_ids: [], percent: 1 })) }, /20/)
+err((s) => { s.before_shift_rules = many(21, (i) => ({ id: `x${i}`, name: 'N', branch_id: null, employee_ids: [], percent: 1 })) }, /20/)
+err((s) => {
+  s.monthly_rules = many(21, (i) => ({ id: `x${i}`, name: 'N', branch_id: null, employee_ids: [], pick_highest: false, tiers: [{ salary: 1, earned_amount: 1, percent: 1 }] }))
+}, /20/)
+const ok20 = full()
+ok20.after_shift_rules = many(20, (i) => ({ id: `x${i}`, name: 'N', branch_id: null, employee_ids: [], percent: 1 }))
+assert.equal(validateSettings(ok20), null)
 // same earned amount for a different salary is fine; exactly 40 rows is fine
-const ok40 = full(); ok40.monthly_tiers = Array.from({ length: 40 }, (_, i) => ({ salary: 1000 + i, earned_amount: 5, percent: 1 }))
+const ok40 = full(); ok40.monthly_rules[0].tiers = many(40, (i) => ({ salary: 1000 + i, earned_amount: 5, percent: 1 }))
 assert.equal(validateSettings(ok40), null)
-const diffSalary = full(); diffSalary.monthly_tiers[1] = { salary: 20000, earned_amount: 50000, percent: 5 }
+const diffSalary = full(); diffSalary.monthly_rules[0].tiers[1] = { salary: 20000, earned_amount: 50000, percent: 5 }
 assert.equal(validateSettings(diffSalary), null)
+// same tiers in two different rules are fine
+const twoMonthly = full()
+twoMonthly.monthly_rules.push({ ...twoMonthly.monthly_rules[0], id: 'm2', name: 'Monthly earnings 2', employee_ids: [E1] })
+assert.equal(validateSettings(twoMonthly), null)
+
+// helpers
+assert.deepEqual(newScopedRule('monthly', 'i1', 'Monthly earnings'), {
+  id: 'i1', name: 'Monthly earnings', branch_id: null, employee_ids: [], pick_highest: false,
+  tiers: [{ salary: '', earned_amount: '', percent: '' }],
+})
+assert.deepEqual(newScopedRule('after_shift', 'i2', 'After shift'), { id: 'i2', name: 'After shift', branch_id: null, employee_ids: [], percent: 0 })
+assert.deepEqual(newScopedRule('before_shift', 'i3', 'Before shift'), { id: 'i3', name: 'Before shift', branch_id: null, employee_ids: [], percent: 0 })
+assert.equal(defaultRuleName('monthly', 0), 'Monthly earnings')
+assert.equal(defaultRuleName('before_shift', 0), 'Before shift')
+assert.equal(defaultRuleName('after_shift', 1), 'After shift 2')
+assert.equal(defaultRuleName('after_shift', 2), 'After shift 3')
 
 // settings without custom_rules still validate
 const old = full(); delete old.custom_rules
 assert.equal(validateSettings(old), null)
+const oldMin = { monthly_rules: [], before_shift_rules: [], after_shift_rules: [] }
+assert.equal(validateSettings(oldMin), null)
 
 // custom rules
 assert.deepEqual(WHO_OPTIONS.map((o) => o.value), ['normal', 'incentive', 'everyone'])

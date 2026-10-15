@@ -1,26 +1,31 @@
 // Pure helpers for the Incentives settings form (no React, no '@/' alias).
 export const MAX_MONTHLY_TIERS = 40
+export const MAX_RULES_PER_KIND = 20
+export const MAX_RULE_EMPLOYEES = 200
 
 export function defaultSettings() {
-  return {
-    pick_highest: false,
-    monthly_tiers: [],
-    before_shift: { value: 0 },
-    after_shift: { value: 0 },
-    custom_rules: [],
-  }
+  return { monthly_rules: [], before_shift_rules: [], after_shift_rules: [], custom_rules: [] }
 }
 
 const isNum = (v) => v !== '' && v !== null && v !== undefined && typeof v !== 'boolean' && Number.isFinite(Number(v))
 
-function checkShift(label, box) {
-  if (!box || typeof box !== 'object' || Array.isArray(box)) return `${label}: invalid value`
-  const extra = Object.keys(box).find((k) => k !== 'value')
-  if (extra) return `${label}: unknown field "${extra}"`
-  if (!isNum(box.value)) return `${label}: enter a percent`
-  const v = Number(box.value)
-  if (v < 0 || v > 100) return `${label}: percent must be between 0 and 100`
-  return null
+export const SCOPED_KINDS = {
+  monthly: { key: 'monthly_rules', title: 'Monthly earnings' },
+  before_shift: { key: 'before_shift_rules', title: 'Before shift' },
+  after_shift: { key: 'after_shift_rules', title: 'After shift' },
+}
+
+// "Monthly earnings", then "Monthly earnings 2", "Monthly earnings 3" ... (existingCount = rules of that kind already there)
+export function defaultRuleName(kind, existingCount) {
+  const title = SCOPED_KINDS[kind].title
+  return existingCount > 0 ? `${title} ${existingCount + 1}` : title
+}
+
+// A fresh card for the form (numbers as strings so inputs can be blank while typing)
+export function newScopedRule(kind, id, name) {
+  const base = { id, name, branch_id: null, employee_ids: [] }
+  if (kind === 'monthly') return { ...base, pick_highest: false, tiers: [{ salary: '', earned_amount: '', percent: '' }] }
+  return { ...base, percent: 0 }
 }
 
 export const WHO_OPTIONS = [
@@ -35,15 +40,14 @@ export function newCustomRule(kind, id) {
   return { id, kind: 'per_service', name: '', who: 'normal', service_ids: [], category_ids: [], pay_as: 'percent', value: 0 }
 }
 
-function checkCustomRules(list) {
+function checkCustomRules(list, ids = new Set()) {
   if (list == null) return null
   if (!Array.isArray(list)) return 'Custom rules: invalid rules'
   if (list.length > MAX_CUSTOM_RULES) return `Custom rules: at most ${MAX_CUSTOM_RULES} rules`
-  const ids = new Set()
   for (const [i, r] of list.entries()) {
     const label = `Custom rule ${i + 1}`
     if (!r || !['per_service', 'target'].includes(r.kind)) return `${label}: unknown rule type`
-    if (ids.has(r.id)) return 'Custom rules: two rules have the same id'
+    if (ids.has(r.id)) return 'Two rules have the same id'
     ids.add(r.id)
     const name = typeof r.name === 'string' ? r.name.trim() : ''
     if (name.length < 1 || name.length > 60) return `${label}: name must be 1 to 60 characters`
@@ -71,36 +75,74 @@ function checkCustomRules(list) {
   return null
 }
 
-const ALLOWED_KEYS = ['pick_highest', 'monthly_tiers', 'before_shift', 'after_shift', 'custom_rules']
+const ALLOWED_KEYS = ['monthly_rules', 'before_shift_rules', 'after_shift_rules', 'custom_rules']
+
+function checkTiers(label, tiers) {
+  if (!Array.isArray(tiers) || tiers.length < 1) return `${label}: add at least one row`
+  if (tiers.length > MAX_MONTHLY_TIERS) return `${label}: at most ${MAX_MONTHLY_TIERS} rows`
+  const seen = new Set()
+  for (const [i, t] of tiers.entries()) {
+    const n = i + 1
+    if (!t || typeof t !== 'object') return `${label} row ${n}: invalid row`
+    if (!isNum(t.salary) || Number(t.salary) <= 0 || Number(t.salary) > 99999999) {
+      return `${label} row ${n}: salary must be more than 0 and at most 99999999`
+    }
+    if (!isNum(t.earned_amount) || Number(t.earned_amount) <= 0 || Number(t.earned_amount) > 99999999) {
+      return `${label} row ${n}: earned amount must be more than 0 and at most 99999999`
+    }
+    if (!isNum(t.percent) || Number(t.percent) < 0 || Number(t.percent) > 100) {
+      return `${label} row ${n}: percent must be between 0 and 100`
+    }
+    const key = `${Number(t.salary)}|${Number(t.earned_amount)}`
+    if (seen.has(key)) return `${label}: two rows have the same salary and earned amount`
+    seen.add(key)
+  }
+  return null
+}
+
+// kind: 'monthly' | 'before_shift' | 'after_shift'; ids is shared across every list
+function checkScopedRules(kind, list, ids) {
+  const { title } = SCOPED_KINDS[kind]
+  if (list == null) return null
+  if (!Array.isArray(list)) return `${title}: invalid rules`
+  if (list.length > MAX_RULES_PER_KIND) return `${title}: at most ${MAX_RULES_PER_KIND} rules`
+  const allowed = ['id', 'name', 'branch_id', 'employee_ids', ...(kind === 'monthly' ? ['pick_highest', 'tiers'] : ['percent'])]
+  for (const [i, r] of list.entries()) {
+    const label = `${title} ${i + 1}`
+    if (!r || typeof r !== 'object' || Array.isArray(r)) return `${label}: invalid rule`
+    const extra = Object.keys(r).find((k) => !allowed.includes(k))
+    if (extra) return `${label}: unknown field "${extra}"`
+    if (typeof r.id !== 'string' || !r.id) return `${label}: missing id`
+    if (ids.has(r.id)) return 'Two rules have the same id'
+    ids.add(r.id)
+    const name = typeof r.name === 'string' ? r.name.trim() : ''
+    if (name.length < 1 || name.length > 60) return `${label}: name must be 1 to 60 characters`
+    if (r.branch_id !== null && typeof r.branch_id !== 'string') return `${label}: choose a branch`
+    if (!Array.isArray(r.employee_ids)) return `${label}: invalid staff list`
+    if (r.employee_ids.length > MAX_RULE_EMPLOYEES) return `${label}: pick at most ${MAX_RULE_EMPLOYEES} employees`
+    if (kind === 'monthly') {
+      if (typeof r.pick_highest !== 'boolean') return `${label}: invalid "pay only the highest row" choice`
+      const bad = checkTiers(label, r.tiers)
+      if (bad) return bad
+    } else if (!isNum(r.percent)) {
+      return `${label}: enter a percent`
+    } else if (Number(r.percent) < 0 || Number(r.percent) > 100) {
+      return `${label}: percent must be between 0 and 100`
+    }
+  }
+  return null
+}
 
 // Returns an error message, or null when the settings are valid.
 export function validateSettings(s) {
   const unknown = Object.keys(s || {}).find((k) => !ALLOWED_KEYS.includes(k))
   if (unknown) return `Unknown setting "${unknown}"`
-  const tiers = s?.monthly_tiers
-  if (!Array.isArray(tiers)) return 'Monthly earnings: invalid rows'
-  if (tiers.length > MAX_MONTHLY_TIERS) return `Monthly earnings: at most ${MAX_MONTHLY_TIERS} rows`
-  const seen = new Set()
-  for (const [i, t] of tiers.entries()) {
-    const n = i + 1
-    if (!isNum(t.salary) || Number(t.salary) <= 0 || Number(t.salary) > 99999999) {
-      return `Monthly earnings row ${n}: salary must be more than 0 and at most 99999999`
-    }
-    if (!isNum(t.earned_amount) || Number(t.earned_amount) <= 0 || Number(t.earned_amount) > 99999999) {
-      return `Monthly earnings row ${n}: earned amount must be more than 0 and at most 99999999`
-    }
-    if (!isNum(t.percent) || Number(t.percent) < 0 || Number(t.percent) > 100) {
-      return `Monthly earnings row ${n}: percent must be between 0 and 100`
-    }
-    const key = `${Number(t.salary)}|${Number(t.earned_amount)}`
-    if (seen.has(key)) return 'Monthly earnings: two rows have the same salary and earned amount'
-    seen.add(key)
+  const ids = new Set()
+  for (const kind of Object.keys(SCOPED_KINDS)) {
+    const bad = checkScopedRules(kind, s?.[SCOPED_KINDS[kind].key], ids)
+    if (bad) return bad
   }
-  const before = checkShift('Before shift', s.before_shift)
-  if (before) return before
-  const after = checkShift('After shift', s.after_shift)
-  if (after) return after
-  return checkCustomRules(s.custom_rules)
+  return checkCustomRules(s?.custom_rules, ids)
 }
 
 // Top 3 employees by earnings (only those above 0). Rows are report employees.
