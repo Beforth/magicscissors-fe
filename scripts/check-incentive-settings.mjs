@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   defaultSettings, validateSettings, newCustomRule, newScopedRule, defaultRuleName, topPerformers, reportCsv, WHO_OPTIONS,
-  MAX_RULES_PER_KIND, shiftRuleName,
+  MAX_RULES_PER_KIND, scopedRuleName,
 } from '../src/lib/incentiveSettings.js'
 
 const B1 = '11111111-1111-4111-8111-111111111111'
@@ -96,11 +96,14 @@ assert.equal(defaultRuleName('monthly', 0), 'Monthly earnings')
 assert.equal(defaultRuleName('before_shift', 0), 'Before shift')
 assert.equal(defaultRuleName('after_shift', 1), 'After shift 2')
 assert.equal(defaultRuleName('after_shift', 2), 'After shift 3')
-assert.equal(shiftRuleName('after_shift', 'After shift 2', 0), 'After shift')
-assert.equal(shiftRuleName('after_shift', 'After shift', 2), 'After shift 3')
-assert.equal(shiftRuleName('before_shift', '', 1), 'Before shift 2')
-assert.equal(shiftRuleName('after_shift', 'Weekend bonus', 1), 'Weekend bonus')
-assert.equal(shiftRuleName('after_shift', 'Before shift', 0), 'Before shift')
+assert.equal(scopedRuleName('after_shift', 'After shift 2', 0), 'After shift')
+assert.equal(scopedRuleName('after_shift', 'After shift', 2), 'After shift 3')
+assert.equal(scopedRuleName('before_shift', '', 1), 'Before shift 2')
+assert.equal(scopedRuleName('after_shift', 'Weekend bonus', 1), 'Weekend bonus')
+assert.equal(scopedRuleName('after_shift', 'Before shift', 0), 'Before shift')
+assert.equal(scopedRuleName('monthly', 'Monthly earnings 2', 0), 'Monthly earnings')
+assert.equal(scopedRuleName('monthly', 'Monthly earnings', 1), 'Monthly earnings 2')
+assert.equal(scopedRuleName('monthly', 'Top salary', 0), 'Top salary')
 
 // settings without custom_rules still validate
 const old = full(); delete old.custom_rules

@@ -23,7 +23,7 @@ export function defaultRuleName(kind, existingCount) {
 
 // Before/After shift rules have no name box: the name is the title, numbered by position ("After shift 2").
 // A saved custom name (not the default pattern) is kept as it is.
-export function shiftRuleName(kind, name, index) {
+export function scopedRuleName(kind, name, index) {
   const title = SCOPED_KINDS[kind].title
   const saved = typeof name === 'string' ? name.trim() : ''
   const isDefault = saved === title || (saved.startsWith(`${title} `) && /^[0-9]+$/.test(saved.slice(title.length + 1)))

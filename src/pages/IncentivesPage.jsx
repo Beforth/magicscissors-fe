@@ -10,7 +10,7 @@ import { serviceService } from '@/services/service.service'
 import { formatMoney, PAY_TYPE_LABEL } from '@/lib/payroll'
 import { downloadBlob } from '@/lib/export-utils'
 import {
-  defaultSettings, validateSettings, newCustomRule, newScopedRule, defaultRuleName, shiftRuleName, topPerformers, reportCsv, WHO_OPTIONS,
+  defaultSettings, validateSettings, newCustomRule, newScopedRule, defaultRuleName, scopedRuleName, topPerformers, reportCsv, WHO_OPTIONS,
   MAX_CUSTOM_RULES, MAX_MONTHLY_TIERS, MAX_RULES_PER_KIND,
 } from '@/lib/incentiveSettings'
 import { cn } from '@/lib/utils'
@@ -127,16 +127,16 @@ const num = (v) => (v === '' ? NaN : Number(v))
 
 const scopePayload = (r) => ({ id: r.id, name: r.name.trim(), branch_id: r.branch_id || null, employee_ids: r.employee_ids })
 const toPayload = (f) => ({
-  monthly_rules: f.monthly_rules.map((r) => ({
-    ...scopePayload(r),
+  monthly_rules: f.monthly_rules.map((r, i) => ({
+    ...scopePayload(r), name: scopedRuleName('monthly', r.name, i),
     pick_highest: r.pick_highest,
     tiers: r.tiers.map((t) => ({ salary: num(t.salary), earned_amount: num(t.earned_amount), percent: num(t.percent) })),
   })),
   before_shift_rules: f.before_shift_rules.map((r, i) => ({
-    ...scopePayload(r), name: shiftRuleName('before_shift', r.name, i), percent: num(r.percent),
+    ...scopePayload(r), name: scopedRuleName('before_shift', r.name, i), percent: num(r.percent),
   })),
   after_shift_rules: f.after_shift_rules.map((r, i) => ({
-    ...scopePayload(r), name: shiftRuleName('after_shift', r.name, i), percent: num(r.percent),
+    ...scopePayload(r), name: scopedRuleName('after_shift', r.name, i), percent: num(r.percent),
   })),
   custom_rules: f.custom_rules.map((r) => (r.kind === 'target'
     ? { id: r.id, kind: 'target', name: r.name.trim(), who: r.who, earned_amount: num(r.earned_amount), percent: num(r.percent) }
@@ -187,17 +187,11 @@ function ShiftFields({ id, rule, onChange }) {
   )
 }
 
-// Name (and a note when a rule saved earlier is limited to some staff / a branch)
-function ScopeFields({ pre, rule, showName, onChange }) {
+// A note when a rule saved earlier is limited to some staff / a branch)
+function ScopeFields({ rule, showHint, onChange }) {
   const limited = !!rule.branch_id || rule.employee_ids.length > 0
   return (
     <div className="space-y-3">
-      {showName && (
-        <div className="space-y-1.5 w-full sm:w-64">
-          <Label htmlFor={`${pre}-name`} className="text-xs font-medium text-foreground">Name</Label>
-          <Input id={`${pre}-name`} maxLength={60} value={rule.name} onChange={(e) => onChange({ name: e.target.value })} />
-        </div>
-      )}
       {limited && (
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs text-muted-foreground">This rule is limited to specific staff/branch (set earlier)</p>
@@ -206,7 +200,7 @@ function ScopeFields({ pre, rule, showName, onChange }) {
           </Button>
         </div>
       )}
-      {showName && <p className="text-xs text-muted-foreground">{SCOPE_HINT}</p>}
+      {showHint && <p className="text-xs text-muted-foreground">{SCOPE_HINT}</p>}
     </div>
   )
 }
@@ -412,14 +406,14 @@ const FORM_KEY = { monthly: 'monthly_rules', before_shift: 'before_shift_rules',
 
 function ScopedRuleCard({ kind, rule, index, onChange, onRemove }) {
   const base = RULES[kind]
-  const title = kind === 'monthly' ? rule.name.trim() || `${base.title} ${index + 1}` : shiftRuleName(kind, rule.name, index)
+  const title = scopedRuleName(kind, rule.name, index)
   const cardRule = { ...base, title, removeLabel: title }
   const pre = `${kind}-${rule.id}`
   const setTier = (i, patch) => onChange({ tiers: rule.tiers.map((t, k) => (k === i ? { ...t, ...patch } : t)) })
   return (
     <RuleCard rule={cardRule} onRemove={onRemove}>
       <div className="space-y-4">
-        <ScopeFields pre={pre} rule={rule} showName={kind === 'monthly'} onChange={onChange} />
+        <ScopeFields rule={rule} showHint={kind === 'monthly'} onChange={onChange} />
         {kind === 'monthly' ? (
           <div className="space-y-3 border-t pt-4">
             {rule.tiers.length > 0 && (
