@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {
-  defaultSettings, validateSettings, newCustomRule, newScopedRule, defaultRuleName, topPerformers, reportCsv, WHO_OPTIONS,
+  defaultSettings, validateSettings, newCustomRule, newScopedRule, defaultRuleName, reportCsv, WHO_OPTIONS,
   MAX_RULES_PER_KIND, scopedRuleName,
 } from '../src/lib/incentiveSettings.js'
 
@@ -137,16 +137,6 @@ assert.match(withRules(okTg({ percent: 101 })) || '', /percent/i)
 assert.match(withRules(okPs({ id: 'a' }), okTg({ id: 'a' })) || '', /same|duplicate/i)
 assert.match(withRules(...Array.from({ length: 21 }, (_, i) => okPs({ id: `r${i}` }))) || '', /20/)
 assert.match(withRules({ ...okPs(), kind: 'weird' }) || '', /rule/i)
-
-// top performers: top 3 by earnings, only > 0
-const rows = [
-  { employee_id: 'a', name: 'A', earnings: 100 }, { employee_id: 'b', name: 'B', earnings: 500 },
-  { employee_id: 'c', name: 'C', earnings: 0 }, { employee_id: 'd', name: 'D', earnings: 300 },
-  { employee_id: 'e', name: 'E', earnings: 200 },
-]
-assert.deepEqual(topPerformers(rows).map((r) => [r.rank, r.employee_id]), [[1, 'b'], [2, 'd'], [3, 'e']])
-assert.deepEqual(topPerformers([{ employee_id: 'z', name: 'Z', earnings: 0 }]), [])
-assert.deepEqual(topPerformers(undefined), [])
 
 // csv
 const rep = [{

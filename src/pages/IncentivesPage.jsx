@@ -10,7 +10,7 @@ import { serviceService } from '@/services/service.service'
 import { formatMoney, PAY_TYPE_LABEL } from '@/lib/payroll'
 import { downloadBlob } from '@/lib/export-utils'
 import {
-  defaultSettings, validateSettings, newCustomRule, newScopedRule, defaultRuleName, scopedRuleName, topPerformers, reportCsv, WHO_OPTIONS,
+  defaultSettings, validateSettings, newCustomRule, newScopedRule, defaultRuleName, scopedRuleName, reportCsv, WHO_OPTIONS,
   MAX_CUSTOM_RULES, MAX_MONTHLY_TIERS, MAX_RULES_PER_KIND,
 } from '@/lib/incentiveSettings'
 import { cn } from '@/lib/utils'
@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   Award, CalendarDays, ChevronDown, ChevronRight, ArrowLeft, Download, Loader2, Plus, Scissors, Sparkles, Sunrise, Sunset,
-  Target, Trash2, Trophy, TrendingUp, UserCheck, Users, Wallet,
+  Target, Trash2, TrendingUp, UserCheck, Users, Wallet,
 } from 'lucide-react'
 
 const errMsg = (err, fallback) => {
@@ -44,13 +44,6 @@ const WHEN_BADGE = {
   before_shift: { label: 'Before shift', variant: 'info' },
   after_shift: { label: 'After shift', variant: 'warning' },
   normal: { label: 'Normal', variant: 'secondary' },
-}
-
-// Rank badge colours: gold, silver, bronze (semantic tokens only)
-const RANK_STYLE = {
-  1: 'bg-warning/15 text-warning border-warning/30',
-  2: 'bg-muted text-muted-foreground border-border',
-  3: 'bg-primary/10 text-primary border-primary/30',
 }
 
 const CUSTOM_STYLES = {
@@ -720,61 +713,6 @@ function Avatar({ name, className }) {
   )
 }
 
-function RankBadge({ rank, className }) {
-  return (
-    <span
-      title={`Top performer #${rank}`}
-      className={cn('inline-flex h-5 shrink-0 items-center gap-1 rounded-full border px-1.5 text-[11px] font-semibold', RANK_STYLE[rank], className)}
-    >
-      <Trophy className="h-3 w-3" />
-      {rank}
-    </span>
-  )
-}
-
-const PODIUM_HEIGHT = { 1: 'sm:pt-6', 2: 'sm:pt-3', 3: 'sm:pt-1' }
-
-function TopPerformers({ list }) {
-  const order = list.length === 3 ? [list[1], list[0], list[2]] : list
-  return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-warning/10 text-warning">
-            <Trophy className="h-5 w-5" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Top performers</p>
-            <p className="text-xs text-muted-foreground">Highest earnings this month</p>
-          </div>
-        </div>
-        {list.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No earnings yet this month.</p>
-        ) : (
-          <ol className="grid items-end gap-2 sm:grid-cols-3">
-            {order.map((e) => (
-              <li
-                key={e.employee_id}
-                className={cn(
-                  'flex items-center gap-3 rounded-xl border p-3 transition-shadow hover:shadow-md sm:flex-col sm:text-center sm:pb-4',
-                  e.rank === 1 ? 'bg-warning/10 border-warning/30' : 'bg-background', PODIUM_HEIGHT[e.rank],
-                )}
-              >
-                <Avatar name={e.full_name} className={cn(e.rank === 1 && 'h-10 w-10 bg-warning/20 text-warning')} />
-                <span className="min-w-0 flex-1 sm:flex-none">
-                  <span className="block truncate text-sm font-medium text-foreground">{e.full_name}</span>
-                  <span className="block text-xs text-muted-foreground tabular-nums">{formatMoney(e.earnings)}</span>
-                </span>
-                <RankBadge rank={e.rank} />
-              </li>
-            ))}
-          </ol>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
 function Amount({ label, value }) {
   return (
     <div className="rounded-md border bg-background px-3 py-1.5">
@@ -880,8 +818,6 @@ function ResultsCard() {
   const paidCount = employees.filter((e) => Number(e.paid_incentive || 0) > 0).length
   const top = employees.reduce((best, e) => (Number(e.paid_incentive || 0) > Number(best?.paid_incentive || 0) ? e : best), null)
   const hasTop = !!top && Number(top.paid_incentive) > 0
-  const performers = useMemo(() => topPerformers(employees), [employees])
-  const rankOf = new Map(performers.map((e) => [e.employee_id, e.rank]))
 
   const toggle = (id) => setOpen((o) => {
     const n = new Set(o)
@@ -940,7 +876,6 @@ function ResultsCard() {
               sub={hasTop ? formatMoney(top.paid_incentive) : undefined}
             />
           </div>
-          <TopPerformers list={performers} />
         </>
       )}
 
@@ -998,7 +933,6 @@ function ResultsCard() {
                   {employees.map((e) => {
                     const isOpen = open.has(e.employee_id)
                     const Chevron = isOpen ? ChevronDown : ChevronRight
-                    const rank = rankOf.get(e.employee_id)
                     const salary = e.salary_used ?? e.base_salary
                     const applied = appliedText(e)
                     return (
@@ -1019,7 +953,6 @@ function ResultsCard() {
                             <div className="flex items-center gap-2 font-medium">
                               <Avatar name={e.full_name} />
                               {e.full_name}
-                              {rank && <RankBadge rank={rank} />}
                             </div>
                             {(e.warnings || []).map((w) => (
                               <div key={w} className="text-xs text-warning">{w}</div>

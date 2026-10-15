@@ -155,15 +155,6 @@ export function validateSettings(s) {
   return checkCustomRules(s?.custom_rules, ids)
 }
 
-// Top 3 employees by earnings (only those above 0). Rows are report employees.
-export function topPerformers(rows, count = 3) {
-  return [...(rows || [])]
-    .filter((e) => Number(e.earnings) > 0)
-    .sort((a, b) => Number(b.earnings) - Number(a.earnings))
-    .slice(0, count)
-    .map((e, i) => ({ ...e, rank: i + 1 }))
-}
-
 const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
 const cell = (v) => (v == null ? '' : v)
 
