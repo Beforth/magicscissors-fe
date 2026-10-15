@@ -21,8 +21,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-  Award, CalendarDays, ChevronDown, ChevronRight, ArrowLeft, Download, Loader2, Plus, Scissors, Sparkles, Sunrise, Sunset,
+  Award, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ArrowLeft, Download, Loader2, Plus, Scissors, Sparkles, Sunrise, Sunset,
   Target, Trash2, TrendingUp, UserCheck, Users, Wallet, Eye, Search, Building2, CheckCircle2, AlertCircle, RefreshCw,
 } from 'lucide-react'
 
@@ -562,7 +563,8 @@ function ScopedRuleCard({ kind, rule, index, onChange, onRemove }) {
   )
 }
 
-function SettingsSection({ addOpen, setAddOpen }) {
+function SettingsSection() {
+  const [addOpen, setAddOpen] = useState(false)
   const queryClient = useQueryClient()
   const { data: res, isLoading, isError, error } = useQuery({
     queryKey: ['incentive-settings'],
@@ -662,6 +664,19 @@ function SettingsSection({ addOpen, setAddOpen }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-muted/30 p-4 rounded-xl border border-muted/80">
+        <div>
+          <h3 className="text-base font-semibold text-foreground">Incentive Rules & Targets</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Configure monthly sales targets, pre/post-shift bonuses, or custom service commissions. Rules apply across all branches.
+          </p>
+        </div>
+        <Button size="sm" onClick={() => setAddOpen(true)} className="gap-1.5 shrink-0 shadow-xs">
+          <Plus className="h-4 w-4" />
+          <span>Add Rule</span>
+        </Button>
+      </div>
+
       {noRules && (
         <Card>
           <CardContent className="text-center py-10 text-muted-foreground">
@@ -695,12 +710,16 @@ function SettingsSection({ addOpen, setAddOpen }) {
         />
       ))}
 
-      <div className="flex items-center gap-3">
-        <Button onClick={handleSave} disabled={!dirty || save.isPending}>
+      <div className="flex items-center gap-3 pt-2">
+        <Button onClick={handleSave} disabled={!dirty || save.isPending} className="shadow-xs">
           {save.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Save
+          Save Changes
         </Button>
-        {dirty && <span className="text-xs text-muted-foreground">You have unsaved changes.</span>}
+        {dirty && (
+          <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+            You have unsaved changes. Remember to click Save Changes to apply them.
+          </span>
+        )}
       </div>
 
       <AddRuleDialog
@@ -713,20 +732,39 @@ function SettingsSection({ addOpen, setAddOpen }) {
 
 function SummaryTile({ icon: Icon, tint, label, value, sub }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border bg-background p-3">
-      <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-lg', tint)}>
-        <Icon className="h-4 w-4" />
-      </span>
-      <div className="min-w-0">
-        <span className="block text-xs font-medium text-muted-foreground">{label}</span>
-        <span className="block truncate text-base font-bold tabular-nums leading-tight text-foreground sm:text-xl">{value}</span>
-        {sub && <span className="block truncate text-xs text-muted-foreground">{sub}</span>}
-      </div>
-    </div>
+    <Card className="border-muted/80 shadow-xs">
+      <CardContent className="p-4 flex items-center gap-3.5">
+        <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-xl shadow-xs', tint)}>
+          <Icon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="block text-xs font-medium text-muted-foreground">{label}</span>
+          <span className="block truncate text-lg sm:text-xl font-bold tabular-nums text-foreground mt-0.5 leading-tight">{value}</span>
+          {sub && <span className="block truncate text-xs text-muted-foreground mt-0.5">{sub}</span>}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
-const fmtDate = (d) => (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d.slice(8)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : d || '—')
+const fmtDate = (d) => {
+  if (!d) return '—'
+  if (d instanceof Date) return d.toLocaleDateString('en-GB')
+  if (typeof d === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}/.test(d)) {
+      return `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`
+    }
+    return d
+  }
+  return String(d)
+}
+
+const monthLabel = (m) => {
+  const match = /^(\d{4})-(\d{2})$/.exec(m || '')
+  if (!match) return 'the month selected'
+  const name = new Date(Number(match[1]), Number(match[2]) - 1, 1).toLocaleString('en-US', { month: 'long' })
+  return `${name} ${match[1]}`
+}
 
 function Amount({ label, value }) {
   return (
@@ -737,45 +775,57 @@ function Amount({ label, value }) {
   )
 }
 
-const appliedText = (e) => e.applied_label || (e.applied ? APPLIED_LABEL[e.applied] || e.applied : null)
+const appliedText = (e) => e?.applied_label || (e?.applied ? APPLIED_LABEL[e.applied] || e.applied : null)
 
 function EmployeeDetailModal({ employee: e, open, onClose, branchName, allBranches, month }) {
   const [search, setSearch] = useState('')
   const [filterWhen, setFilterWhen] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   useEffect(() => {
     setSearch('')
     setFilterWhen('all')
+    setPage(1)
   }, [e?.employee_id])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, filterWhen, pageSize])
 
   if (!e) return null
 
-  const services = e.services || []
-  const showBranchCol = services.some((sv) => sv.branch_name)
+  const services = Array.isArray(e.services) ? e.services : []
+  const showBranchCol = services.some((sv) => sv?.branch_name)
   const branchRows = Array.isArray(e.earnings_by_branch) ? e.earnings_by_branch : []
   const applied = appliedText(e)
   const salary = e.salary_used ?? e.base_salary
 
   const filteredServices = services.filter((sv) => {
+    if (!sv) return false
     if (filterWhen !== 'all' && sv.when !== filterWhen) return false
     if (!search.trim()) return true
     const q = search.toLowerCase()
     return (
-      (sv.service_name || '').toLowerCase().includes(q) ||
-      (sv.bill_number || '').toLowerCase().includes(q) ||
-      (sv.date || '').toLowerCase().includes(q)
+      String(sv.service_name || '').toLowerCase().includes(q) ||
+      String(sv.bill_number || '').toLowerCase().includes(q) ||
+      String(sv.date || '').toLowerCase().includes(q)
     )
   })
 
-  const totalFilteredAmount = filteredServices.reduce((sum, s) => sum + Number(s.amount || 0), 0)
-  const yieldPct = e.earnings > 0 ? ((Number(e.paid_incentive || 0) / Number(e.earnings)) * 100).toFixed(1) : '0'
+  const totalFilteredAmount = filteredServices.reduce((sum, s) => sum + Number(s?.amount || 0), 0)
+  const yieldPct = Number(e.earnings) > 0 ? ((Number(e.paid_incentive || 0) / Number(e.earnings)) * 100).toFixed(1) : '0'
 
   const whenCounts = {
     all: services.length,
-    normal: services.filter((s) => s.when === 'normal' || !s.when).length,
-    before_shift: services.filter((s) => s.when === 'before_shift').length,
-    after_shift: services.filter((s) => s.when === 'after_shift').length,
+    normal: services.filter((s) => s?.when === 'normal' || !s?.when).length,
+    before_shift: services.filter((s) => s?.when === 'before_shift').length,
+    after_shift: services.filter((s) => s?.when === 'after_shift').length,
   }
+
+  const totalPages = Math.max(1, Math.ceil(filteredServices.length / (pageSize || 10)))
+  const currentPage = Math.min(Math.max(1, page), totalPages)
+  const paginatedServices = filteredServices.slice((currentPage - 1) * pageSize, (currentPage - 1) * pageSize + pageSize)
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
@@ -1033,11 +1083,17 @@ function EmployeeDetailModal({ employee: e, open, onClose, branchName, allBranch
                     <TableHead className="text-[11px] font-medium text-muted-foreground">Service</TableHead>
                     <TableHead className="text-[11px] font-medium text-muted-foreground">Timing</TableHead>
                     <TableHead className="text-[11px] font-medium text-muted-foreground text-right">Amount</TableHead>
+                    {e.pay_type === 'incentive' && (
+                      <TableHead className="text-[11px] font-medium text-muted-foreground text-right">Incentive ({salary || 0}%)</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredServices.map((sv, i) => {
+                  {paginatedServices.map((sv, i) => {
                     const when = WHEN_BADGE[sv.when] || WHEN_BADGE.normal
+                    const commAmt = e.pay_type === 'incentive' && Number(salary) > 0
+                      ? (Number(salary) / 100) * Number(sv.amount || 0)
+                      : null
                     return (
                       <TableRow key={i} className="hover:bg-muted/20">
                         <TableCell className="text-xs py-2">{fmtDate(sv.date)}</TableCell>
@@ -1053,6 +1109,11 @@ function EmployeeDetailModal({ employee: e, open, onClose, branchName, allBranch
                         <TableCell className="text-xs py-2 text-right font-semibold tabular-nums">
                           {money(sv.amount)}
                         </TableCell>
+                        {e.pay_type === 'incentive' && (
+                          <TableCell className="text-xs py-2 text-right font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                            {commAmt != null ? money(commAmt) : '—'}
+                          </TableCell>
+                        )}
                       </TableRow>
                     )
                   })}
@@ -1061,10 +1122,112 @@ function EmployeeDetailModal({ employee: e, open, onClose, branchName, allBranch
             </div>
           )}
 
+          {/* Pagination Controls */}
           {filteredServices.length > 0 && (
-            <div className="flex items-center justify-between text-xs text-muted-foreground px-1 pt-1">
-              <span>Showing {filteredServices.length} of {services.length} service(s)</span>
-              <span>Total filtered sales: <strong className="text-foreground">{money(totalFilteredAmount)}</strong></span>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t">
+              <div className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground">
+                <span>
+                  Showing <strong className="text-foreground">{Math.min((page - 1) * pageSize + 1, filteredServices.length)}</strong>–<strong className="text-foreground">{Math.min(page * pageSize, filteredServices.length)}</strong> of <strong className="text-foreground">{filteredServices.length}</strong> service(s)
+                </span>
+                <span>•</span>
+                <span>Total sales: <strong className="text-foreground">{money(totalFilteredAmount)}</strong></span>
+                {filteredServices.length > 5 && (
+                  <div className="flex items-center gap-1.5 ml-1">
+                    <span>Per page:</span>
+                    <select
+                      className="h-7 px-1.5 border border-input rounded bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      value={pageSize}
+                      onChange={(ev) => setPageSize(Number(ev.target.value))}
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    Page <strong className="text-foreground">{page}</strong> of <strong className="text-foreground">{totalPages}</strong>
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      aria-label="Previous page"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </Button>
+
+                    {totalPages <= 6 ? (
+                      Array.from({ length: totalPages }, (_, idx) => idx + 1).map((p) => (
+                        <Button
+                          key={p}
+                          type="button"
+                          variant={page === p ? 'default' : 'outline'}
+                          size="sm"
+                          className="h-7 w-7 p-0 text-xs"
+                          onClick={() => setPage(p)}
+                        >
+                          {p}
+                        </Button>
+                      ))
+                    ) : (
+                      <>
+                        <Button
+                          type="button"
+                          variant={page === 1 ? 'default' : 'outline'}
+                          size="sm"
+                          className="h-7 w-7 p-0 text-xs"
+                          onClick={() => setPage(1)}
+                        >
+                          1
+                        </Button>
+                        {page > 3 && <span className="text-xs text-muted-foreground px-0.5">...</span>}
+                        {page > 1 && page < totalPages && (
+                          <Button
+                            type="button"
+                            variant="default"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-xs"
+                          >
+                            {page}
+                          </Button>
+                        )}
+                        {page < totalPages - 2 && <span className="text-xs text-muted-foreground px-0.5">...</span>}
+                        <Button
+                          type="button"
+                          variant={page === totalPages ? 'default' : 'outline'}
+                          size="sm"
+                          className="h-7 w-7 p-0 text-xs"
+                          onClick={() => setPage(totalPages)}
+                        >
+                          {totalPages}
+                        </Button>
+                      </>
+                    )}
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      disabled={page >= totalPages}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      aria-label="Next page"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1080,12 +1243,6 @@ function EmployeeDetailModal({ employee: e, open, onClose, branchName, allBranch
   )
 }
 
-const monthLabel = (m) => {
-  const match = /^(\d{4})-(\d{2})$/.exec(m || '')
-  if (!match) return 'the month selected'
-  const name = new Date(Number(match[1]), Number(match[2]) - 1, 1).toLocaleString('en-US', { month: 'long' })
-  return `${name} ${match[1]}`
-}
 
 function ResultsCard() {
   const [selectedBranchId, setSelectedBranchId] = useState('')
@@ -1114,6 +1271,19 @@ function ResultsCard() {
     refetchInterval: 60000,
   })
   const employees = useMemo(() => res?.data?.employees || [], [res])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  useEffect(() => {
+    setPage(1)
+  }, [branchId, month])
+
+  const totalPages = Math.max(1, Math.ceil(employees.length / pageSize))
+  const paginatedEmployees = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return employees.slice(start, start + pageSize)
+  }, [employees, page, pageSize])
+
   const grand = employees.reduce((t, e) => t + Number(e.paid_incentive || 0), 0)
   const paidCount = employees.filter((e) => Number(e.paid_incentive || 0) > 0).length
   const top = employees.reduce((best, e) => (Number(e.paid_incentive || 0) > Number(best?.paid_incentive || 0) ? e : best), null)
@@ -1257,20 +1427,19 @@ function ResultsCard() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
-                      <TableHead className="text-[11px] font-medium text-muted-foreground">Staff</TableHead>
-                      <TableHead className="text-[11px] font-medium text-muted-foreground">Pay type</TableHead>
-                      <TableHead className="text-[11px] font-medium text-muted-foreground text-center">Salary / %</TableHead>
-                      <TableHead className="text-[11px] font-medium text-muted-foreground text-right">Sales</TableHead>
-                      <TableHead className="text-[11px] font-medium text-muted-foreground text-center">Services</TableHead>
-                      <TableHead className="text-[11px] font-medium text-muted-foreground text-center">Monthly</TableHead>
-                      <TableHead className="text-[11px] font-medium text-muted-foreground text-center">Before shift</TableHead>
-                      <TableHead className="text-[11px] font-medium text-muted-foreground text-center">After shift</TableHead>
-                      <TableHead className="text-[11px] font-medium text-muted-foreground text-right">Incentive</TableHead>
-                      <TableHead className="text-[11px] font-medium text-muted-foreground text-center w-20">Details</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-muted-foreground py-3">Staff</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-muted-foreground py-3">Pay Plan</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-muted-foreground py-3 text-right">Sales Billed</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-muted-foreground py-3 text-center">Services</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-muted-foreground py-3 text-center">Monthly Target</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-muted-foreground py-3 text-center">Before Shift</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-muted-foreground py-3 text-center">After Shift</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-muted-foreground py-3 text-right">Total Incentive</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-muted-foreground py-3 text-center w-20">Details</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {employees.map((e) => {
+                    {paginatedEmployees.map((e) => {
                       const salary = e.salary_used ?? e.base_salary
                       const applied = appliedText(e)
                       return (
@@ -1296,58 +1465,147 @@ function ResultsCard() {
                             </div>
                           </TableCell>
                           <TableCell className="py-3">
-                            <Badge variant="outline" className="text-xs font-normal">
-                              {e.pay_type ? PAY_TYPE_LABEL[e.pay_type] || e.pay_type : '—'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-3 text-center tabular-nums">
                             {e.pay_type === 'incentive' ? (
-                              <Badge variant="secondary" className="text-xs font-semibold">
+                              <Badge variant="secondary" className="text-xs font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20">
                                 {salary != null && salary !== '' ? `${salary}%` : '0%'}
                               </Badge>
+                            ) : e.pay_type === 'monthly' ? (
+                              <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
+                                mo • {money(salary)}
+                              </Badge>
+                            ) : e.pay_type === 'daily' ? (
+                              <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
+                                day • {money(salary)}
+                              </Badge>
                             ) : (
-                              <span className="text-muted-foreground">{money(salary)}</span>
+                              <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
+                                {e.pay_type || '—'}
+                              </Badge>
                             )}
                           </TableCell>
                           <TableCell className="py-3 text-right tabular-nums font-semibold text-foreground">{money(e.earnings)}</TableCell>
-                          <TableCell className="py-3 text-center tabular-nums">{e.services_count ?? '—'}</TableCell>
+                          <TableCell className="py-3 text-center tabular-nums font-medium text-foreground">{e.services_count ?? '—'}</TableCell>
                           <TableCell className="py-3 text-center tabular-nums">
-                            {e.pay_type === 'incentive' ? <span className="text-muted-foreground/60">—</span> : money(e.monthly_incentive)}
+                            {e.pay_type === 'incentive' ? (
+                              <span className="text-muted-foreground/40 text-xs">—</span>
+                            ) : Number(e.monthly_incentive) > 0 ? (
+                              <span className="font-semibold text-emerald-600 dark:text-emerald-400">{money(e.monthly_incentive)}</span>
+                            ) : (
+                              <span className="text-muted-foreground/40 text-xs">—</span>
+                            )}
                           </TableCell>
                           <TableCell className="py-3 text-center tabular-nums">
-                            {e.pay_type === 'incentive' ? <span className="text-muted-foreground/60">—</span> : money(e.before_shift_incentive)}
+                            {e.pay_type === 'incentive' ? (
+                              <span className="text-muted-foreground/40 text-xs">—</span>
+                            ) : Number(e.before_shift_incentive) > 0 ? (
+                              <span className="font-semibold text-emerald-600 dark:text-emerald-400">{money(e.before_shift_incentive)}</span>
+                            ) : (
+                              <span className="text-muted-foreground/40 text-xs">—</span>
+                            )}
                           </TableCell>
                           <TableCell className="py-3 text-center tabular-nums">
-                            {e.pay_type === 'incentive' ? <span className="text-muted-foreground/60">—</span> : money(e.after_shift_incentive)}
+                            {e.pay_type === 'incentive' ? (
+                              <span className="text-muted-foreground/40 text-xs">—</span>
+                            ) : Number(e.after_shift_incentive) > 0 ? (
+                              <span className="font-semibold text-emerald-600 dark:text-emerald-400">{money(e.after_shift_incentive)}</span>
+                            ) : (
+                              <span className="text-muted-foreground/40 text-xs">—</span>
+                            )}
                           </TableCell>
                           <TableCell className="py-3 text-right tabular-nums">
-                            <div className="font-bold text-foreground text-sm">{money(e.paid_incentive)}</div>
-                            {applied && <div className="text-[10px] text-muted-foreground font-medium">{applied}</div>}
+                            {Number(e.paid_incentive) > 0 ? (
+                              <div>
+                                <span className="font-bold text-foreground text-sm">{money(e.paid_incentive)}</span>
+                                {applied && <div className="text-[10px] text-muted-foreground font-medium truncate max-w-[140px] text-right">{applied}</div>}
+                              </div>
+                            ) : (
+                              <span className="text-sm font-normal text-muted-foreground/60">₹0</span>
+                            )}
                           </TableCell>
                           <TableCell className="py-3 text-center" onClick={(ev) => ev.stopPropagation()}>
                             <Button
                               type="button"
                               size="sm"
                               variant="ghost"
-                              className="h-8 px-2.5 text-xs text-primary hover:text-primary hover:bg-primary/10 gap-1.5"
+                              className="h-8 px-2.5 text-xs text-primary hover:text-primary hover:bg-primary/10 gap-1 rounded-md"
                               onClick={() => setSelectedEmployee(e)}
                             >
-                              <Eye className="h-3.5 w-3.5" />
                               <span>Details</span>
+                              <ChevronRight className="h-3.5 w-3.5" />
                             </Button>
                           </TableCell>
                         </TableRow>
                       )
                     })}
                     <TableRow className="font-semibold bg-muted/30 hover:bg-muted/30">
-                      <TableCell colSpan={8} className="py-2.5 text-xs font-medium text-muted-foreground">Total</TableCell>
-                      <TableCell className="py-2.5 text-right tabular-nums text-sm text-primary font-bold">{formatMoney(grand)}</TableCell>
+                      <TableCell colSpan={7} className="py-3 text-xs font-medium text-muted-foreground">Total Payouts</TableCell>
+                      <TableCell className="py-3 text-right tabular-nums text-sm text-primary font-bold">{formatMoney(grand)}</TableCell>
                       <TableCell />
                     </TableRow>
                   </TableBody>
                 </Table>
               </div>
-              <p className="mt-3 text-xs text-muted-foreground">
+
+              {/* Pagination Controls */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t">
+                <div className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground">
+                  <span>
+                    Showing <strong className="text-foreground">{Math.min((page - 1) * pageSize + 1, employees.length)}</strong>–<strong className="text-foreground">{Math.min(page * pageSize, employees.length)}</strong> of <strong className="text-foreground">{employees.length}</strong> staff members
+                  </span>
+                  {employees.length > 10 && (
+                    <>
+                      <span>•</span>
+                      <div className="flex items-center gap-1.5">
+                        <span>Per page:</span>
+                        <select
+                          className="h-7 px-1.5 border border-input rounded bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                          value={pageSize}
+                          onChange={(e) => {
+                            setPageSize(Number(e.target.value))
+                            setPage(1)
+                          }}
+                        >
+                          <option value={10}>10</option>
+                          <option value={20}>20</option>
+                          <option value={50}>50</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                      Previous
+                    </Button>
+                    <span className="text-xs text-muted-foreground px-1">
+                      Page <strong className="text-foreground">{page}</strong> of <strong className="text-foreground">{totalPages}</strong>
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      disabled={page >= totalPages}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    >
+                      Next
+                      <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <p className="mt-2 text-xs text-muted-foreground">
                 Total Incentive = Monthly earnings + Before shift + After shift + any custom rules. Added directly to net pay in Payroll.
               </p>
             </>
@@ -1356,38 +1614,54 @@ function ResultsCard() {
       </Card>
 
       {/* Modern Employee Detail Modal */}
-      <EmployeeDetailModal
-        employee={activeEmployee}
-        open={!!selectedEmployee}
-        onClose={() => setSelectedEmployee(null)}
-        branchName={branchName}
-        allBranches={allBranches}
-        month={month}
-      />
+      {selectedEmployee && (
+        <EmployeeDetailModal
+          employee={activeEmployee}
+          open={!!selectedEmployee}
+          onClose={() => setSelectedEmployee(null)}
+          branchName={branchName}
+          allBranches={allBranches}
+          month={month}
+        />
+      )}
     </div>
   )
 }
 
 export default function IncentivesPage() {
   const { user } = useSelector((s) => s.auth)
-  const [addOpen, setAddOpen] = useState(false)
   if (user?.role !== 'owner') return <Navigate to="/" replace />
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Incentives</h1>
-          <p className="text-muted-foreground">Extra pay for staff, based on the services they complete. Rules apply to everyone who qualifies, in all branches.</p>
+      <Tabs defaultValue="report" className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Incentives</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+              Service commissions, monthly milestone targets, and shift earnings.
+            </p>
+          </div>
+          <TabsList className="grid grid-cols-2 w-full sm:w-auto h-10 p-1 bg-muted/60">
+            <TabsTrigger value="report" className="gap-2 px-4 py-1.5 text-xs font-semibold">
+              <Wallet className="h-3.5 w-3.5" />
+              Staff Payouts
+            </TabsTrigger>
+            <TabsTrigger value="rules" className="gap-2 px-4 py-1.5 text-xs font-semibold">
+              <Sparkles className="h-3.5 w-3.5" />
+              Incentive Rules
+            </TabsTrigger>
+          </TabsList>
         </div>
-        <Button onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add rule
-        </Button>
-      </div>
 
-      <SettingsSection addOpen={addOpen} setAddOpen={setAddOpen} />
-      <ResultsCard />
+        <TabsContent value="report" className="space-y-6 mt-0 outline-none">
+          <ResultsCard />
+        </TabsContent>
+
+        <TabsContent value="rules" className="space-y-6 mt-0 outline-none">
+          <SettingsSection />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

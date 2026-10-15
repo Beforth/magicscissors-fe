@@ -134,8 +134,6 @@ function StaffModal({ open, onOpenChange, staff = null }) {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
-      // Incentive-based staff have no wage: clear any salary when that type is picked
-      ...(field === 'pay_type' && value === 'incentive' ? { base_salary: '' } : {}),
     }))
   }
 
@@ -385,16 +383,27 @@ function StaffModal({ open, onOpenChange, staff = null }) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="base_salary">Salary (₹)</Label>
+                  <Label htmlFor="base_salary">
+                    {formData.pay_type === 'incentive' ? 'Service Incentive (%)' : 'Salary (₹)'}
+                  </Label>
                   <div className="flex gap-2">
-                    <Input
-                      id="base_salary"
-                      type="number"
-                      value={formData.base_salary}
-                      onChange={(e) => handleChange('base_salary', e.target.value)}
-                      placeholder={formData.pay_type === 'incentive' ? 'No wage' : '25000'}
-                      disabled={!isOwner || formData.pay_type === 'incentive'}
-                    />
+                    <div className="relative flex-1">
+                      <Input
+                        id="base_salary"
+                        type="number"
+                        min="0"
+                        max={formData.pay_type === 'incentive' ? '100' : undefined}
+                        step="any"
+                        value={formData.base_salary}
+                        onChange={(e) => handleChange('base_salary', e.target.value)}
+                        placeholder={formData.pay_type === 'incentive' ? 'e.g. 20' : '25000'}
+                        disabled={!isOwner}
+                        className={formData.pay_type === 'incentive' ? 'pr-7' : ''}
+                      />
+                      {formData.pay_type === 'incentive' && (
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">%</span>
+                      )}
+                    </div>
                     <select
                       id="pay_type"
                       aria-label="Pay type"
@@ -411,12 +420,12 @@ function StaffModal({ open, onOpenChange, staff = null }) {
                   </div>
                   {formData.pay_type === 'incentive' && (
                     <p className="text-xs text-muted-foreground">
-                      Incentive-based staff have no wage; they are paid only through incentive rules
+                      This employee earns this percentage of each service they complete (e.g. 20%)
                     </p>
                   )}
                   {!isOwner && (
                     <p className="text-xs text-muted-foreground">
-                      Only the owner or developer can change salary
+                      Only the owner or developer can change salary / incentive rate
                     </p>
                   )}
                 </div>

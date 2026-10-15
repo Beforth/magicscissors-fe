@@ -501,6 +501,7 @@ function BillCreatePage() {
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       queryClient.invalidateQueries({ queryKey: ['customers'] })
       queryClient.invalidateQueries({ queryKey: ['rotation-queue'] })
+      queryClient.invalidateQueries({ queryKey: ['employee-status'] })
       const billId = response.data?.bill_id
       if (billId) {
         navigate(`/bills/${billId}`)
@@ -1276,7 +1277,7 @@ function BillCreatePage() {
     mutationFn: (body) => billService.reviseBill(editId, body),
     onSuccess: () => {
       toast.success('Bill updated')
-      for (const key of [['bills'], ['bill', editId], ['bill-audit', editId], ['pending-services'], ['dashboard-stats'], ['customers']]) {
+      for (const key of [['bills'], ['bill', editId], ['bill-audit', editId], ['pending-services'], ['dashboard-stats'], ['customers'], ['employee-status']]) {
         queryClient.invalidateQueries({ queryKey: key })
       }
       navigate(`/bills/${editId}`)

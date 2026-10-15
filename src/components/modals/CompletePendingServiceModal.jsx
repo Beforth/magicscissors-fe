@@ -103,6 +103,7 @@ function CompletePendingServiceModal({ open, onOpenChange, item }) {
       queryClient.invalidateQueries({ queryKey: ['bill', String(item.bill_id)] })
       queryClient.invalidateQueries({ queryKey: ['open-containers'] })
       queryClient.invalidateQueries({ queryKey: ['rotation-queue'] })
+      queryClient.invalidateQueries({ queryKey: ['employee-status'] })
       queryClient.invalidateQueries({ queryKey: ['staff-performance'] })
       onOpenChange(false)
     },

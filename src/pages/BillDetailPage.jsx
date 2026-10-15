@@ -176,6 +176,7 @@ function BillDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bill', id] })
       queryClient.invalidateQueries({ queryKey: ['bills'] })
+      queryClient.invalidateQueries({ queryKey: ['employee-status'] })
       setEditModalOpen(false)
       toast.success('Bill updated')
     },
@@ -229,6 +230,7 @@ function BillDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['bill', id] })
       queryClient.invalidateQueries({ queryKey: ['rotation-queue'] })
       queryClient.invalidateQueries({ queryKey: ['pending-services'] })
+      queryClient.invalidateQueries({ queryKey: ['employee-status'] })
       setCompletingItemId(null)
       toast.success('Service completed')
     },
@@ -244,6 +246,7 @@ function BillDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bill', id] })
       queryClient.invalidateQueries({ queryKey: ['rotation-queue'] })
+      queryClient.invalidateQueries({ queryKey: ['employee-status'] })
       setAssigningItemId(null)
       setSelectResetKey(k => k + 1)
       toast.success('Employee assigned')
@@ -261,6 +264,7 @@ function BillDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bill', id] })
       queryClient.invalidateQueries({ queryKey: ['rotation-queue'] })
+      queryClient.invalidateQueries({ queryKey: ['employee-status'] })
       setSelectResetKey(k => k + 1)
       toast.success('Employee removed')
     },

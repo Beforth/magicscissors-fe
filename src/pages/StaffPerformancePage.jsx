@@ -126,6 +126,19 @@ function StaffPerformancePage() {
   }
 
   const employees = performanceData?.data?.employees || []
+  const [summaryPage, setSummaryPage] = useState(1)
+  const [summaryPageSize, setSummaryPageSize] = useState(10)
+
+  useEffect(() => {
+    setSummaryPage(1)
+  }, [filters.branch, filters.startDate, filters.endDate, filters.singleDate, filters.mode])
+
+  const totalSummaryPages = Math.max(1, Math.ceil(employees.length / summaryPageSize))
+  const paginatedEmployees = useMemo(() => {
+    const start = (summaryPage - 1) * summaryPageSize
+    return employees.slice(start, start + summaryPageSize)
+  }, [employees, summaryPage, summaryPageSize])
+
   const globalGoal = performanceData?.data?.global_monthly_star_goal || 100
   const isSingleDay = performanceData?.data?.is_single_day === true
   const dailyTimeline = performanceData?.data?.daily_timeline || []
@@ -1048,7 +1061,7 @@ function StaffPerformancePage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {employees.map((e) => (
+                      {paginatedEmployees.map((e) => (
                         <TableRow
                           key={e.employee_id}
                           className="cursor-pointer hover:bg-muted/50"
@@ -1086,6 +1099,65 @@ function StaffPerformancePage() {
                       ))}
                     </TableBody>
                   </Table>
+
+                  {/* Pagination Controls */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t mt-3">
+                    <div className="flex flex-wrap items-center gap-2.5 text-xs text-muted-foreground">
+                      <span>
+                        Showing <strong className="text-foreground">{Math.min((summaryPage - 1) * summaryPageSize + 1, employees.length)}</strong>–<strong className="text-foreground">{Math.min(summaryPage * summaryPageSize, employees.length)}</strong> of <strong className="text-foreground">{employees.length}</strong> employees
+                      </span>
+                      {employees.length > 10 && (
+                        <>
+                          <span>•</span>
+                          <div className="flex items-center gap-1.5">
+                            <span>Per page:</span>
+                            <select
+                              className="h-7 px-1.5 border border-input rounded bg-background text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                              value={summaryPageSize}
+                              onChange={(e) => {
+                                setSummaryPageSize(Number(e.target.value))
+                                setSummaryPage(1)
+                              }}
+                            >
+                              <option value={10}>10</option>
+                              <option value={20}>20</option>
+                              <option value={50}>50</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {totalSummaryPages > 1 && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          disabled={summaryPage <= 1}
+                          onClick={() => setSummaryPage((p) => Math.max(1, p - 1))}
+                        >
+                          <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                          Previous
+                        </Button>
+                        <span className="text-xs text-muted-foreground px-1">
+                          Page <strong className="text-foreground">{summaryPage}</strong> of <strong className="text-foreground">{totalSummaryPages}</strong>
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-2 text-xs"
+                          disabled={summaryPage >= totalSummaryPages}
+                          onClick={() => setSummaryPage((p) => Math.min(totalSummaryPages, p + 1))}
+                        >
+                          Next
+                          <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
