@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   Award, CalendarDays, ChevronDown, ChevronRight, ArrowLeft, Download, Loader2, Plus, Scissors, Sparkles, Sunrise, Sunset,
-  Target, Trash2, TrendingUp, UserCheck, Users, Wallet,
+  Target, Trash2, TrendingUp, UserCheck, Users, Wallet, Eye, Search, Building2, CheckCircle2, AlertCircle, RefreshCw,
 } from 'lucide-react'
 
 const errMsg = (err, fallback) => {
@@ -62,6 +62,13 @@ const CUSTOM_STYLES = {
 }
 
 const money = (v) => (v == null ? '—' : formatMoney(v))
+
+const getInitials = (name) => {
+  if (!name) return 'ST'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
 
 const SELECT_CLASS = 'w-full h-10 px-3 border border-input rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring'
 
@@ -138,42 +145,78 @@ const toPayload = (f) => ({
     })),
 })
 
-function RuleCard({ kind, rule: custom, onRemove, children }) {
+function RuleCard({ kind, rule: custom, badge, summary, defaultOpen = true, onRemove, children }) {
+  const [open, setOpen] = useState(defaultOpen)
   const rule = custom || RULES[kind]
   const Icon = rule.icon
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0">
-            <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-lg', rule.tint)}>
+    <Card className="transition-all duration-200 border-muted/80 shadow-xs">
+      <CardHeader
+        className={cn('cursor-pointer select-none py-3.5 px-4 sm:px-6 hover:bg-muted/30 transition-colors rounded-t-xl', open && 'border-b border-muted/50')}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-lg shadow-xs', rule.tint)}>
               <Icon className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <CardTitle className="text-lg">{rule.title}</CardTitle>
-              <CardDescription className="mt-1">{rule.help}</CardDescription>
+              <div className="flex items-center gap-2 flex-wrap">
+                <CardTitle className="text-base font-semibold text-foreground">{rule.title}</CardTitle>
+                {badge && <Badge variant="secondary" className="text-[11px] font-normal">{badge}</Badge>}
+              </div>
+              <CardDescription className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{rule.help}</CardDescription>
+              {!open && summary && (
+                <div className="mt-1 text-xs font-medium text-primary flex items-center gap-1.5">
+                  <span>{summary}</span>
+                </div>
+              )}
             </div>
           </div>
-          <Button type="button" size="sm" variant="ghost" aria-label={`Remove ${custom?.removeLabel || rule.title}`} onClick={onRemove}>
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
+          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md"
+              aria-label={`Remove ${custom?.removeLabel || rule.title}`}
+              onClick={onRemove}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md"
+              aria-label={open ? 'Collapse details' : 'Expand details'}
+              onClick={() => setOpen((o) => !o)}
+            >
+              <ChevronDown className={cn('h-4 w-4 transition-transform duration-200', open && 'rotate-180')} />
+            </Button>
+          </div>
         </div>
       </CardHeader>
-      <CardContent>{children}</CardContent>
+      {open && <CardContent className="pt-4 px-4 sm:px-6 pb-5">{children}</CardContent>}
     </Card>
   )
 }
 
 function ShiftFields({ id, rule, onChange }) {
   return (
-    <div className="space-y-1.5 w-full sm:w-48">
+    <div className="space-y-2 max-w-sm">
       <Label htmlFor={`${id}-value`} className="text-xs font-medium text-foreground">Percent (%) of each service</Label>
-      <Input
-        id={`${id}-value`}
-        type="number" min="0" max="100" step="any"
-        value={rule.percent}
-        onChange={(e) => onChange({ percent: e.target.value })}
-      />
+      <div className="relative w-44">
+        <Input
+          id={`${id}-value`}
+          type="number" min="0" max="100" step="any"
+          className="pr-7 text-sm"
+          placeholder="0"
+          value={rule.percent}
+          onChange={(e) => onChange({ percent: e.target.value })}
+        />
+        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">%</span>
+      </div>
       <p className="text-xs text-muted-foreground">0 = pays nothing. Not paid to incentive-based staff.</p>
     </div>
   )
@@ -232,12 +275,16 @@ function CustomRuleCard({ rule, index, services, categories, onChange, onRemove 
     tint: style.tint,
     removeLabel: `custom rule ${index + 1}`,
     help: rule.kind === 'target'
-      ? 'If the employee’s earnings for the month reach the target below, they get this percent of all their earnings.'
-      : 'Pays for each completed service that matches. Leave both lists empty to match every service; if you pick both, a service must match both.',
+      ? 'If employee sales reach the monthly target, pays this % of total sales.'
+      : 'Pays for specific matching services performed by staff.',
   }
+  const badge = rule.kind === 'target'
+    ? (rule.earned_amount ? `Target: ₹${rule.earned_amount} → ${rule.percent}%` : 'Target Rule')
+    : (rule.pay_as === 'percent' ? `${rule.value || 0}% per service` : `₹${rule.value || 0} per service`)
+  const summary = `Applies to: ${WHO_OPTIONS.find((o) => o.value === rule.who)?.label || rule.who}`
   const pre = `custom-${rule.id}`
   return (
-    <RuleCard rule={cardRule} onRemove={onRemove}>
+    <RuleCard rule={cardRule} badge={badge} summary={summary} defaultOpen={true} onRemove={onRemove}>
       <div className="space-y-4">
         <div className="flex flex-wrap items-end gap-4">
           <div className="space-y-1.5 w-full sm:w-64">
@@ -402,87 +449,111 @@ function ScopedRuleCard({ kind, rule, index, onChange, onRemove }) {
   const cardRule = { ...base, title, removeLabel: title }
   const pre = `${kind}-${rule.id}`
   const setTier = (i, patch) => onChange({ tiers: rule.tiers.map((t, k) => (k === i ? { ...t, ...patch } : t)) })
+
+  let badge = null
+  let summary = null
+  if (kind === 'monthly') {
+    badge = `${rule.tiers.length} ${rule.tiers.length === 1 ? 'tier' : 'tiers'}`
+    summary = `Click arrow to expand and view ${rule.tiers.length} salary target row(s)`
+  } else {
+    badge = `${rule.percent || 0}% rate`
+    summary = `${rule.percent || 0}% extra pay ${kind === 'before_shift' ? 'before shift' : 'after shift'}`
+  }
+
   return (
-    <RuleCard rule={cardRule} onRemove={onRemove}>
+    <RuleCard kind={kind} rule={cardRule} badge={badge} summary={summary} defaultOpen={true} onRemove={onRemove}>
       <div className="space-y-4">
         <ScopeFields rule={rule} onChange={onChange} />
         {kind === 'monthly' ? (
-          <div className="space-y-3 border-t pt-4">
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Salary targets & rates</span>
+              <span className="text-xs text-muted-foreground">{rule.tiers.length} of {MAX_MONTHLY_TIERS} rows used</span>
+            </div>
             {rule.tiers.length > 0 && (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Salary (₹)</TableHead>
-                    <TableHead>Earned amount (₹)</TableHead>
-                    <TableHead>Percent (%)</TableHead>
-                    <TableHead className="w-12" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rule.tiers.map((t, i) => (
-                    <TableRow key={i}>
-                      <TableCell>
-                        <Input
-                          aria-label={`Salary, row ${i + 1}`}
-                          type="number" min="0" step="any" className="w-36" list="inc-salary-list"
-                          value={t.salary}
-                          onChange={(e) => setTier(i, { salary: e.target.value })}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          aria-label={`Earned amount, row ${i + 1}`}
-                          type="number" min="0" step="any" className="w-40"
-                          value={t.earned_amount}
-                          onChange={(e) => setTier(i, { earned_amount: e.target.value })}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          aria-label={`Percent, row ${i + 1}`}
-                          type="number" min="0" max="100" step="any" className="w-28"
-                          value={t.percent}
-                          onChange={(e) => setTier(i, { percent: e.target.value })}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          type="button" size="sm" variant="ghost" aria-label={`Remove row ${i + 1}`}
-                          onClick={() => onChange({ tiers: rule.tiers.filter((_, k) => k !== i) })}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="text-[11px] font-medium text-muted-foreground">Salary (₹)</TableHead>
+                      <TableHead className="text-[11px] font-medium text-muted-foreground">Sales target (₹)</TableHead>
+                      <TableHead className="text-[11px] font-medium text-muted-foreground">Payout rate (%)</TableHead>
+                      <TableHead className="w-10 text-center text-[11px] font-medium text-muted-foreground" />
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {rule.tiers.map((t, i) => (
+                      <TableRow key={i} className="hover:bg-muted/20">
+                        <TableCell className="py-2">
+                          <Input
+                            aria-label={`Salary, row ${i + 1}`}
+                            type="number" min="0" step="any" className="h-8 w-36 text-sm" list="inc-salary-list"
+                            placeholder="e.g. 20000"
+                            value={t.salary}
+                            onChange={(e) => setTier(i, { salary: e.target.value })}
+                          />
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <Input
+                            aria-label={`Earned amount, row ${i + 1}`}
+                            type="number" min="0" step="any" className="h-8 w-40 text-sm"
+                            placeholder="e.g. 50000"
+                            value={t.earned_amount}
+                            onChange={(e) => setTier(i, { earned_amount: e.target.value })}
+                          />
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <div className="relative w-28">
+                            <Input
+                              aria-label={`Percent, row ${i + 1}`}
+                              type="number" min="0" max="100" step="any" className="h-8 pr-6 text-sm"
+                              placeholder="5"
+                              value={t.percent}
+                              onChange={(e) => setTier(i, { percent: e.target.value })}
+                            />
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2 text-center">
+                          <Button
+                            type="button" size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                            aria-label={`Remove row ${i + 1}`}
+                            onClick={() => onChange({ tiers: rule.tiers.filter((_, k) => k !== i) })}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
             <div className="flex flex-wrap items-center gap-3">
               <Button
-                type="button" size="sm" variant="outline"
+                type="button" size="sm" variant="outline" className="h-8 text-xs gap-1.5"
                 disabled={rule.tiers.length >= MAX_MONTHLY_TIERS}
                 onClick={() => onChange({ tiers: [...rule.tiers, { salary: '', earned_amount: '', percent: '' }] })}
               >
-                <Plus className="h-4 w-4 mr-1" />
-                Add row
+                <Plus className="h-3.5 w-3.5" />
+                Add Salary Tier
               </Button>
-              <span className="text-xs text-muted-foreground">Up to {MAX_MONTHLY_TIERS} rows. Pick a salary from the list or type one.</span>
+              <span className="text-xs text-muted-foreground">Pick a staff salary from dropdown or type any custom amount.</span>
             </div>
-            <label className="flex items-start gap-3 cursor-pointer border-t pt-4">
+            <label className="flex items-start gap-3 cursor-pointer border-t pt-3 mt-3">
               <input
                 type="checkbox"
-                className="mt-0.5 h-4 w-4 accent-primary"
+                className="mt-0.5 h-4 w-4 accent-primary rounded"
                 checked={rule.pick_highest}
                 onChange={(e) => onChange({ pick_highest: e.target.checked })}
               />
-              <span className="text-sm text-foreground">
-                Pay only the highest row (instead of adding the rows an employee qualifies for)
+              <span className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Pay highest tier only</strong> (if unchecked, all matching tiers will add up together).
               </span>
             </label>
           </div>
         ) : (
-          <div className="border-t pt-4">
+          <div className="pt-2">
             <ShiftFields id={pre} rule={rule} onChange={onChange} />
           </div>
         )}
@@ -647,7 +718,7 @@ function SummaryTile({ icon: Icon, tint, label, value, sub }) {
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0">
-        <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+        <span className="block text-xs font-medium text-muted-foreground">{label}</span>
         <span className="block truncate text-base font-bold tabular-nums leading-tight text-foreground sm:text-xl">{value}</span>
         {sub && <span className="block truncate text-xs text-muted-foreground">{sub}</span>}
       </div>
@@ -660,7 +731,7 @@ const fmtDate = (d) => (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ?
 function Amount({ label, value }) {
   return (
     <div className="rounded-md border bg-background px-3 py-1.5">
-      <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className="block text-xs font-medium text-muted-foreground">{label}</span>
       <span className="block text-sm font-semibold tabular-nums text-foreground">{value}</span>
     </div>
   )
@@ -668,72 +739,344 @@ function Amount({ label, value }) {
 
 const appliedText = (e) => e.applied_label || (e.applied ? APPLIED_LABEL[e.applied] || e.applied : null)
 
-function EmployeeDetail({ e }) {
+function EmployeeDetailModal({ employee: e, open, onClose, branchName, allBranches, month }) {
+  const [search, setSearch] = useState('')
+  const [filterWhen, setFilterWhen] = useState('all')
+
+  useEffect(() => {
+    setSearch('')
+    setFilterWhen('all')
+  }, [e?.employee_id])
+
+  if (!e) return null
+
   const services = e.services || []
+  const showBranchCol = services.some((sv) => sv.branch_name)
+  const branchRows = Array.isArray(e.earnings_by_branch) ? e.earnings_by_branch : []
   const applied = appliedText(e)
+  const salary = e.salary_used ?? e.base_salary
+
+  const filteredServices = services.filter((sv) => {
+    if (filterWhen !== 'all' && sv.when !== filterWhen) return false
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return (
+      (sv.service_name || '').toLowerCase().includes(q) ||
+      (sv.bill_number || '').toLowerCase().includes(q) ||
+      (sv.date || '').toLowerCase().includes(q)
+    )
+  })
+
+  const totalFilteredAmount = filteredServices.reduce((sum, s) => sum + Number(s.amount || 0), 0)
+  const yieldPct = e.earnings > 0 ? ((Number(e.paid_incentive || 0) / Number(e.earnings)) * 100).toFixed(1) : '0'
+
+  const whenCounts = {
+    all: services.length,
+    normal: services.filter((s) => s.when === 'normal' || !s.when).length,
+    before_shift: services.filter((s) => s.when === 'before_shift').length,
+    after_shift: services.filter((s) => s.when === 'after_shift').length,
+  }
+
   return (
-    <div className="space-y-3 py-2">
-      <div className="flex flex-wrap gap-2">
-        <Amount label="Earnings" value={money(e.earnings)} />
-        <Amount label="Services" value={e.services_count ?? '—'} />
-        {e.pay_type !== 'incentive' && (
-          <>
-            <Amount label="Monthly earnings" value={money(e.monthly_incentive)} />
-            <Amount label="Before shift" value={money(e.before_shift_incentive)} />
-            <Amount label="After shift" value={money(e.after_shift_incentive)} />
-          </>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[88vh] overflow-y-auto p-4 sm:p-6 gap-5">
+        <DialogHeader className="space-y-1">
+          <div className="flex items-start gap-3.5">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary font-bold text-lg shadow-xs">
+              {getInitials(e.full_name)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <DialogTitle className="text-xl font-bold text-foreground">{e.full_name}</DialogTitle>
+                <Badge variant={e.pay_type === 'incentive' ? 'secondary' : 'default'} className="text-xs">
+                  {e.pay_type ? PAY_TYPE_LABEL[e.pay_type] || e.pay_type : 'Employee'}
+                </Badge>
+                {e.pay_type === 'incentive' ? (
+                  <Badge variant="outline" className="text-xs font-normal">
+                    Commission Rate: {salary != null && salary !== '' ? `${salary}%` : '0%'}
+                  </Badge>
+                ) : salary ? (
+                  <Badge variant="outline" className="text-xs font-normal">
+                    Base Salary: {money(salary)}
+                  </Badge>
+                ) : null}
+              </div>
+              <DialogDescription className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+                <span className="flex items-center gap-1 font-medium text-foreground/80">
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  {allBranches ? 'All branches' : branchName}
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                  {monthLabel(month)}
+                </span>
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        {/* Hero Card: Total Incentive & Snapshot Metrics */}
+        <div className="rounded-xl border bg-gradient-to-br from-primary/5 via-card to-background p-4 sm:p-5 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <span className="text-xs font-medium text-muted-foreground">Total incentive earned</span>
+              <div className="text-3xl font-extrabold tabular-nums text-primary mt-0.5">
+                {money(e.paid_incentive)}
+              </div>
+              {applied ? (
+                <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1">
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                  <span>Rule applied: {applied}</span>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">No incentive rules applied or targets reached.</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 text-center sm:text-right">
+              <div className="rounded-lg bg-background/80 border p-2.5">
+                <span className="block text-[11px] font-medium text-muted-foreground">Sales billed</span>
+                <span className="text-sm sm:text-base font-bold tabular-nums text-foreground">{money(e.earnings)}</span>
+              </div>
+              <div className="rounded-lg bg-background/80 border p-2.5">
+                <span className="block text-[11px] font-medium text-muted-foreground">Services</span>
+                <span className="text-sm sm:text-base font-bold tabular-nums text-foreground">{e.services_count ?? 0}</span>
+              </div>
+              <div className="rounded-lg bg-background/80 border p-2.5">
+                <span className="block text-[11px] font-medium text-muted-foreground">Yield</span>
+                <span className="text-sm sm:text-base font-bold tabular-nums text-foreground">{yieldPct}%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Rule Breakdown Mini-Tiles */}
+          <div className="border-t border-border/60 pt-3">
+            <span className="text-xs font-medium text-muted-foreground block mb-2">
+              Rule contributions
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {e.pay_type === 'incentive' ? (
+                <>
+                  <div className="rounded-lg border bg-background/60 p-2">
+                    <span className="text-[11px] text-muted-foreground block truncate">Service Commission</span>
+                    <span className="text-sm font-semibold text-primary tabular-nums">
+                      {money(e.paid_incentive)}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground block mt-0.5">
+                      {salary != null && salary !== '' ? `${salary}% rate` : '0% rate'}
+                    </span>
+                  </div>
+                  <div className="rounded-lg border bg-background/60 p-2 opacity-60">
+                    <span className="text-[11px] text-muted-foreground block truncate">Monthly Target</span>
+                    <span className="text-sm font-semibold text-muted-foreground tabular-nums">N/A</span>
+                    <span className="text-[10px] text-muted-foreground block mt-0.5">Salary staff only</span>
+                  </div>
+                  <div className="rounded-lg border bg-background/60 p-2 opacity-60">
+                    <span className="text-[11px] text-muted-foreground block truncate">Shift Targets</span>
+                    <span className="text-sm font-semibold text-muted-foreground tabular-nums">N/A</span>
+                    <span className="text-[10px] text-muted-foreground block mt-0.5">Salary staff only</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="rounded-lg border bg-background/60 p-2">
+                    <span className="text-[11px] text-muted-foreground block truncate">Monthly Target</span>
+                    <span className="text-sm font-semibold text-foreground tabular-nums">
+                      {money(e.monthly_incentive)}
+                    </span>
+                  </div>
+                  <div className="rounded-lg border bg-background/60 p-2">
+                    <span className="text-[11px] text-muted-foreground block truncate">Before Shift</span>
+                    <span className="text-sm font-semibold text-foreground tabular-nums">
+                      {money(e.before_shift_incentive)}
+                    </span>
+                  </div>
+                  <div className="rounded-lg border bg-background/60 p-2">
+                    <span className="text-[11px] text-muted-foreground block truncate">After Shift</span>
+                    <span className="text-sm font-semibold text-foreground tabular-nums">
+                      {money(e.after_shift_incentive)}
+                    </span>
+                  </div>
+                </>
+              )}
+              {(e.custom_incentives || []).map((c) => (
+                <div key={c.id} className="rounded-lg border bg-background/60 p-2">
+                  <span className="text-[11px] text-muted-foreground block truncate">{c.name}</span>
+                  <span className="text-sm font-semibold text-foreground tabular-nums">{money(c.amount)}</span>
+                </div>
+              ))}
+              {(!e.custom_incentives || e.custom_incentives.length === 0) && e.pay_type !== 'incentive' && (
+                <div className="rounded-lg border bg-background/60 p-2">
+                  <span className="text-[11px] text-muted-foreground block truncate">Custom Rules</span>
+                  <span className="text-sm font-semibold text-muted-foreground tabular-nums">₹0</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Warnings */}
+          {e.warnings && e.warnings.length > 0 && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1">
+              {e.warnings.map((w, idx) => (
+                <div key={idx} className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                  <span>{w}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {branchRows.length > 1 && (
+          <div className="rounded-lg border bg-background p-3">
+            <span className="text-xs font-medium text-muted-foreground block mb-1.5">By branch</span>
+            <ul className="space-y-0.5 text-xs">
+              {branchRows.map((b, i) => (
+                <li key={b.branch_id || i} className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-foreground">{b.branch_name || 'Branch'}</span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {b.services_count ?? 0} {Number(b.services_count) === 1 ? 'service' : 'services'} — <strong className="text-foreground">{money(b.earnings)}</strong>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
-        {(e.custom_incentives || []).map((c) => <Amount key={c.id} label={c.name} value={money(c.amount)} />)}
-        <Amount label="Paid" value={money(e.paid_incentive)} />
-      </div>
-      <p className="text-xs text-muted-foreground">
-        {applied ? `Paid: ${applied}.` : 'Nothing paid.'}
-      </p>
-      {Array.isArray(e.rule_amounts) && e.rule_amounts.length > 0 && (
-        <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          {e.rule_amounts.map((r) => (
-            <li key={r.id} className="flex items-baseline justify-between gap-3 border-b border-dashed py-0.5">
-              <span className="truncate text-muted-foreground">{r.name}</span>
-              <span className="font-medium tabular-nums text-foreground">{money(r.amount)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {services.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No services to show.</p>
-      ) : (
-        <>
-        <p className="text-xs text-muted-foreground">Only services with a completed bill are listed.</p>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Time</TableHead>
-              <TableHead>Bill no.</TableHead>
-              <TableHead>Service</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead>When</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {services.map((sv, i) => {
-              const when = WHEN_BADGE[sv.when] || WHEN_BADGE.normal
-              return (
-                <TableRow key={i}>
-                  <TableCell>{fmtDate(sv.date)}</TableCell>
-                  <TableCell>{sv.time || '—'}</TableCell>
-                  <TableCell>{sv.bill_number || '—'}</TableCell>
-                  <TableCell>{sv.service_name || '—'}</TableCell>
-                  <TableCell className="text-right">{money(sv.amount)}</TableCell>
-                  <TableCell><Badge variant={when.variant}>{when.label}</Badge></TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-        </>
-      )}
-    </div>
+
+        {/* Completed Services Table Section */}
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div>
+              <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Scissors className="h-4 w-4 text-primary" />
+                Completed Services Breakdown
+                <Badge variant="secondary" className="text-xs">
+                  {services.length}
+                </Badge>
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                Only completed services from completed bills count toward incentives.
+              </p>
+            </div>
+
+            {/* Filter Pills */}
+            {services.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={filterWhen === 'all' ? 'secondary' : 'ghost'}
+                  className="h-7 text-xs px-2.5"
+                  onClick={() => setFilterWhen('all')}
+                >
+                  All ({whenCounts.all})
+                </Button>
+                {whenCounts.before_shift > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={filterWhen === 'before_shift' ? 'secondary' : 'ghost'}
+                    className="h-7 text-xs px-2.5"
+                    onClick={() => setFilterWhen('before_shift')}
+                  >
+                    Before Shift ({whenCounts.before_shift})
+                  </Button>
+                )}
+                {whenCounts.after_shift > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={filterWhen === 'after_shift' ? 'secondary' : 'ghost'}
+                    className="h-7 text-xs px-2.5"
+                    onClick={() => setFilterWhen('after_shift')}
+                  >
+                    After Shift ({whenCounts.after_shift})
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Search bar if many services */}
+          {services.length > 2 && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by service name, bill number, or date..."
+                className="pl-9 h-9 text-xs"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          )}
+
+          {services.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+              <Scissors className="h-8 w-8 mx-auto mb-2 opacity-20" />
+              <p className="text-sm font-medium">No completed services</p>
+              <p className="text-xs">This employee has no completed services recorded for {monthLabel(month)}{allBranches ? '' : ` at ${branchName}`}.</p>
+            </div>
+          ) : filteredServices.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
+              <p className="text-sm">No services match your search or filter.</p>
+            </div>
+          ) : (
+            <div className="rounded-lg border overflow-hidden max-h-72 overflow-y-auto">
+              <Table>
+                <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                  <TableRow>
+                    <TableHead className="text-[11px] font-medium text-muted-foreground">Date</TableHead>
+                    <TableHead className="text-[11px] font-medium text-muted-foreground">Time</TableHead>
+                    {showBranchCol && <TableHead className="text-[11px] font-medium text-muted-foreground">Branch</TableHead>}
+                    <TableHead className="text-[11px] font-medium text-muted-foreground">Bill no.</TableHead>
+                    <TableHead className="text-[11px] font-medium text-muted-foreground">Service</TableHead>
+                    <TableHead className="text-[11px] font-medium text-muted-foreground">Timing</TableHead>
+                    <TableHead className="text-[11px] font-medium text-muted-foreground text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredServices.map((sv, i) => {
+                    const when = WHEN_BADGE[sv.when] || WHEN_BADGE.normal
+                    return (
+                      <TableRow key={i} className="hover:bg-muted/20">
+                        <TableCell className="text-xs py-2">{fmtDate(sv.date)}</TableCell>
+                        <TableCell className="text-xs py-2 text-muted-foreground">{sv.time || '—'}</TableCell>
+                        {showBranchCol && <TableCell className="text-xs py-2">{sv.branch_name || '—'}</TableCell>}
+                        <TableCell className="text-xs py-2 font-mono font-medium">{sv.bill_number || '—'}</TableCell>
+                        <TableCell className="text-xs py-2 font-medium">{sv.service_name || '—'}</TableCell>
+                        <TableCell className="text-xs py-2">
+                          <Badge variant={when.variant} className="text-[10px] px-1.5 py-0.5">
+                            {when.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs py-2 text-right font-semibold tabular-nums">
+                          {money(sv.amount)}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {filteredServices.length > 0 && (
+            <div className="flex items-center justify-between text-xs text-muted-foreground px-1 pt-1">
+              <span>Showing {filteredServices.length} of {services.length} service(s)</span>
+              <span>Total filtered sales: <strong className="text-foreground">{money(totalFilteredAmount)}</strong></span>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end pt-2 border-t">
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -746,7 +1089,7 @@ const monthLabel = (m) => {
 
 function ResultsCard() {
   const [selectedBranchId, setSelectedBranchId] = useState('')
-  const [open, setOpen] = useState(() => new Set())
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [month, setMonth] = useState(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -757,13 +1100,18 @@ function ResultsCard() {
     queryFn: () => branchService.getBranches({ is_active: 'true' }),
   })
   const branches = branchesData?.data || []
-  const branchId = selectedBranchId || branches[0]?.branch_id || ''
+  const branchId = selectedBranchId // '' = all branches (default)
+  const allBranches = !branchId
   const branchName = branches.find((b) => b.branch_id === branchId)?.name || 'branch'
 
-  const { data: res, isLoading, isError, error } = useQuery({
+  const { data: res, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } = useQuery({
     queryKey: ['incentive-report', branchId, month],
     queryFn: () => incentiveService.getReport(branchId, month),
-    enabled: !!branchId && !!month,
+    enabled: !!month,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchInterval: 60000,
   })
   const employees = useMemo(() => res?.data?.employees || [], [res])
   const grand = employees.reduce((t, e) => t + Number(e.paid_incentive || 0), 0)
@@ -771,12 +1119,9 @@ function ResultsCard() {
   const top = employees.reduce((best, e) => (Number(e.paid_incentive || 0) > Number(best?.paid_incentive || 0) ? e : best), null)
   const hasTop = !!top && Number(top.paid_incentive) > 0
 
-  const toggle = (id) => setOpen((o) => {
-    const n = new Set(o)
-    if (n.has(id)) n.delete(id)
-    else n.add(id)
-    return n
-  })
+  const activeEmployee = selectedEmployee
+    ? employees.find((x) => x.employee_id === selectedEmployee.employee_id) || selectedEmployee
+    : null
 
   const exportCsv = () => {
     const rules = []
@@ -787,75 +1132,116 @@ function ResultsCard() {
       }
     }
     const blob = new Blob([reportCsv(employees, rules)], { type: 'text/csv;charset=utf-8;' })
-    const safeBranch = String(branchName).trim().replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'branch'
+    const safeBranch = allBranches ? 'all-branches' : String(branchName).trim().replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'branch'
     downloadBlob(blob, `incentives_${safeBranch}_${month}.csv`)
   }
 
   return (
     <div className="space-y-4">
+      {/* Branch & Month Toolbar Card */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-1.5 w-full sm:w-64">
-              <Label htmlFor="inc-branch" className="text-xs font-medium text-foreground">Branch</Label>
-              <select
-                id="inc-branch"
-                className={SELECT_CLASS}
-                value={branchId}
-                onChange={(e) => { setSelectedBranchId(e.target.value); setOpen(new Set()) }}
-              >
-                {branches.map((b) => <option key={b.branch_id} value={b.branch_id}>{b.name}</option>)}
-              </select>
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div className="flex flex-wrap items-end gap-3 sm:gap-4 flex-1">
+              <div className="space-y-1.5 w-full sm:w-64">
+                <Label htmlFor="inc-branch" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5" />
+                  Branch
+                </Label>
+                <select
+                  id="inc-branch"
+                  className={SELECT_CLASS}
+                  value={branchId}
+                  onChange={(e) => { setSelectedBranchId(e.target.value); setSelectedEmployee(null) }}
+                >
+                  <option value="">All branches</option>
+                  {branches.map((b) => <option key={b.branch_id} value={b.branch_id}>{b.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1.5 w-full sm:w-48">
+                <Label htmlFor="inc-month" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  Month
+                </Label>
+                <Input
+                  id="inc-month"
+                  type="month"
+                  value={month}
+                  onChange={(e) => { setMonth(e.target.value); setSelectedEmployee(null) }}
+                />
+              </div>
             </div>
-            <div className="space-y-1.5 w-full sm:w-48">
-              <Label htmlFor="inc-month" className="text-xs font-medium text-foreground">Month</Label>
-              <Input id="inc-month" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setOpen(new Set()) }} />
+            <div className="flex flex-wrap items-center gap-2">
+              {dataUpdatedAt > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  Updated {new Date(dataUpdatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 text-xs gap-1.5"
+                disabled={isFetching}
+                onClick={() => refetch()}
+              >
+                <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
+                Refresh
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 text-xs gap-1.5"
+                disabled={employees.length === 0}
+                onClick={exportCsv}
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* KPI Tiles */}
       {employees.length > 0 && (
-        <>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <SummaryTile icon={Wallet} tint="bg-primary/10 text-primary" label="Total paid this month" value={formatMoney(grand)} />
-            <SummaryTile icon={UserCheck} tint="bg-success/10 text-success" label="Employees paid" value={`${paidCount} of ${employees.length}`} />
-            <SummaryTile
-              icon={TrendingUp}
-              tint="bg-info/10 text-info"
-              label="Highest paid"
-              value={hasTop ? top.full_name : '—'}
-              sub={hasTop ? formatMoney(top.paid_incentive) : undefined}
-            />
-          </div>
-        </>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <SummaryTile icon={Wallet} tint="bg-primary/10 text-primary" label="Total paid this month" value={formatMoney(grand)} />
+          <SummaryTile icon={UserCheck} tint="bg-success/10 text-success" label="Employees paid" value={`${paidCount} of ${employees.length}`} />
+          <SummaryTile
+            icon={TrendingUp}
+            tint="bg-info/10 text-info"
+            label="Highest earner"
+            value={hasTop ? top.full_name : '—'}
+            sub={hasTop ? formatMoney(top.paid_incentive) : undefined}
+          />
+        </div>
       )}
 
+      {/* Results Table Card */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <Wallet className="h-5 w-5" />
-                Results
+                <Wallet className="h-5 w-5 text-primary" />
+                Staff Incentive Results
               </CardTitle>
-              <CardDescription className="mt-1.5">
-                What each employee earns for the month. Added to net pay in Payroll. Click a row to see the services.
-              </CardDescription>
-              <p className="mt-1.5 text-xs text-muted-foreground">
+              <CardDescription className="mt-1 text-xs">
                 Counts completed services on completed bills (the same rule as Staff Performance), billed at{' '}
-                {branchId ? branchName : 'the branch selected above'} in {monthLabel(month)}.
-              </p>
+                <strong className="text-foreground">{allBranches ? 'all branches' : branchName}</strong>, for{' '}
+                <strong className="text-foreground">{monthLabel(month)}</strong>. Click any staff row to see their full breakdown and completed services.
+              </CardDescription>
+              <CardDescription className="mt-1 text-xs">
+                Incentives are worked out on each person&apos;s earnings across all branches and paid in their own branch&apos;s payroll.
+              </CardDescription>
             </div>
-            <Button type="button" variant="outline" size="sm" disabled={employees.length === 0} onClick={exportCsv}>
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
           </div>
         </CardHeader>
         <CardContent>
-          {!branchId || !month ? (
-            <p className="text-center text-muted-foreground py-8">Select a branch and month.</p>
+          {!month ? (
+            <p className="text-center text-muted-foreground py-8">Select a month.</p>
           ) : isLoading ? (
             <Spinner />
           ) : isError ? (
@@ -863,88 +1249,121 @@ function ResultsCard() {
           ) : employees.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
-              <p>No employees to report for this branch.</p>
+              <p>{allBranches ? 'No employees to report.' : 'No employees to report for this branch.'}</p>
             </div>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-8" />
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Pay type</TableHead>
-                    <TableHead className="text-right">Salary</TableHead>
-                    <TableHead className="text-right">Earnings</TableHead>
-                    <TableHead className="text-right">Services</TableHead>
-                    <TableHead className="text-right">Monthly earnings</TableHead>
-                    <TableHead className="text-right">Before shift</TableHead>
-                    <TableHead className="text-right">After shift</TableHead>
-                    <TableHead className="text-right">Paid</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {employees.map((e) => {
-                    const isOpen = open.has(e.employee_id)
-                    const Chevron = isOpen ? ChevronDown : ChevronRight
-                    const salary = e.salary_used ?? e.base_salary
-                    const applied = appliedText(e)
-                    return (
-                      <Fragment key={e.employee_id}>
-                        <TableRow className="cursor-pointer" onClick={() => toggle(e.employee_id)}>
-                          <TableCell>
-                            <button
-                              type="button"
-                              aria-expanded={isOpen}
-                              aria-label={`${isOpen ? 'Hide' : 'Show'} services for ${e.full_name}`}
-                              className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring"
-                              onClick={(ev) => { ev.stopPropagation(); toggle(e.employee_id) }}
-                            >
-                              <Chevron className="h-4 w-4" />
-                            </button>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2 font-medium">
-                              {e.full_name}
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead className="text-[11px] font-medium text-muted-foreground">Staff</TableHead>
+                      <TableHead className="text-[11px] font-medium text-muted-foreground">Pay type</TableHead>
+                      <TableHead className="text-[11px] font-medium text-muted-foreground text-center">Salary / %</TableHead>
+                      <TableHead className="text-[11px] font-medium text-muted-foreground text-right">Sales</TableHead>
+                      <TableHead className="text-[11px] font-medium text-muted-foreground text-center">Services</TableHead>
+                      <TableHead className="text-[11px] font-medium text-muted-foreground text-center">Monthly</TableHead>
+                      <TableHead className="text-[11px] font-medium text-muted-foreground text-center">Before shift</TableHead>
+                      <TableHead className="text-[11px] font-medium text-muted-foreground text-center">After shift</TableHead>
+                      <TableHead className="text-[11px] font-medium text-muted-foreground text-right">Incentive</TableHead>
+                      <TableHead className="text-[11px] font-medium text-muted-foreground text-center w-20">Details</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {employees.map((e) => {
+                      const salary = e.salary_used ?? e.base_salary
+                      const applied = appliedText(e)
+                      return (
+                        <TableRow
+                          key={e.employee_id}
+                          className="cursor-pointer hover:bg-muted/50 transition-colors group"
+                          onClick={() => setSelectedEmployee(e)}
+                        >
+                          <TableCell className="py-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary font-semibold text-xs shadow-xs">
+                                {getInitials(e.full_name)}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-1">
+                                  <span className="truncate">{e.full_name}</span>
+                                  <ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary shrink-0" />
+                                </div>
+                                {(e.warnings || []).map((w, wi) => (
+                                  <div key={`${wi}-${w}`} className="text-[11px] text-amber-600 dark:text-amber-400 font-normal truncate max-w-xs">{w}</div>
+                                ))}
+                              </div>
                             </div>
-                            {(e.warnings || []).map((w, wi) => (
-                              <div key={`${wi}-${w}`} className="mt-1 max-w-md whitespace-normal break-words text-xs leading-snug text-warning">{w}</div>
-                            ))}
                           </TableCell>
-                          <TableCell>{e.pay_type ? PAY_TYPE_LABEL[e.pay_type] || e.pay_type : '—'}</TableCell>
-                          <TableCell className="text-right">
-                            {money(salary)}
+                          <TableCell className="py-3">
+                            <Badge variant="outline" className="text-xs font-normal">
+                              {e.pay_type ? PAY_TYPE_LABEL[e.pay_type] || e.pay_type : '—'}
+                            </Badge>
                           </TableCell>
-                          <TableCell className="text-right">{money(e.earnings)}</TableCell>
-                          <TableCell className="text-right">{e.services_count ?? '—'}</TableCell>
-                          <TableCell className="text-right">{money(e.monthly_incentive)}</TableCell>
-                          <TableCell className="text-right">{money(e.before_shift_incentive)}</TableCell>
-                          <TableCell className="text-right">{money(e.after_shift_incentive)}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="font-medium">{money(e.paid_incentive)}</div>
-                            {applied && <div className="mt-0.5 text-xs text-muted-foreground">{applied}</div>}
+                          <TableCell className="py-3 text-center tabular-nums">
+                            {e.pay_type === 'incentive' ? (
+                              <Badge variant="secondary" className="text-xs font-semibold">
+                                {salary != null && salary !== '' ? `${salary}%` : '0%'}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">{money(salary)}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-3 text-right tabular-nums font-semibold text-foreground">{money(e.earnings)}</TableCell>
+                          <TableCell className="py-3 text-center tabular-nums">{e.services_count ?? '—'}</TableCell>
+                          <TableCell className="py-3 text-center tabular-nums">
+                            {e.pay_type === 'incentive' ? <span className="text-muted-foreground/60">—</span> : money(e.monthly_incentive)}
+                          </TableCell>
+                          <TableCell className="py-3 text-center tabular-nums">
+                            {e.pay_type === 'incentive' ? <span className="text-muted-foreground/60">—</span> : money(e.before_shift_incentive)}
+                          </TableCell>
+                          <TableCell className="py-3 text-center tabular-nums">
+                            {e.pay_type === 'incentive' ? <span className="text-muted-foreground/60">—</span> : money(e.after_shift_incentive)}
+                          </TableCell>
+                          <TableCell className="py-3 text-right tabular-nums">
+                            <div className="font-bold text-foreground text-sm">{money(e.paid_incentive)}</div>
+                            {applied && <div className="text-[10px] text-muted-foreground font-medium">{applied}</div>}
+                          </TableCell>
+                          <TableCell className="py-3 text-center" onClick={(ev) => ev.stopPropagation()}>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-2.5 text-xs text-primary hover:text-primary hover:bg-primary/10 gap-1.5"
+                              onClick={() => setSelectedEmployee(e)}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              <span>Details</span>
+                            </Button>
                           </TableCell>
                         </TableRow>
-                        {isOpen && (
-                          <TableRow className="bg-muted/30 hover:bg-muted/30">
-                            <TableCell colSpan={10}><EmployeeDetail e={e} /></TableCell>
-                          </TableRow>
-                        )}
-                      </Fragment>
-                    )
-                  })}
-                  <TableRow className="font-bold bg-muted/50">
-                    <TableCell colSpan={9}>Total</TableCell>
-                    <TableCell className="text-right">{formatMoney(grand)}</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+                      )
+                    })}
+                    <TableRow className="font-semibold bg-muted/30 hover:bg-muted/30">
+                      <TableCell colSpan={8} className="py-2.5 text-xs font-medium text-muted-foreground">Total</TableCell>
+                      <TableCell className="py-2.5 text-right tabular-nums text-sm text-primary font-bold">{formatMoney(grand)}</TableCell>
+                      <TableCell />
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
               <p className="mt-3 text-xs text-muted-foreground">
-                Paid = Monthly earnings + Before shift + After shift + any custom rules, all added together.
+                Total Incentive = Monthly earnings + Before shift + After shift + any custom rules. Added directly to net pay in Payroll.
               </p>
             </>
           )}
         </CardContent>
       </Card>
+
+      {/* Modern Employee Detail Modal */}
+      <EmployeeDetailModal
+        employee={activeEmployee}
+        open={!!selectedEmployee}
+        onClose={() => setSelectedEmployee(null)}
+        branchName={branchName}
+        allBranches={allBranches}
+        month={month}
+      />
     </div>
   )
 }
