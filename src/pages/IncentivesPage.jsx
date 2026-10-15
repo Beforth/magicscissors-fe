@@ -10,7 +10,7 @@ import { serviceService } from '@/services/service.service'
 import { formatMoney, PAY_TYPE_LABEL } from '@/lib/payroll'
 import { downloadBlob } from '@/lib/export-utils'
 import {
-  defaultSettings, validateSettings, newCustomRule, topPerformers, reportCsv, WHO_OPTIONS, MAX_CUSTOM_RULES,
+  defaultSettings, validateSettings, newCustomRule, topPerformers, reportCsv, WHO_OPTIONS, MAX_CUSTOM_RULES, MAX_MONTHLY_TIERS,
 } from '@/lib/incentiveSettings'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,11 +32,10 @@ const errMsg = (err, fallback) => {
 }
 
 const APPLIED_LABEL = {
-  monthly: 'Highest: Monthly earnings',
-  before_shift: 'Highest: Before shift',
-  after_shift: 'Highest: After shift',
+  monthly: 'Monthly earnings',
+  before_shift: 'Before shift',
+  after_shift: 'After shift',
   all: 'All added together',
-  service_percent: 'Percent of services',
   custom: 'Custom rule',
 }
 
@@ -78,7 +77,7 @@ const RULES = {
     icon: CalendarDays,
     tint: 'bg-primary/10 text-primary',
     pick: 'Extra percent when an employee earns a set amount in a month.',
-    help: "If an employee's earnings for the month reach the amount below (and are above their own salary), they get this percent of all their earnings. For monthly-salary staff only.",
+    help: 'Set a row for each salary. When an employee has that salary and their earnings for the month reach the earned amount, they get the percent of all their earnings.',
   },
   before_shift: {
     title: 'Before shift',
@@ -94,13 +93,6 @@ const RULES = {
     pick: 'Extra pay for services that start after the shift ends.',
     help: "Services that start after the employee's shift ends earn extra. For monthly and daily staff.",
   },
-  incentive_staff: {
-    title: 'Incentive-based staff',
-    icon: Users,
-    tint: 'bg-success/10 text-success',
-    pick: 'A percent of every service for staff who have no salary.',
-    help: 'Staff with no salary get this percent of the price of every service they complete.',
-  },
 }
 const RULE_KEYS = Object.keys(RULES)
 
@@ -115,11 +107,11 @@ function Spinner() {
 // Server settings -> editable form state (numbers as strings so inputs can be blank while typing)
 const toForm = (s) => ({
   pick_highest: !!s.pick_highest,
-  monthly_tiers: (s.monthly_tiers || []).map((t) => ({ earned_amount: String(t.earned_amount), percent: String(t.percent) })),
-  before_shift: { type: s.before_shift?.type || 'percent', value: String(s.before_shift?.value ?? 0) },
-  after_shift: { type: s.after_shift?.type || 'percent', value: String(s.after_shift?.value ?? 0) },
-  incentive_staff_percent: String(s.incentive_staff_percent ?? 0),
-  salary_overrides: (s.salary_overrides || []).map((o) => ({ employee_id: o.employee_id, salary: String(o.salary) })),
+  monthly_tiers: (s.monthly_tiers || []).map((t) => ({
+    salary: String(t.salary ?? ''), earned_amount: String(t.earned_amount), percent: String(t.percent),
+  })),
+  before_shift: { value: String(s.before_shift?.value ?? 0) },
+  after_shift: { value: String(s.after_shift?.value ?? 0) },
   custom_rules: (s.custom_rules || []).map((r) => (r.kind === 'target'
     ? { ...r, earned_amount: String(r.earned_amount), percent: String(r.percent) }
     : { ...r, service_ids: [...(r.service_ids || [])], category_ids: [...(r.category_ids || [])], value: String(r.value) })),
@@ -129,14 +121,9 @@ const num = (v) => (v === '' ? NaN : Number(v))
 
 const toPayload = (f) => ({
   pick_highest: f.pick_highest,
-  monthly_tiers: f.monthly_tiers.map((t) => ({
-    earned_amount: t.earned_amount === '' ? NaN : Number(t.earned_amount),
-    percent: t.percent === '' ? NaN : Number(t.percent),
-  })),
-  before_shift: { type: f.before_shift.type, value: f.before_shift.value === '' ? NaN : Number(f.before_shift.value) },
-  after_shift: { type: f.after_shift.type, value: f.after_shift.value === '' ? NaN : Number(f.after_shift.value) },
-  incentive_staff_percent: f.incentive_staff_percent === '' ? NaN : Number(f.incentive_staff_percent),
-  salary_overrides: f.salary_overrides.map((o) => ({ employee_id: o.employee_id, salary: num(o.salary) })),
+  monthly_tiers: f.monthly_tiers.map((t) => ({ salary: num(t.salary), earned_amount: num(t.earned_amount), percent: num(t.percent) })),
+  before_shift: { value: num(f.before_shift.value) },
+  after_shift: { value: num(f.after_shift.value) },
   custom_rules: f.custom_rules.map((r) => (r.kind === 'target'
     ? { id: r.id, kind: 'target', name: r.name.trim(), who: r.who, earned_amount: num(r.earned_amount), percent: num(r.percent) }
     : {
@@ -147,10 +134,9 @@ const toPayload = (f) => ({
 
 // Which rule cards the saved settings contain something for
 const hasRule = (s) => ({
-  monthly: (s.monthly_tiers || []).length > 0 || (s.salary_overrides || []).length > 0,
+  monthly: (s.monthly_tiers || []).length > 0,
   before_shift: Number(s.before_shift?.value) > 0,
   after_shift: Number(s.after_shift?.value) > 0,
-  incentive_staff: Number(s.incentive_staff_percent) > 0,
 })
 
 function RuleCard({ kind, rule: custom, onRemove, children }) {
@@ -181,30 +167,15 @@ function RuleCard({ kind, rule: custom, onRemove, children }) {
 
 function ShiftFields({ id, box, onChange }) {
   return (
-    <div className="flex flex-wrap items-end gap-4">
-      <div className="space-y-1.5 w-full sm:w-56">
-        <Label htmlFor={`${id}-type`} className="text-xs font-medium text-foreground">Pay as</Label>
-        <select
-          id={`${id}-type`}
-          className={SELECT_CLASS}
-          value={box.type}
-          onChange={(e) => onChange({ ...box, type: e.target.value })}
-        >
-          <option value="percent">% of each service</option>
-          <option value="hourly">₹ per hour</option>
-        </select>
-      </div>
-      <div className="space-y-1.5 w-full sm:w-40">
-        <Label htmlFor={`${id}-value`} className="text-xs font-medium text-foreground">
-          {box.type === 'hourly' ? 'Amount per hour (₹)' : 'Percent (%)'}
-        </Label>
-        <Input
-          id={`${id}-value`}
-          type="number" min="0" step="any"
-          value={box.value}
-          onChange={(e) => onChange({ ...box, value: e.target.value })}
-        />
-      </div>
+    <div className="space-y-1.5 w-full sm:w-48">
+      <Label htmlFor={`${id}-value`} className="text-xs font-medium text-foreground">Percent (%) of each service</Label>
+      <Input
+        id={`${id}-value`}
+        type="number" min="0" max="100" step="any"
+        value={box.value}
+        onChange={(e) => onChange({ ...box, value: e.target.value })}
+      />
+      <p className="text-xs text-muted-foreground">0 = off. Not paid to incentive-based staff.</p>
     </div>
   )
 }
@@ -326,58 +297,6 @@ function CustomRuleCard({ rule, index, services, categories, onChange, onRemove 
   )
 }
 
-function SalaryOverrides({ rows, employees, onChange }) {
-  const taken = new Set(rows.map((r) => r.employee_id))
-  const setRow = (i, patch) => onChange(rows.map((r, k) => (k === i ? { ...r, ...patch } : r)))
-  return (
-    <div className="space-y-3 border-t pt-4">
-      <div>
-        <p className="text-sm font-medium text-foreground">Salary used for the check (optional)</p>
-        <p className="text-xs text-muted-foreground">
-          Type a salary to use instead of the one on the Staff form when checking if earnings are above salary. Monthly-salary staff only.
-        </p>
-      </div>
-      {rows.length > 0 && (
-        <div className="space-y-2">
-          {rows.map((r, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-2">
-              <select
-                aria-label={`Employee, salary row ${i + 1}`}
-                className={cn(SELECT_CLASS, 'sm:w-64')}
-                value={r.employee_id}
-                onChange={(e) => setRow(i, { employee_id: e.target.value })}
-              >
-                <option value="">Choose employee</option>
-                {employees.map((u) => (
-                  <option key={u.id} value={u.id} disabled={taken.has(u.id) && u.id !== r.employee_id}>{u.name}</option>
-                ))}
-              </select>
-              <Input
-                aria-label={`Salary, row ${i + 1}`} placeholder="Salary (₹)"
-                type="number" min="0" step="any" className="w-40"
-                value={r.salary} onChange={(e) => setRow(i, { salary: e.target.value })}
-              />
-              <Button
-                type="button" size="sm" variant="ghost" aria-label={`Remove salary row ${i + 1}`}
-                onClick={() => onChange(rows.filter((_, k) => k !== i))}
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
-      <Button
-        type="button" size="sm" variant="outline" disabled={rows.length >= 200}
-        onClick={() => onChange([...rows, { employee_id: '', salary: '' }])}
-      >
-        <Plus className="h-4 w-4 mr-1" />
-        Add salary
-      </Button>
-    </div>
-  )
-}
-
 function RuleOption({ icon: Icon, tint, title, text, disabled, badge, onClick }) {
   return (
     <button
@@ -472,10 +391,15 @@ function SettingsSection({ addOpen, setAddOpen }) {
     queryKey: ['incentive-employees'],
     queryFn: () => userService.getUsers({ role: 'employee,manager,cashier', limit: 500 }),
   })
-  const employees = useMemo(
-    () => (usersRes?.data || []).filter((u) => u.employee_details).map((u) => ({ id: u.user_id || u.id, name: u.full_name })),
-    [usersRes],
-  )
+  const salaries = useMemo(() => {
+    const found = new Set()
+    for (const u of usersRes?.data || []) {
+      const d = u.employee_details
+      const n = Number(d?.base_salary)
+      if (d?.pay_type === 'monthly' && Number.isFinite(n) && n > 0) found.add(n)
+    }
+    return [...found].sort((a, b) => a - b)
+  }, [usersRes])
   const { data: servicesRes } = useQuery({
     queryKey: ['incentive-services'],
     queryFn: () => serviceService.getServices({ limit: 500 }),
@@ -522,7 +446,7 @@ function SettingsSection({ addOpen, setAddOpen }) {
   // A card that is off the page always has its default (off) values, so the form matches what is shown.
   const addRule = (k) => {
     setShown((s) => (s.includes(k) ? s : [...s, k]))
-    if (k === 'monthly' && form.monthly_tiers.length === 0) set({ monthly_tiers: [{ earned_amount: '', percent: '' }] })
+    if (k === 'monthly' && form.monthly_tiers.length === 0) set({ monthly_tiers: [{ salary: '', earned_amount: '', percent: '' }] })
     setAddOpen(false)
   }
   const addCustom = (kind) => {
@@ -534,10 +458,9 @@ function SettingsSection({ addOpen, setAddOpen }) {
   const removeRule = (k) => {
     setShown((s) => s.filter((x) => x !== k))
     const d = toForm(defaultSettings())
-    if (k === 'monthly') set({ monthly_tiers: d.monthly_tiers, salary_overrides: d.salary_overrides })
+    if (k === 'monthly') set({ monthly_tiers: d.monthly_tiers, pick_highest: d.pick_highest })
     if (k === 'before_shift') set({ before_shift: d.before_shift })
     if (k === 'after_shift') set({ after_shift: d.after_shift })
-    if (k === 'incentive_staff') set({ incentive_staff_percent: d.incentive_staff_percent })
   }
 
   const handleSave = () => {
@@ -555,23 +478,6 @@ function SettingsSection({ addOpen, setAddOpen }) {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardContent className="p-4">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              className="mt-1 h-4 w-4 accent-primary"
-              checked={form.pick_highest}
-              onChange={(e) => set({ pick_highest: e.target.checked })}
-            />
-            <span>
-              <span className="block text-sm font-medium text-foreground">Pay only the highest incentive</span>
-              <span className="block text-xs text-muted-foreground">Instead of adding all of them together.</span>
-            </span>
-          </label>
-        </CardContent>
-      </Card>
-
       {shown.length === 0 && form.custom_rules.length === 0 && (
         <Card>
           <CardContent className="text-center py-10 text-muted-foreground">
@@ -593,6 +499,7 @@ function SettingsSection({ addOpen, setAddOpen }) {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Salary (₹)</TableHead>
                     <TableHead>Earned amount (₹)</TableHead>
                     <TableHead>Percent (%)</TableHead>
                     <TableHead className="w-12" />
@@ -601,6 +508,14 @@ function SettingsSection({ addOpen, setAddOpen }) {
                 <TableBody>
                   {form.monthly_tiers.map((t, i) => (
                     <TableRow key={i}>
+                      <TableCell>
+                        <Input
+                          aria-label={`Salary, row ${i + 1}`}
+                          type="number" min="0" step="any" className="w-36" list="inc-salary-list"
+                          value={t.salary}
+                          onChange={(e) => setTier(i, { salary: e.target.value })}
+                        />
+                      </TableCell>
                       <TableCell>
                         <Input
                           aria-label={`Earned amount, row ${i + 1}`}
@@ -630,21 +545,31 @@ function SettingsSection({ addOpen, setAddOpen }) {
                 </TableBody>
               </Table>
             )}
+            <datalist id="inc-salary-list">
+              {salaries.map((n) => <option key={n} value={n} />)}
+            </datalist>
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 type="button" size="sm" variant="outline"
-                disabled={form.monthly_tiers.length >= 20}
-                onClick={() => set({ monthly_tiers: [...form.monthly_tiers, { earned_amount: '', percent: '' }] })}
+                disabled={form.monthly_tiers.length >= MAX_MONTHLY_TIERS}
+                onClick={() => set({ monthly_tiers: [...form.monthly_tiers, { salary: '', earned_amount: '', percent: '' }] })}
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add row
               </Button>
-              <span className="text-xs text-muted-foreground">Up to 20 rows.</span>
+              <span className="text-xs text-muted-foreground">Up to {MAX_MONTHLY_TIERS} rows. Pick a salary from the list or type one.</span>
             </div>
-            <SalaryOverrides
-              rows={form.salary_overrides} employees={employees}
-              onChange={(rows) => set({ salary_overrides: rows })}
-            />
+            <label className="flex items-start gap-3 cursor-pointer border-t pt-4">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-primary"
+                checked={form.pick_highest}
+                onChange={(e) => set({ pick_highest: e.target.checked })}
+              />
+              <span className="text-sm text-foreground">
+                Pay only the highest row (instead of adding the rows an employee qualifies for)
+              </span>
+            </label>
           </div>
         </RuleCard>
       )}
@@ -658,20 +583,6 @@ function SettingsSection({ addOpen, setAddOpen }) {
       {shown.includes('after_shift') && (
         <RuleCard kind="after_shift" onRemove={() => removeRule('after_shift')}>
           <ShiftFields id="after" box={form.after_shift} onChange={(b) => set({ after_shift: b })} />
-        </RuleCard>
-      )}
-
-      {shown.includes('incentive_staff') && (
-        <RuleCard kind="incentive_staff" onRemove={() => removeRule('incentive_staff')}>
-          <div className="space-y-1.5 w-full sm:w-40">
-            <Label htmlFor="inc-staff-percent" className="text-xs font-medium text-foreground">Percent (%)</Label>
-            <Input
-              id="inc-staff-percent"
-              type="number" min="0" max="100" step="any"
-              value={form.incentive_staff_percent}
-              onChange={(e) => set({ incentive_staff_percent: e.target.value })}
-            />
-          </div>
         </RuleCard>
       )}
 
@@ -970,7 +881,7 @@ function ResultsCard() {
                     const isOpen = open.has(e.employee_id)
                     const Chevron = isOpen ? ChevronDown : ChevronRight
                     const rank = rankOf.get(e.employee_id)
-                    const salary = e.salary_used !== undefined ? e.salary_used : e.base_salary
+                    const salary = e.salary_used ?? e.base_salary
                     const applied = appliedText(e)
                     return (
                       <Fragment key={e.employee_id}>
@@ -998,7 +909,6 @@ function ResultsCard() {
                           <TableCell>{e.pay_type ? PAY_TYPE_LABEL[e.pay_type] || e.pay_type : '—'}</TableCell>
                           <TableCell className="text-right">
                             {money(salary)}
-                            {e.salary_overridden && <Badge variant="info" className="ml-1.5">Typed</Badge>}
                           </TableCell>
                           <TableCell className="text-right">{money(e.earnings)}</TableCell>
                           <TableCell className="text-right">{e.services_count ?? '—'}</TableCell>
@@ -1007,11 +917,7 @@ function ResultsCard() {
                           <TableCell className="text-right">{money(e.after_shift_incentive)}</TableCell>
                           <TableCell className="text-right">
                             <div className="font-medium">{money(e.paid_incentive)}</div>
-                            {applied && (
-                              <Badge variant={e.applied === 'all' || e.applied === 'service_percent' ? 'secondary' : 'info'} className="mt-1">
-                                {applied}
-                              </Badge>
-                            )}
+                            {applied && <div className="mt-0.5 text-xs text-muted-foreground">{applied}</div>}
                           </TableCell>
                         </TableRow>
                         {isOpen && (
@@ -1029,7 +935,7 @@ function ResultsCard() {
                 </TableBody>
               </Table>
               <p className="mt-3 text-xs text-muted-foreground">
-                Paid = the highest incentive when the checkbox is on, otherwise all of them added together.
+                Paid = Monthly earnings + Before shift + After shift + any custom rules, all added together.
               </p>
             </>
           )}

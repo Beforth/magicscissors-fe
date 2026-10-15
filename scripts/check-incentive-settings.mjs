@@ -3,18 +3,14 @@ import { defaultSettings, validateSettings, newCustomRule, topPerformers, report
 
 const full = () => ({
   pick_highest: true,
-  monthly_tiers: [{ earned_amount: 50000, percent: 20 }, { earned_amount: 80000, percent: 25 }],
-  before_shift: { type: 'percent', value: 10 },
-  after_shift: { type: 'hourly', value: 120 },
-  incentive_staff_percent: 30,
-  salary_overrides: [],
+  monthly_tiers: [{ salary: 15000, earned_amount: 50000, percent: 20 }, { salary: 15000, earned_amount: 80000, percent: 25 }],
+  before_shift: { value: 10 },
+  after_shift: { value: 12 },
   custom_rules: [],
 })
 
 assert.deepEqual(defaultSettings(), {
-  pick_highest: false, monthly_tiers: [],
-  before_shift: { type: 'percent', value: 0 }, after_shift: { type: 'percent', value: 0 },
-  incentive_staff_percent: 0, salary_overrides: [], custom_rules: [],
+  pick_highest: false, monthly_tiers: [], before_shift: { value: 0 }, after_shift: { value: 0 }, custom_rules: [],
 })
 assert.notEqual(defaultSettings(), defaultSettings())
 assert.equal(validateSettings(defaultSettings()), null)
@@ -24,37 +20,31 @@ const err = (mut, re) => { const s = full(); mut(s); assert.match(validateSettin
 err((s) => { s.monthly_tiers[0].percent = 101 }, /percent/i)
 err((s) => { s.monthly_tiers[0].percent = -1 }, /percent/i)
 err((s) => { s.monthly_tiers[1].earned_amount = 50000 }, /same/i)
+err((s) => { delete s.monthly_tiers[0].salary }, /salary/i)
+err((s) => { s.monthly_tiers[0].salary = '' }, /salary/i)
+err((s) => { s.monthly_tiers[0].salary = 0 }, /salary/i)
+err((s) => { s.monthly_tiers[0].salary = 100000000 }, /salary/i)
 err((s) => { s.monthly_tiers[0].earned_amount = -5 }, /earned/i)
 err((s) => { s.monthly_tiers[0].earned_amount = 0 }, /earned/i)
 err((s) => { s.monthly_tiers[0].earned_amount = 100000000 }, /earned/i)
-err((s) => { s.monthly_tiers = Array.from({ length: 21 }, (_, i) => ({ earned_amount: i + 1, percent: 1 })) }, /20/)
-err((s) => { s.before_shift.type = 'fixed' }, /before shift/i)
-err((s) => { s.after_shift.type = 'bogus' }, /after shift/i)
-err((s) => { s.before_shift.value = 101 }, /before shift/i)
-err((s) => { s.after_shift.value = 100000 }, /after shift/i)
-err((s) => { s.after_shift.value = -1 }, /after shift/i)
-err((s) => { s.incentive_staff_percent = 101 }, /incentive-based/i)
-err((s) => { s.incentive_staff_percent = 'abc' }, /incentive-based/i)
-// hourly allows values above 100, percent does not
-const h = full(); h.before_shift = { type: 'hourly', value: 500 }
-assert.equal(validateSettings(h), null)
-// blank strings from inputs are not numbers
 err((s) => { s.monthly_tiers[0].earned_amount = '' }, /earned/i)
+err((s) => { s.monthly_tiers = Array.from({ length: 41 }, (_, i) => ({ salary: 1, earned_amount: i + 1, percent: 1 })) }, /40/)
+err((s) => { s.before_shift.value = 101 }, /before shift/i)
+err((s) => { s.after_shift.value = 101 }, /after shift/i)
+err((s) => { s.after_shift.value = -1 }, /after shift/i)
+err((s) => { s.before_shift.value = '' }, /before shift/i)
+err((s) => { s.incentive_staff_percent = 30 }, /unknown|not allowed|incentive_staff_percent/i)
+err((s) => { s.salary_overrides = [] }, /unknown|not allowed|salary_overrides/i)
+err((s) => { s.before_shift.type = 'percent' }, /unknown|not allowed|type/i)
+// same earned amount for a different salary is fine; exactly 40 rows is fine
+const ok40 = full(); ok40.monthly_tiers = Array.from({ length: 40 }, (_, i) => ({ salary: 1000 + i, earned_amount: 5, percent: 1 }))
+assert.equal(validateSettings(ok40), null)
+const diffSalary = full(); diffSalary.monthly_tiers[1] = { salary: 20000, earned_amount: 50000, percent: 5 }
+assert.equal(validateSettings(diffSalary), null)
 
-// old saved settings without the new arrays still validate
-const old = full(); delete old.salary_overrides; delete old.custom_rules
+// settings without custom_rules still validate
+const old = full(); delete old.custom_rules
 assert.equal(validateSettings(old), null)
-
-// salary overrides
-const E1 = '11111111-1111-4111-8111-111111111111', E2 = '22222222-2222-4222-8222-222222222222'
-const so = (arr) => { const s = full(); s.salary_overrides = arr; return validateSettings(s) }
-assert.equal(so([{ employee_id: E1, salary: 30000 }, { employee_id: E2, salary: 0 }]), null)
-assert.match(so([{ employee_id: E1, salary: 1 }, { employee_id: E1, salary: 2 }]) || '', /same employee/i)
-assert.match(so([{ employee_id: '', salary: 1 }]) || '', /employee/i)
-assert.match(so([{ employee_id: E1, salary: '' }]) || '', /salary/i)
-assert.match(so([{ employee_id: E1, salary: -1 }]) || '', /salary/i)
-assert.match(so([{ employee_id: E1, salary: 100000000 }]) || '', /salary/i)
-assert.match(so(Array.from({ length: 201 }, (_, i) => ({ employee_id: `e${i}`, salary: 1 }))) || '', /200/)
 
 // custom rules
 assert.deepEqual(WHO_OPTIONS.map((o) => o.value), ['normal', 'incentive', 'everyone'])
