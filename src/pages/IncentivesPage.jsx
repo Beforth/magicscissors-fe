@@ -702,6 +702,8 @@ function EmployeeDetail({ e }) {
       {services.length === 0 ? (
         <p className="text-sm text-muted-foreground">No services to show.</p>
       ) : (
+        <>
+        <p className="text-xs text-muted-foreground">Only services with a completed bill are listed.</p>
         <Table>
           <TableHeader>
             <TableRow>
@@ -729,9 +731,17 @@ function EmployeeDetail({ e }) {
             })}
           </TableBody>
         </Table>
+        </>
       )}
     </div>
   )
+}
+
+const monthLabel = (m) => {
+  const match = /^(\d{4})-(\d{2})$/.exec(m || '')
+  if (!match) return 'the month selected'
+  const name = new Date(Number(match[1]), Number(match[2]) - 1, 1).toLocaleString('en-US', { month: 'long' })
+  return `${name} ${match[1]}`
 }
 
 function ResultsCard() {
@@ -832,6 +842,10 @@ function ResultsCard() {
               <CardDescription className="mt-1.5">
                 What each employee earns for the month. Added to net pay in Payroll. Click a row to see the services.
               </CardDescription>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Counts completed services on completed bills (the same rule as Staff Performance), billed at{' '}
+                {branchId ? branchName : 'the branch selected above'} in {monthLabel(month)}.
+              </p>
             </div>
             <Button type="button" variant="outline" size="sm" disabled={employees.length === 0} onClick={exportCsv}>
               <Download className="h-4 w-4 mr-2" />
@@ -892,8 +906,8 @@ function ResultsCard() {
                             <div className="flex items-center gap-2 font-medium">
                               {e.full_name}
                             </div>
-                            {(e.warnings || []).map((w) => (
-                              <div key={w} className="text-xs text-warning">{w}</div>
+                            {(e.warnings || []).map((w, wi) => (
+                              <div key={`${wi}-${w}`} className="mt-1 max-w-md whitespace-normal break-words text-xs leading-snug text-warning">{w}</div>
                             ))}
                           </TableCell>
                           <TableCell>{e.pay_type ? PAY_TYPE_LABEL[e.pay_type] || e.pay_type : '—'}</TableCell>
