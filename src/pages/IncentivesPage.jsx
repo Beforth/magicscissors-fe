@@ -206,7 +206,7 @@ function ScopeFields({ pre, rule, showName, onChange }) {
           </Button>
         </div>
       )}
-      <p className="text-xs text-muted-foreground">{SCOPE_HINT}</p>
+      {showName && <p className="text-xs text-muted-foreground">{SCOPE_HINT}</p>}
     </div>
   )
 }
