@@ -113,7 +113,9 @@ export function describeCheckIn(record) {
       return { tone: 'destructive', label: `Late ${formatHours(late / 60)}`, detail: parts.join(' + ') }
     }
     const grace = legacy ? 15 : record.shift.grace_period
-    return { tone: 'warning', label: `Late ${formatHours(late / 60)} — within grace (${grace}m)`, detail: null }
+    const within = late <= Number(grace)
+    const label = `Late ${formatHours(late / 60)} — ${within ? 'within' : 'past'} grace (${grace}m)${within ? '' : ', no fine'}`
+    return { tone: 'warning', label, detail: null }
   }
   return { tone: 'success', label: 'On time', detail: null }
 }

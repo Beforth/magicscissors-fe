@@ -23,4 +23,10 @@ assert.equal(describeCheckIn(rec({ late_minutes: 70, late_penalty_hours: 1.5, la
 // profile (legacy) shift: 15 minute grace
 const legacy = rec({ shift: null, penalty_rule: 'legacy', late_minutes: 9 })
 assert.equal(describeCheckIn(legacy).label, 'Late 9m — within grace (15m)')
+// grace boundary: equal to grace is still within grace; past grace with no fine is not
+assert.match(describeCheckIn(rec({ late_minutes: 10 })).label, /within grace \(10m\)/)
+const past = describeCheckIn(rec({ late_minutes: 12 }))
+assert.doesNotMatch(past.label, /within grace/)
+assert.equal(past.tone, 'warning')
+assert.equal(past.label, 'Late 12m — past grace (10m), no fine')
 console.log('check-in status checks passed')
