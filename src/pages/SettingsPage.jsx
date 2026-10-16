@@ -3,11 +3,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { settingsService } from '@/services/settings.service'
+import { branchService } from '@/services/branch.service'
+import { cashService } from '@/services/cash.service'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { formatCurrency } from '@/lib/utils'
 import {
   Settings,
   Building2,
@@ -25,12 +36,183 @@ import {
   ArrowRight,
   Key,
   MapPin,
+  Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import AttendanceApiKeysPanel from '@/components/settings/AttendanceApiKeysPanel'
 import GeofencePanel from '@/components/settings/GeofencePanel'
 
+function StartingCashModal({ open, onOpenChange, branches = [] }) {
+  const queryClient = useQueryClient()
+  const [amounts, setAmounts] = useState({})
+  const [savingBranchId, setSavingBranchId] = useState(null)
+  const [savingAll, setSavingAll] = useState(false)
+
+  const { data: branchesData } = useQuery({
+    queryKey: ['branches'],
+    queryFn: () => branchService.getBranches({ is_active: 'true' }),
+    enabled: open && (!branches || branches.length === 0),
+  })
+
+  const effectiveBranches = (branches && branches.length > 0)
+    ? branches
+    : (branchesData?.data || []).map((b) => ({
+        id: b.branch_id,
+        name: b.name,
+        has_starting_cash_balance: false,
+        starting_cash_balance: null,
+      }))
+
+  useEffect(() => {
+    if (effectiveBranches && effectiveBranches.length > 0) {
+      const initial = {}
+      effectiveBranches.forEach((b) => {
+        initial[b.id] = b.starting_cash_balance != null ? String(b.starting_cash_balance) : ''
+      })
+      setAmounts(initial)
+    }
+  }, [effectiveBranches.length, open])
+
+  const handleAmountChange = (branchId, val) => {
+    setAmounts((prev) => ({ ...prev, [branchId]: val }))
+  }
+
+  const handleSaveBranch = async (branchId, branchName) => {
+    const rawVal = amounts[branchId]
+    if (rawVal === undefined || rawVal === '' || isNaN(parseFloat(rawVal))) {
+      toast.error('Please enter a valid amount')
+      return
+    }
+    const amount = parseFloat(rawVal)
+    if (amount < 0) {
+      toast.error('Amount cannot be negative')
+      return
+    }
+
+    try {
+      setSavingBranchId(branchId)
+      await cashService.setStartingBalance({
+        branch_id: branchId,
+        amount,
+      })
+      toast.success(`Opening cash balance set to ${formatCurrency(amount)} for ${branchName}`)
+      queryClient.invalidateQueries({ queryKey: ['setup-status'] })
+      queryClient.invalidateQueries({ queryKey: ['cash-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['branches'] })
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'Failed to save opening cash balance')
+    } finally {
+      setSavingBranchId(null)
+    }
+  }
+
+  const handleSaveAll = async () => {
+    try {
+      setSavingAll(true)
+      let savedCount = 0
+      for (const b of effectiveBranches) {
+        const rawVal = amounts[b.id]
+        if (rawVal !== undefined && rawVal !== '' && !isNaN(parseFloat(rawVal))) {
+          await cashService.setStartingBalance({
+            branch_id: b.id,
+            amount: parseFloat(rawVal),
+          })
+          savedCount++
+        }
+      }
+      if (savedCount > 0) {
+        toast.success('Opening cash balances saved successfully')
+        queryClient.invalidateQueries({ queryKey: ['setup-status'] })
+        queryClient.invalidateQueries({ queryKey: ['cash-summary'] })
+        queryClient.invalidateQueries({ queryKey: ['branches'] })
+        onOpenChange(false)
+      } else {
+        toast.error('Please enter an amount for at least one branch')
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message || 'Failed to save opening cash balance')
+    } finally {
+      setSavingAll(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Wallet className="h-5 w-5 text-primary" />
+            Set Up Opening Cash Balance
+          </DialogTitle>
+          <DialogDescription>
+            Enter the initial cash drawer float for each branch. This amount is used as the opening cash balance in Cash Reconciliation until daily cash counts are performed.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2">
+          {effectiveBranches.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">No active branches found</p>
+          ) : (
+            effectiveBranches.map((b) => (
+              <div key={b.id} className="p-3 border rounded-lg bg-gray-50/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-gray-900">{b.name}</span>
+                  {b.has_starting_cash_balance && b.starting_cash_balance != null && (
+                    <span className="text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded font-medium border border-green-200">
+                      Current: {formatCurrency(b.starting_cash_balance)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">₹</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      className="pl-7 bg-white"
+                      placeholder="e.g. 2000"
+                      value={amounts[b.id] ?? ''}
+                      onChange={(e) => handleAmountChange(b.id, e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={savingBranchId === b.id || savingAll}
+                    onClick={() => handleSaveBranch(b.id, b.name)}
+                  >
+                    {savingBranchId === b.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Save'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+          {effectiveBranches.length > 1 && (
+            <Button onClick={handleSaveAll} disabled={savingAll}>
+              {savingAll && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save All
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function SetupChecklist({ status, navigate, setActiveTab }) {
+  const [startingCashModalOpen, setStartingCashModalOpen] = useState(false)
+
   const items = [
     // Essential
     {
@@ -73,19 +255,25 @@ function SetupChecklist({ status, navigate, setActiveTab }) {
     {
       section: 'Recommended',
       key: 'starting_cash',
-      label: 'Starting Cash Balance',
+      label: 'Starting Cash Balance (Opening Float)',
       done: (() => {
         const details = status.branches?.details || []
         return details.length > 0 && details.every(b => b.has_starting_cash_balance)
       })(),
-      doneText: 'Set for all branches',
+      doneText: (() => {
+        const details = status.branches?.details || []
+        const balances = details
+          .filter(b => b.has_starting_cash_balance && b.starting_cash_balance != null)
+          .map(b => `${b.name}: ${formatCurrency(b.starting_cash_balance)}`)
+        return balances.length > 0 ? balances.join(' • ') : 'Set for all branches'
+      })(),
       pendingText: (() => {
         const details = status.branches?.details || []
         const missing = details.filter(b => !b.has_starting_cash_balance).length
         if (missing > 0) return `Not set for ${missing} branch${missing !== 1 ? 'es' : ''}`
         return 'Not configured'
       })(),
-      link: () => navigate('/cash-reconciliation'),
+      link: () => setStartingCashModalOpen(true),
     },
     // Optional
     {
@@ -192,7 +380,7 @@ function SetupChecklist({ status, navigate, setActiveTab }) {
                         )}
                       </div>
                     </div>
-                    {!item.done && (
+                    {!item.done ? (
                       <div className="flex-shrink-0 ml-4">
                         <Button
                           variant="outline"
@@ -204,7 +392,18 @@ function SetupChecklist({ status, navigate, setActiveTab }) {
                           <ArrowRight className="h-3 w-3 ml-1" />
                         </Button>
                       </div>
-                    )}
+                    ) : item.key === 'starting_cash' ? (
+                      <div className="flex-shrink-0 ml-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={item.link}
+                          className="whitespace-nowrap text-xs text-gray-700 hover:text-gray-900"
+                        >
+                          Edit
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 )
               })}
@@ -212,6 +411,12 @@ function SetupChecklist({ status, navigate, setActiveTab }) {
           </Card>
         )
       })}
+
+      <StartingCashModal
+        open={startingCashModalOpen}
+        onOpenChange={setStartingCashModalOpen}
+        branches={status.branches?.details || []}
+      />
     </div>
   )
 }

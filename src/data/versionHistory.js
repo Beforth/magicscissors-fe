@@ -1,6 +1,26 @@
-export const CURRENT_VERSION = 'v2.13.0'
+export const CURRENT_VERSION = 'v2.14.0'
 
 export const versionHistory = [
+  {
+    version: 'v2.14.0',
+    date: 'Oct 2026',
+    title: 'Opening Cash Balance Setup',
+    highlights: [
+      'Set and update the opening cash balance (starting drawer float) per branch directly from Settings',
+      'Opening Balance remains strictly read-only on Cash Reconciliation and other operational pages',
+      'Daily cash drawer counts automatically carry forward into the next day opening balance',
+    ],
+    details: [
+      {
+        section: 'Settings & Cash Drawer',
+        items: [
+          'Setup checklist in Settings includes dedicated modal to configure starting cash balance per branch',
+          'Opening balance card in Cash Reconciliation accurately reflects the configured starting balance or prior day actual count',
+          'Opening balance is completely non-editable on operational screens for drawer integrity',
+        ],
+      },
+    ],
+  },
   {
     version: 'v2.13.0',
     date: 'Oct 2026',

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSelector } from 'react-redux'
 import { cashService } from '@/services/cash.service'
@@ -31,6 +31,7 @@ import {
   Receipt,
   ArrowDownCircle,
   ArrowUpCircle,
+  Pencil,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -54,9 +55,13 @@ function CashReconciliationPage() {
   const canSeeRevenue = isOwner
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
-  const [selectedBranch, setSelectedBranch] = useState(user?.branchId || '')
+  const [selectedBranch, setSelectedBranch] = useState(isOwner ? 'all' : (user?.branchId || ''))
+  const [modalBranch, setModalBranch] = useState('')
   const [showReconcileModal, setShowReconcileModal] = useState(false)
   const [showDepositModal, setShowDepositModal] = useState(false)
+  const [showStartingBalanceModal, setShowStartingBalanceModal] = useState(false)
+  const [startingBalanceAmount, setStartingBalanceAmount] = useState('')
+  const [startingBalanceBranch, setStartingBalanceBranch] = useState('')
   const [denominations, setDenominations] = useState({})
   const [reconcileNotes, setReconcileNotes] = useState('')
   const [depositData, setDepositData] = useState({
@@ -66,6 +71,15 @@ function CashReconciliationPage() {
     reference_number: '',
     notes: '',
   })
+
+  // Ensure default branch is set when user data is ready
+  useEffect(() => {
+    if (isOwner && !selectedBranch) {
+      setSelectedBranch('all')
+    } else if (!isOwner && user?.branchId && !selectedBranch) {
+      setSelectedBranch(user.branchId)
+    }
+  }, [isOwner, user?.branchId, selectedBranch])
 
   // Fetch branches for owner
   const { data: branchesData } = useQuery({
@@ -77,13 +91,17 @@ function CashReconciliationPage() {
   const branches = branchesData?.data || []
 
   // Fetch daily cash summary
+  const effectiveBranchId = isOwner ? (selectedBranch || 'all') : (user?.branchId || selectedBranch || '')
+
   const { data: summaryData, isLoading, refetch } = useQuery({
-    queryKey: ['cash-summary', selectedDate, selectedBranch || user?.branchId],
+    queryKey: ['cash-summary', selectedDate, effectiveBranchId],
     queryFn: () => cashService.getDailySummary({
       date: selectedDate,
-      branch_id: selectedBranch || user?.branchId,
+      branch_id: effectiveBranchId,
     }),
-    enabled: !!(selectedBranch || user?.branchId),
+    enabled: !!effectiveBranchId,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 
   const summary = summaryData?.data
@@ -129,11 +147,24 @@ function CashReconciliationPage() {
     },
   })
 
+  // Starting cash balance mutation
+  const startingBalanceMutation = useMutation({
+    mutationFn: cashService.setStartingBalance,
+    onSuccess: (data) => {
+      toast.success(`Starting cash balance set to ${formatCurrency(data.data.starting_cash_balance)}`)
+      queryClient.invalidateQueries({ queryKey: ['cash-summary'] })
+      queryClient.invalidateQueries({ queryKey: ['branches'] })
+      setShowStartingBalanceModal(false)
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error?.message || 'Failed to set starting cash balance')
+    },
+  })
+
   const resetDenominations = () => {
     setDenominations({})
     setReconcileNotes('')
   }
-
   const handleDenominationChange = (denom, count) => {
     setDenominations(prev => ({
       ...prev,
@@ -147,10 +178,52 @@ function CashReconciliationPage() {
     }, 0)
   }
 
+  const openReconcileModal = () => {
+    const defaultBranch = (selectedBranch && selectedBranch !== 'all') ? selectedBranch : (branches[0]?.branch_id || user?.branchId || '')
+    setModalBranch(defaultBranch)
+    setShowReconcileModal(true)
+  }
+
+  const openDepositModal = () => {
+    const defaultBranch = (selectedBranch && selectedBranch !== 'all') ? selectedBranch : (branches[0]?.branch_id || user?.branchId || '')
+    setModalBranch(defaultBranch)
+    setShowDepositModal(true)
+  }
+
+  const openStartingBalanceModal = () => {
+    const defaultBranch = (selectedBranch && selectedBranch !== 'all') ? selectedBranch : (branches[0]?.branch_id || user?.branchId || '')
+    setStartingBalanceBranch(defaultBranch)
+    setStartingBalanceAmount(
+      summary?.starting_cash_balance != null ? String(summary.starting_cash_balance) : ''
+    )
+    setShowStartingBalanceModal(true)
+  }
+
+  const handleSetStartingBalance = () => {
+    const targetBranch = startingBalanceBranch || (selectedBranch && selectedBranch !== 'all' ? selectedBranch : (branches[0]?.branch_id || user?.branchId))
+    if (!targetBranch) {
+      toast.error('Please select a branch')
+      return
+    }
+    if (startingBalanceAmount === '' || isNaN(parseFloat(startingBalanceAmount))) {
+      toast.error('Please enter a valid amount')
+      return
+    }
+    startingBalanceMutation.mutate({
+      branch_id: targetBranch,
+      amount: parseFloat(startingBalanceAmount),
+    })
+  }
+
   const handleReconcile = () => {
+    const targetBranch = modalBranch || (selectedBranch && selectedBranch !== 'all' ? selectedBranch : (branches[0]?.branch_id || user?.branchId))
+    if (!targetBranch) {
+      toast.error('Please select a branch to reconcile')
+      return
+    }
     const actualCash = calculateTotalCash()
     reconcileMutation.mutate({
-      branch_id: selectedBranch || user?.branchId,
+      branch_id: targetBranch,
       date: selectedDate,
       actual_cash: actualCash,
       denominations,
@@ -159,12 +232,17 @@ function CashReconciliationPage() {
   }
 
   const handleDeposit = () => {
+    const targetBranch = modalBranch || (selectedBranch && selectedBranch !== 'all' ? selectedBranch : (branches[0]?.branch_id || user?.branchId))
+    if (!targetBranch) {
+      toast.error('Please select a branch to record deposit')
+      return
+    }
     if (!depositData.bank_name || !depositData.amount) {
       toast.error('Bank name and amount are required')
       return
     }
     depositMutation.mutate({
-      branch_id: selectedBranch || user?.branchId,
+      branch_id: targetBranch,
       date: selectedDate,
       ...depositData,
       amount: parseFloat(depositData.amount),
@@ -183,11 +261,11 @@ function CashReconciliationPage() {
           <p className="text-gray-500">End of day cash drawer balancing</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={() => setShowDepositModal(true)}>
+          <Button variant="outline" onClick={openDepositModal}>
             <Building className="h-4 w-4 mr-2" />
             Bank Deposit
           </Button>
-          <Button onClick={() => setShowReconcileModal(true)}>
+          <Button onClick={openReconcileModal}>
             <Calculator className="h-4 w-4 mr-2" />
             Count Cash
           </Button>
@@ -212,10 +290,10 @@ function CashReconciliationPage() {
                 <Label className="mb-2 block">Branch</Label>
                 <select
                   className="h-10 px-3 border rounded-md min-w-[180px]"
-                  value={selectedBranch}
+                  value={selectedBranch || 'all'}
                   onChange={(e) => setSelectedBranch(e.target.value)}
                 >
-                  <option value="">Select Branch</option>
+                  <option value="all">All Branches</option>
                   {branches.map((branch) => (
                     <option key={branch.branch_id} value={branch.branch_id}>
                       {branch.name}
@@ -252,12 +330,25 @@ function CashReconciliationPage() {
                     <div className="p-3 bg-gray-100 rounded-lg">
                       <Wallet className="h-6 w-6 text-gray-600" />
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm text-gray-600">Opening Balance</p>
                       <p className="text-2xl font-bold text-gray-700">
                         {formatCurrency(summary.opening_balance || 0)}
                       </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {summary.starting_cash_balance != null
+                          ? `Starting balance: ${formatCurrency(summary.starting_cash_balance)}`
+                          : 'Starting balance not set'}
+                      </p>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Set starting cash balance"
+                      onClick={openStartingBalanceModal}
+                    >
+                      <Pencil className="h-4 w-4 text-gray-500" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -289,7 +380,7 @@ function CashReconciliationPage() {
                     <div>
                       <p className="text-sm text-blue-600">Cash Sales</p>
                       <p className="text-2xl font-bold text-blue-700">
-                        {formatCurrency(summary.payment_breakdown.cash)}
+                        {formatCurrency(summary.payment_breakdown?.cash || 0)}
                       </p>
                     </div>
                   </div>
@@ -343,7 +434,7 @@ function CashReconciliationPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {Object.entries(summary.payment_breakdown).map(([mode, amount]) => {
+                  {summary.payment_breakdown && Object.entries(summary.payment_breakdown).map(([mode, amount]) => {
                     const icons = {
                       cash: Banknote,
                       card: CreditCard,
@@ -358,22 +449,42 @@ function CashReconciliationPage() {
                       : 0
 
                     return (
-                      <div key={mode} className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Icon className="h-5 w-5 text-gray-400" />
-                          <span className="capitalize">{mode.replace('_', ' ')}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary rounded-full"
-                              style={{ width: `${percentage}%` }}
-                            />
+                      <div key={mode} className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Icon className="h-5 w-5 text-gray-400" />
+                            <span className="capitalize">{mode.replace('_', ' ')}</span>
                           </div>
-                          <span className="font-bold w-24 text-right">
-                            {formatCurrency(amount)}
-                          </span>
+                          <div className="flex items-center gap-3">
+                            <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary rounded-full"
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                            <span className="font-bold w-24 text-right">
+                              {formatCurrency(amount)}
+                            </span>
+                          </div>
                         </div>
+
+                        {mode === 'upi' && summary.upi_accounts_breakdown?.some((acc) => acc.total_amount > 0) && (
+                          <div className="ml-8 pl-3 border-l-2 border-gray-100 space-y-1 text-xs text-gray-500 pt-0.5">
+                            {summary.upi_accounts_breakdown
+                              .filter((acc) => acc.total_amount > 0)
+                              .map((acc) => (
+                                <div key={acc.account_id || acc.account_name} className="flex justify-between items-center py-0.5">
+                                  <span>
+                                    {acc.account_name}
+                                    {acc.branch_name && (!selectedBranch || selectedBranch === 'all') && (
+                                      <span className="text-[10px] text-gray-400 ml-1">({acc.branch_name})</span>
+                                    )}
+                                  </span>
+                                  <span className="font-medium text-gray-700">{formatCurrency(acc.total_amount)}</span>
+                                </div>
+                              ))}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -526,6 +637,22 @@ function CashReconciliationPage() {
           </DialogHeader>
 
           <div className="space-y-6">
+            {isOwner && (!selectedBranch || selectedBranch === 'all') && branches.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="reconcile_branch">Branch *</Label>
+                <select
+                  id="reconcile_branch"
+                  className="h-10 px-3 border rounded-md w-full bg-white text-sm"
+                  value={modalBranch}
+                  onChange={(e) => setModalBranch(e.target.value)}
+                >
+                  {branches.map((b) => (
+                    <option key={b.branch_id} value={b.branch_id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Denomination Counter */}
             <div>
               <Label className="mb-3 block">Enter denomination counts</Label>
@@ -641,6 +768,22 @@ function CashReconciliationPage() {
           </DialogHeader>
 
           <div className="space-y-4">
+            {isOwner && (!selectedBranch || selectedBranch === 'all') && branches.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="deposit_branch">Branch *</Label>
+                <select
+                  id="deposit_branch"
+                  className="h-10 px-3 border rounded-md w-full bg-white text-sm"
+                  value={modalBranch}
+                  onChange={(e) => setModalBranch(e.target.value)}
+                >
+                  {branches.map((b) => (
+                    <option key={b.branch_id} value={b.branch_id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="bank_name">Bank Name *</Label>
               <Input
@@ -705,6 +848,69 @@ function CashReconciliationPage() {
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
               Record Deposit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Starting Cash Balance Modal */}
+      <Dialog open={showStartingBalanceModal} onOpenChange={setShowStartingBalanceModal}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5" />
+              Starting Cash Balance
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {(!selectedBranch || selectedBranch === 'all') && branches.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="starting_balance_branch">Branch *</Label>
+                <select
+                  id="starting_balance_branch"
+                  className="h-10 px-3 border rounded-md w-full bg-white text-sm"
+                  value={startingBalanceBranch}
+                  onChange={(e) => setStartingBalanceBranch(e.target.value)}
+                >
+                  {branches.map((b) => (
+                    <option key={b.branch_id} value={b.branch_id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="starting_balance_amount">Amount *</Label>
+              <Input
+                id="starting_balance_amount"
+                type="number"
+                min="0"
+                value={startingBalanceAmount}
+                onChange={(e) => setStartingBalanceAmount(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+
+            <p className="text-xs text-gray-500">
+              This is the cash already in the drawer for this branch. It is used as the opening
+              balance only until the branch&apos;s first reconciliation; after that the opening
+              balance carries forward from the last reconciliation.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowStartingBalanceModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSetStartingBalance}
+              disabled={startingBalanceMutation.isPending}
+            >
+              {startingBalanceMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -115,6 +115,7 @@ function BillDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bills'] })
       queryClient.invalidateQueries({ queryKey: ['chairs'] })
+      queryClient.invalidateQueries({ queryKey: ['cash-summary'] })
       goBack()
     },
   })
@@ -177,6 +178,7 @@ function BillDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['bill', id] })
       queryClient.invalidateQueries({ queryKey: ['bills'] })
       queryClient.invalidateQueries({ queryKey: ['employee-status'] })
+      queryClient.invalidateQueries({ queryKey: ['cash-summary'] })
       setEditModalOpen(false)
       toast.success('Bill updated')
     },

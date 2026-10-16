@@ -82,6 +82,7 @@ function CompleteBillModal({ open, onOpenChange, bill }) {
       queryClient.invalidateQueries({ queryKey: ['open-containers'] })
       queryClient.invalidateQueries({ queryKey: ['employee-status'] })
       queryClient.invalidateQueries({ queryKey: ['rotation-queue'] })
+      queryClient.invalidateQueries({ queryKey: ['cash-summary'] })
       onOpenChange(false)
     },
     onError: (error) => {
