@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowRightLeft, BadgeIndianRupee, BarChart3, BoxesIcon, Droplets, Landmark, Package, Scissors, Star, TrendingDown, Users, Warehouse, Wallet,
+  ArrowRightLeft, BadgeIndianRupee, BarChart3, BoxesIcon, CalendarCheck, CalendarDays, Droplets, Landmark, Package, Scissors, Star, TrendingDown, Users, Warehouse, Wallet,
 } from 'lucide-react'
 import { branchService } from '@/services/branch.service'
 import { Empty, Panel } from '@/components/reports/ReportKit'
@@ -11,6 +11,8 @@ import { PRESETS, istTodayStr, presetOf, rangeFor, rangeLabel } from '@/componen
 import SalesReport from '@/components/reports/SalesReport'
 import CustomersReport from '@/components/reports/CustomersReport'
 import StaffReport from '@/components/reports/StaffReport'
+import AttendanceDailyReport from '@/components/reports/AttendanceDailyReport'
+import AttendanceSummaryReport from '@/components/reports/AttendanceSummaryReport'
 import CatalogReport from '@/components/reports/CatalogReport'
 import ProfitLossReport from '@/components/reports/ProfitLossReport'
 import LegacyReports from '@/components/reports/LegacyReports'
@@ -25,6 +27,8 @@ const REPORTS = [
   { id: 'pl', group: 'Sales', label: 'Profit & loss', hint: 'Revenue against expenses', icon: Landmark, roles: OWNER, range: true, branch: 'optional', Comp: ProfitLossReport },
   { id: 'customers', group: 'People', label: 'Customers', hint: 'New, returning, win-back list', icon: Users, roles: MGR, range: true, branch: 'optional', Comp: CustomersReport },
   { id: 'staff', group: 'People', label: 'Staff', hint: 'Services and revenue per employee', icon: Star, roles: MGR, range: true, branch: 'optional', Comp: StaffReport },
+  { id: 'attendance-daily', group: 'People', label: 'Daily attendance', hint: 'Who is in, late or absent on one day', icon: CalendarCheck, roles: MGR, range: true, day: true, branch: 'optional', Comp: AttendanceDailyReport },
+  { id: 'attendance-summary', group: 'People', label: 'Attendance summary', hint: 'Days present, late, absent and overtime per person', icon: CalendarDays, roles: MGR, range: true, branch: 'optional', Comp: AttendanceSummaryReport },
   { id: 'catalog', group: 'Catalog', label: 'Services & products', hint: 'What sells, what is slowing', icon: Scissors, roles: MGR, range: true, branch: 'optional', Comp: CatalogReport },
   { id: 'inventory', group: 'Stock', label: 'Stock levels', hint: 'Low stock and expiring items', icon: Package, roles: MGR, range: false, branch: 'none', legacy: true },
   { id: 'stock-snapshot', group: 'Stock', label: 'Stock value', hint: 'Value of stock at every location', icon: BoxesIcon, roles: OWNER, range: false, branch: 'none', legacy: true },
@@ -136,11 +140,20 @@ export default function ReportsPage() {
           <div className="rounded-2xl border bg-card p-4">
             <div className="mb-3">
               <h2 className="text-lg font-bold">{active.label}</h2>
-              <p className="text-sm text-muted-foreground">{active.hint}{active.range ? ` · ${rangeLabel(from, to)}` : ''}</p>
+              <p className="text-sm text-muted-foreground">{active.hint}{active.range ? ` · ${active.day ? to : rangeLabel(from, to)}` : ''}</p>
             </div>
             {(active.range || showBranchPicker) && (
               <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-                {active.range && (
+                {active.range && active.day && (
+                  <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Day">
+                    {[['Today', today], ['Yesterday', new Date(new Date(`${today}T00:00:00Z`).getTime() - 86400000).toISOString().slice(0, 10)]].map(([label, d]) => (
+                      <button key={label} type="button" onClick={() => set({ from: d, to: d })} aria-pressed={to === d}
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${to === d ? 'border-primary bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-accent'}`}>{label}</button>
+                    ))}
+                    <input type="date" aria-label="Day" value={to} max={today} onChange={(e) => e.target.value && set({ from: e.target.value, to: e.target.value })} className="h-8 rounded-md border bg-background px-2 text-xs" />
+                  </div>
+                )}
+                {active.range && !active.day && (
                   <>
                     <div className="flex flex-wrap gap-1.5" role="group" aria-label="Date range">
                       {PRESETS.map((p) => (
