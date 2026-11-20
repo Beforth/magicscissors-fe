@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { reportsService } from '@/services/reports.service'
-import { DataTable, Empty, ExportMenu, Kpi, Panel, ReportError, ReportLoading } from './ReportKit'
+import { DataTable, Empty, ExportMenu, Kpi, Panel, PrintButton, ReportError, ReportLoading } from './ReportKit'
 import { DaysDrawer } from './AttendanceBits'
 
 /** A range, one line per person. Every number opens the days behind it. */
-export default function AttendanceSummaryReport({ from, to, branchId }) {
+export default function AttendanceSummaryReport({ from, to, branchId, branchName }) {
   const [drill, setDrill] = useState(null)
   const [q, setQ] = useState('')
   const { data, isLoading, error, refetch } = useQuery({
@@ -24,6 +24,13 @@ export default function AttendanceSummaryReport({ from, to, branchId }) {
     : <span className="text-muted-foreground">—</span>)
   const exportRows = data.rows.map((r) => ({ name: r.name, employee_code: r.employee_code || '', present: r.present, late: r.late, half_day: r.half_day, leave: r.leave, absent: r.absent, avg_check_in: r.avg_check_in || '', worked_hours: r.hours, overtime_hours: r.overtime_hours, late_fine: r.late_amount, late_hours_off: r.late_hours, break_minutes: r.break_minutes }))
 
+  const printRows = shown.map((r) => ({
+    employee: r.name, code: r.employee_code || '', present: r.present, late: r.late, half_day: r.half_day, leave: r.leave, absent: r.absent,
+    not_marked: r.unmarked, avg_in: r.avg_check_in || '', worked_h: r.hours, overtime_h: r.overtime_hours, late_fine: r.late_amount ? `Rs ${r.late_amount}` : '',
+  }))
+  const printHeaders = ['Employee', 'Code', 'Present', 'Late', 'Half day', 'Leave', 'Absent', 'Not marked', 'Avg in', 'Worked h', 'Overtime h', 'Late fine']
+  const printSummary = [['Staff', t.staff], ['Present days', t.present], ['Late days', t.late], ['Half days', t.half_day], ['Absent days', t.absent], ['Not marked', t.unmarked], ['Hours worked', t.hours]].map(([label, value]) => ({ label, value: String(value) }))
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -40,6 +47,7 @@ export default function AttendanceSummaryReport({ from, to, branchId }) {
         action={
           <div className="flex items-center gap-2">
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or code" aria-label="Search" className="h-8 w-44 rounded-md border bg-background px-2 text-xs" />
+            <PrintButton rows={printRows} headers={printHeaders} title="Attendance summary" subtitle={`${from} to ${to} · ${branchName || 'All branches'}`} summary={printSummary} />
             <ExportMenu rows={exportRows} filename={`attendance-summary-${from}-to-${to}`} title={`Attendance summary ${from} to ${to}`} />
           </div>
         }

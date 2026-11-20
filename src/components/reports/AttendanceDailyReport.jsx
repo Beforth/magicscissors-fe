@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { reportsService } from '@/services/reports.service'
-import { DataTable, Empty, ExportMenu, Kpi, Panel, ReportError, ReportLoading } from './ReportKit'
+import { DataTable, Empty, ExportMenu, Kpi, Panel, PrintButton, ReportError, ReportLoading } from './ReportKit'
 import { KIND_LABEL, KindBadge, hhmm, shiftLabel } from './AttendanceBits'
 import DayEditor from './DayEditor'
 
 /** One day, everyone. `to` is the chosen day. */
-export default function AttendanceDailyReport({ to: date, branchId }) {
+export default function AttendanceDailyReport({ to: date, branchId, branchName }) {
   const [q, setQ] = useState('')
   const [only, setOnly] = useState(null)
   const [edit, setEdit] = useState(null)
@@ -27,6 +27,16 @@ export default function AttendanceDailyReport({ to: date, branchId }) {
   const rank = { unmarked: 0, absent: 1, leave: 2, half_day: 3, present: 4 }
   const exportRows = data.rows.map((r) => ({ name: r.name, employee_code: r.employee_code || '', branch: r.branch || '', shift: shiftLabel(r.shift || r.planned_shift), status: KIND_LABEL[r.kind] + (r.late ? ' (late)' : ''), check_in: hhmm(r.check_in), check_out: hhmm(r.check_out), worked_hours: r.hours, overtime_hours: r.overtime_hours, late_fine: r.late_amount, late_hours_off: r.late_hours, break_minutes: r.break_minutes }))
 
+  // What is printed is what is on screen (search / tile filter included), in plain words.
+  const printRows = shown.map((r) => ({
+    employee: r.name, code: r.employee_code || '', branch: r.branch || '', shift: shiftLabel(r.shift || r.planned_shift) || '',
+    status: KIND_LABEL[r.kind] + (r.late ? ' (late)' : ''), in: hhmm(r.check_in) || '', out: hhmm(r.check_out) || '',
+    worked_h: r.hours || '', overtime_h: r.overtime_hours || '', late_fine: r.late_amount ? `Rs ${r.late_amount}` : '',
+  }))
+  const printHeaders = ['Employee', 'Code', 'Branch', 'Shift', 'Status', 'In', 'Out', 'Worked h', 'Overtime h', 'Late fine']
+  const printSummary = [['Present', t.present], ['Late', t.late], ['Half day', t.half_day], ['On leave', t.leave], ['Absent', t.absent], ['Not marked', t.unmarked], ['Staff', t.staff]].map(([label, value]) => ({ label, value: String(value) }))
+  const longDate = new Date(`${date}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -43,6 +53,7 @@ export default function AttendanceDailyReport({ to: date, branchId }) {
         action={
           <div className="flex items-center gap-2">
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or code" aria-label="Search" className="h-8 w-44 rounded-md border bg-background px-2 text-xs" />
+            <PrintButton rows={printRows} headers={printHeaders} title="Daily attendance" subtitle={`${longDate} · ${branchName || 'All branches'}${only ? ` · ${KIND_LABEL[only]} only` : ''}`} summary={printSummary} />
             <ExportMenu rows={exportRows} filename={`attendance-${date}`} title={`Attendance ${date}`} />
           </div>
         }

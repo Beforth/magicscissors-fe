@@ -192,7 +192,7 @@ export default function ReportsPage() {
           ) : active.legacy ? (
             <LegacyReports activeReport={active.id} selectedBranch={branchId} startDate={from} endDate={to} />
           ) : (
-            <active.Comp key={`${active.id}-${from}-${to}-${branchId}`} from={from} to={to} branchId={branchId} />
+            <active.Comp key={`${active.id}-${from}-${to}-${branchId}`} from={from} to={to} branchId={branchId} branchName={allBranches.find((b) => b.id === branchId)?.name || 'All branches'} />
           )}
         </div>
       </div>

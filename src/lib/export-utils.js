@@ -166,6 +166,7 @@ export function exportToPDF(data, filename, options = {}) {
     columns,
     headers,
     summaryCards = [],
+    landscape = false,
     dateGenerated = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }),
   } = options
 
@@ -269,7 +270,7 @@ export function exportToPDF(data, filename, options = {}) {
     @media print {
       body { padding: 0; }
       .no-print { display: none; }
-      @page { margin: 1cm; }
+      @page { margin: 1cm; ${landscape ? 'size: landscape;' : ''} }
     }
   </style>
 </head>

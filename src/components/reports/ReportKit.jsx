@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, ArrowDownRight, ArrowUpRight, ChevronDown, Download, FileSpreadsheet, FileText, Minus } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowDownRight, ArrowUpRight, ChevronDown, Download, FileSpreadsheet, FileText, Minus, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { exportToCSV, exportToExcel, exportToPDF } from '@/lib/export-utils'
@@ -159,6 +159,17 @@ export function DataTable({ columns, rows, rowKey, onRowClick, defaultSort, empt
         )}
       </table>
     </div>
+  )
+}
+
+/** A visible Print button: opens a clean print page (use the browser's "Save as PDF" to keep a copy). */
+export function PrintButton({ rows, headers, columns, title, subtitle, summary = [], landscape = true }) {
+  if (!rows || rows.length === 0) return null
+  return (
+    <Button variant="outline" size="sm" onClick={() => exportToPDF(rows, title, { title, subtitle, columns, headers, summaryCards: summary, landscape })}>
+      <Printer className="mr-2 h-4 w-4" />
+      Print
+    </Button>
   )
 }
 
