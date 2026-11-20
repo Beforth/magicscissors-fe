@@ -22,6 +22,7 @@ import { Kbd } from '@/components/ui/kbd'
 import { Link } from 'react-router-dom'
 import { formatDeduction, formatLate as formatLateMin } from '@/lib/attendanceDay'
 import PunchMeta from '@/components/attendance/PunchMeta'
+import OrphanPunchesPanel from '@/components/attendance/OrphanPunchesPanel'
 import { attendanceService } from '@/services/attendance.service'
 import { branchService } from '@/services/branch.service'
 import { machineService } from '@/services/machine.service'
@@ -597,6 +598,7 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-6">
+      {['owner', 'developer'].includes(user?.role) && <OrphanPunchesPanel />}
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

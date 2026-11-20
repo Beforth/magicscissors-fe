@@ -11,6 +11,9 @@ export const reportsService = {
   hubStaff: (params) => api.get('/reports/hub/staff', { params }),
   hubCatalog: (params) => api.get('/reports/hub/catalog', { params }),
   hubProfitLoss: (params) => api.get('/reports/hub/profit-loss', { params }),
+  hubAttendanceDaily: (params) => api.get('/reports/hub/attendance/daily', { params }),
+  hubAttendanceSummary: (params) => api.get('/reports/hub/attendance/summary', { params }),
+  hubAttendanceDays: (params) => api.get('/reports/hub/attendance/days', { params }),
 
   getDailySales: (params) => api.get('/reports/daily-sales', { params }),
 
