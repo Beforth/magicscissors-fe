@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { reportsService } from '@/services/reports.service'
 import { Empty, ReportError, ReportLoading } from './ReportKit'
+import DayEditor from './DayEditor'
 
 export const KIND_LABEL = { present: 'Present', half_day: 'Half day', leave: 'On leave', absent: 'Absent', unmarked: 'Not marked' }
 export const KIND_TONE = {
@@ -13,7 +14,7 @@ export const KIND_TONE = {
   unmarked: 'bg-muted text-muted-foreground',
 }
 export const DRILL_TITLE = {
-  present: 'Present days', late: 'Late days', half_day: 'Half days', leave: 'Days on leave', absent: 'Absent days', overtime: 'Overtime days',
+  unmarked: 'Days with no record', present: 'Present days', late: 'Late days', half_day: 'Half days', leave: 'Days on leave', absent: 'Absent days', overtime: 'Overtime days',
 }
 
 /** "Morning 09:00-18:00", "09:00-20:00" or "Flexible" for the shift an attendance row belongs to. */
@@ -32,13 +33,14 @@ export function KindBadge({ row }) {
   )
 }
 
-/** Right-hand drawer: the days behind one number of the summary, for one person. Read-only; fix times on the Attendance page. */
+/** Right-hand drawer: the days behind one number of the summary, for one person. Each day has an Edit button to fix times or mark the day. */
 export function DaysDrawer({ employeeId, name, kind, from, to, branchId, onClose }) {
+  const [edit, setEdit] = useState(null)
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose()
+    const onKey = (e) => e.key === 'Escape' && !edit && onClose()
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, edit])
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['hub-attendance', 'days', employeeId, kind, from, to, branchId],
     queryFn: () => reportsService.hubAttendanceDays({ employee_id: employeeId, kind, start_date: from, end_date: to, branch_id: branchId || undefined }).then((r) => r.data),
@@ -61,7 +63,10 @@ export function DaysDrawer({ employeeId, name, kind, from, to, branchId, onClose
                 <li key={`${d.date}-${d.branch_id}`} className="rounded-lg border p-3 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-semibold">{longDate(d.date)}</span>
-                    <KindBadge row={d} />
+                    <span className="flex items-center gap-2">
+                      <KindBadge row={d} />
+                      <button type="button" onClick={() => setEdit(d)} className="rounded-md border px-2 py-0.5 text-xs font-semibold hover:bg-accent">Edit</button>
+                    </span>
                   </div>
                   <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
                     <span>In: <b className="text-foreground">{hhmm(d.check_in) || '—'}</b></span>
@@ -80,6 +85,7 @@ export function DaysDrawer({ employeeId, name, kind, from, to, branchId, onClose
           )}
         </div>
       </aside>
+      {edit && <DayEditor employeeId={employeeId} name={name} date={edit.date} row={edit} onClose={() => setEdit(null)} />}
     </div>
   )
 }

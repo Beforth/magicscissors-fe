@@ -36,7 +36,7 @@ export default function AttendanceSummaryReport({ from, to, branchId }) {
       </div>
       <Panel
         title="Attendance summary"
-        subtitle="Click any number to see the days behind it. Days the system closed because nobody punched count as absent."
+        subtitle="Click any number to see the days behind it and fix them. 'Not marked' = days with no record. Days the system closed because nobody punched count as absent."
         action={
           <div className="flex items-center gap-2">
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or code" aria-label="Search" className="h-8 w-44 rounded-md border bg-background px-2 text-xs" />
@@ -57,6 +57,7 @@ export default function AttendanceSummaryReport({ from, to, branchId }) {
               { key: 'half_day', label: 'Half day', align: 'right', render: cell('half_day', 'half_day') },
               { key: 'leave', label: 'Leave', align: 'right', render: cell('leave', 'leave') },
               { key: 'absent', label: 'Absent', align: 'right', render: cell('absent', 'absent') },
+              { key: 'unmarked', label: 'Not marked', align: 'right', render: cell('unmarked', 'unmarked') },
               { key: 'avg_check_in', label: 'Avg in', align: 'right', render: (r) => r.avg_check_in || '—' },
               { key: 'hours', label: 'Worked h', align: 'right' },
               { key: 'overtime_hours', label: 'Overtime h', align: 'right', render: cell('overtime', 'overtime_hours') },

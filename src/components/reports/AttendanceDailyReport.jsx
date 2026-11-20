@@ -3,10 +3,13 @@ import { useQuery } from '@tanstack/react-query'
 import { reportsService } from '@/services/reports.service'
 import { DataTable, Empty, ExportMenu, Kpi, Panel, ReportError, ReportLoading } from './ReportKit'
 import { KIND_LABEL, KindBadge, hhmm, shiftLabel } from './AttendanceBits'
+import DayEditor from './DayEditor'
 
 /** One day, everyone. `to` is the chosen day. */
 export default function AttendanceDailyReport({ to: date, branchId }) {
   const [q, setQ] = useState('')
+  const [only, setOnly] = useState(null)
+  const [edit, setEdit] = useState(null)
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['hub-attendance', 'daily', date, branchId],
     queryFn: () => reportsService.hubAttendanceDaily({ date, branch_id: branchId || undefined }).then((r) => r.data),
@@ -16,7 +19,11 @@ export default function AttendanceDailyReport({ to: date, branchId }) {
 
   const t = data.totals
   const needle = q.trim().toLowerCase()
-  const shown = needle ? data.rows.filter((r) => `${r.name} ${r.employee_code || ''}`.toLowerCase().includes(needle)) : data.rows
+  const byKind = only ? data.rows.filter((r) => r.kind === only) : data.rows
+  const shown = needle ? byKind.filter((r) => `${r.name} ${r.employee_code || ''}`.toLowerCase().includes(needle)) : byKind
+  const tile = (kind, node) => (
+    <button type="button" onClick={() => setOnly(only === kind ? null : kind)} aria-pressed={only === kind} title="Click to show only these" className={`rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${only === kind ? 'ring-2 ring-primary' : ''}`}>{node}</button>
+  )
   const rank = { unmarked: 0, absent: 1, leave: 2, half_day: 3, present: 4 }
   const exportRows = data.rows.map((r) => ({ name: r.name, employee_code: r.employee_code || '', branch: r.branch || '', shift: shiftLabel(r.shift || r.planned_shift), status: KIND_LABEL[r.kind] + (r.late ? ' (late)' : ''), check_in: hhmm(r.check_in), check_out: hhmm(r.check_out), worked_hours: r.hours, overtime_hours: r.overtime_hours, late_fine: r.late_amount, late_hours_off: r.late_hours, break_minutes: r.break_minutes }))
 
@@ -26,13 +33,13 @@ export default function AttendanceDailyReport({ to: date, branchId }) {
         <Kpi label="Present" value={t.present} hint={t.late ? `${t.late} of them late` : undefined} />
         <Kpi label="Half day" value={t.half_day} />
         <Kpi label="On leave" value={t.leave} />
-        <Kpi label="Absent" value={t.absent} tone={t.absent ? 'text-rose-600' : ''} />
-        <Kpi label="Not marked" value={t.unmarked} tone={t.unmarked ? 'text-amber-600' : ''} hint="no record that day" />
+        {tile('absent', <Kpi label="Absent" value={t.absent} tone={t.absent ? 'text-rose-600' : ''} />)}
+        {tile('unmarked', <Kpi label="Not marked" value={t.unmarked} tone={t.unmarked ? 'text-amber-600' : ''} hint="click to list, then fix" />)}
         <Kpi label="Staff" value={t.staff} />
       </div>
       <Panel
         title="Daily attendance"
-        subtitle="Everyone on the chosen day. 'Not marked' means no punch and no record. If you expected punches here, check Unmatched punches on the Attendance page."
+        subtitle={`Click a row to fix that person's day. 'Not marked' means no punch and no record. If you expected punches here, check Unmatched punches on the Attendance page.${only ? ` Showing only: ${KIND_LABEL[only]}.` : ''}`}
         action={
           <div className="flex items-center gap-2">
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or code" aria-label="Search" className="h-8 w-44 rounded-md border bg-background px-2 text-xs" />
@@ -44,6 +51,7 @@ export default function AttendanceDailyReport({ to: date, branchId }) {
           <DataTable
             rows={shown}
             rowKey={(r) => `${r.employee_id}-${r.branch_id}`}
+            onRowClick={setEdit}
             defaultSort={{ key: 'kind', dir: 'asc' }}
             maxHeight="32rem"
             columns={[
@@ -60,6 +68,7 @@ export default function AttendanceDailyReport({ to: date, branchId }) {
           />
         )}
       </Panel>
+      {edit && <DayEditor employeeId={edit.employee_id} name={edit.name} date={date} row={edit} onClose={() => setEdit(null)} />}
     </div>
   )
 }
