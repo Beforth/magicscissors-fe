@@ -108,22 +108,22 @@ export default function RosterGrid({ branchId }) {
     const ops = cells.filter((cell) => (lookup(cell.employeeId, cell.date)?.shift_id ?? null) !== cell.shiftId)
     if (!ops.length) return
     setSaving(true)
-    const results = await Promise.allSettled(
-      ops.map((cell) => {
-        const existing = lookup(cell.employeeId, cell.date)
-        if (cell.shiftId) return shiftService.assignShift(cell.employeeId, cell.shiftId, cell.date)
-        return existing ? shiftService.removeAssignment(existing.id) : Promise.resolve()
-      })
-    )
+    // One request per 2000 cells instead of one per cell (the API is rate limited, and a big selection used to fail partway).
+    const cellsOut = ops.map((cell) => ({ employee_id: cell.employeeId, shift_date: cell.date, shift_id: cell.shiftId }))
+    const BATCH = 2000
+    let error = null
+    for (let i = 0; i < cellsOut.length && !error; i += BATCH) {
+      try {
+        await shiftService.bulkAssign(cellsOut.slice(i, i + BATCH))
+      } catch (e) {
+        error = e?.response?.data?.error?.message || 'Could not save the shifts'
+      }
+    }
     await queryClient.invalidateQueries({ queryKey: ['shift-assignments'] })
     queryClient.invalidateQueries({ queryKey: ['attendance-monthly-self'] })
     setSaving(false)
-    const failed = results.filter((r) => r.status === 'rejected')
-    if (failed.length) {
-      toast.error(failed[0].reason?.response?.data?.error?.message || `${failed.length} change(s) failed`)
-    } else {
-      toast.success(`${ops.length} day${ops.length > 1 ? 's' : ''} updated`)
-    }
+    if (error) toast.error(error)
+    else toast.success(`${ops.length} day${ops.length > 1 ? 's' : ''} updated`)
   }
 
   const selectedCells = (shiftId) => {
