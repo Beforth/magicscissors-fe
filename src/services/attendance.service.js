@@ -10,6 +10,8 @@ export const attendanceService = {
   getOrphans: (params) => api.get('/attendance/orphans', { params }),
   reprocessOrphans: () => api.post('/attendance/orphans/reprocess'),
   getMonthlyAttendance: (params) => api.get('/attendance/monthly', { params }),
+  // The signed-in person's own month (all branches). Used by My Attendance and the employee dashboard.
+  getMyMonthlyAttendance: (params) => api.get('/attendance/self/monthly', { params }),
   updateTimes: (data) => api.post('/attendance/update-times', data),
   getPresenceCode: (branchId) => api.get('/attendance/presence-code', { params: { branch_id: branchId } }),
   getSelfConfig: () => api.get('/attendance/self/config'),

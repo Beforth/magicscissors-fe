@@ -373,12 +373,12 @@ function HoursThisWeekCard({ userId }) {
 
   const { data: m1Data, isLoading: l1 } = useQuery({
     queryKey: ['attendance-monthly-self', months[0]],
-    queryFn: () => attendanceService.getMonthlyAttendance({ month: months[0] }),
+    queryFn: () => attendanceService.getMyMonthlyAttendance({ month: months[0] }),
     staleTime: 5 * 60_000,
   })
   const { data: m2Data, isLoading: l2 } = useQuery({
     queryKey: ['attendance-monthly-self', months[1]],
-    queryFn: () => attendanceService.getMonthlyAttendance({ month: months[1] }),
+    queryFn: () => attendanceService.getMyMonthlyAttendance({ month: months[1] }),
     enabled: months.length > 1,
     staleTime: 5 * 60_000,
   })
@@ -462,7 +462,7 @@ function ThisMonthCard() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['attendance-monthly-self', month],
-    queryFn: () => attendanceService.getMonthlyAttendance({ month }),
+    queryFn: () => attendanceService.getMyMonthlyAttendance({ month }),
     staleTime: 5 * 60_000,
   })
 

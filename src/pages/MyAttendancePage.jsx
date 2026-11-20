@@ -87,7 +87,7 @@ export default function MyAttendancePage() {
 
   const { data: monthlyData, isLoading: isLoadingMonth } = useQuery({
     queryKey: ['attendance-monthly-self', selectedMonth],
-    queryFn: () => attendanceService.getMonthlyAttendance({ month: selectedMonth }),
+    queryFn: () => attendanceService.getMyMonthlyAttendance({ month: selectedMonth }),
     staleTime: 5 * 60_000,
   })
   const monthAttendance = monthlyData?.data?.attendance || []
