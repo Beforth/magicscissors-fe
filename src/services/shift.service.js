@@ -20,5 +20,8 @@ export const shiftService = {
       shift_date: shiftDate,
     }),
 
+  // Many employee/day cells in one request. cells: [{ employee_id, shift_date, shift_id | null }]; null clears the day.
+  bulkAssign: (cells) => api.post('/shifts/assignments/bulk', { cells }),
+
   removeAssignment: (id) => api.delete(`/shifts/assignments/${id}`),
 }
