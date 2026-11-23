@@ -608,7 +608,7 @@ function StaffFormPage() {
                       value={formData.role}
                       onChange={(e) => handleChange('role', e.target.value)}
                     >
-                      {ROLES.filter(r => isOwner || r.value !== 'owner').map((role) => (
+                      {ROLES.filter(r => isOwner || r.value === formData.role || (r.value !== 'owner' && (({ employee: 1, cashier: 2, manager: 3 })[r.value] || 9) <= (({ employee: 1, cashier: 2, manager: 3 })[user?.role] || 0))).map((role) => (
                         <option key={role.value} value={role.value}>
                           {role.label}
                         </option>

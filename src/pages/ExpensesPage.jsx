@@ -502,7 +502,7 @@ function ExpensesPage() {
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            {isOwner && (
+                            {(
                               <Button
                                 variant="ghost"
                                 size="sm"

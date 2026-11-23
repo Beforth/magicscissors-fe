@@ -45,6 +45,9 @@ function StaffPage() {
   const navigate = useNavigate()
   const { user } = useSelector((state) => state.auth)
   const isOwner = user?.role === 'owner' || user?.role === 'developer'
+  // Managers and cashiers can deactivate staff at or below their own role (the server enforces the same rule).
+  const RANK = { employee: 1, cashier: 2, manager: 3 }
+  const canDeactivate = (staff) => isOwner || (!!RANK[staff.role] && RANK[staff.role] <= (RANK[user?.role] || 0))
 
   const [search, setSearch] = useState('')
   const [selectedRole, setSelectedRole] = useState('')
@@ -350,7 +353,7 @@ function StaffPage() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        {isOwner && staff.user_id !== user?.id && (
+                        {canDeactivate(staff) && staff.user_id !== user?.id && (
                           <Button
                             variant="ghost"
                             size="sm"
