@@ -13,6 +13,7 @@ import CustomersReport from '@/components/reports/CustomersReport'
 import StaffReport from '@/components/reports/StaffReport'
 import AttendanceDailyReport from '@/components/reports/AttendanceDailyReport'
 import AttendanceSummaryReport from '@/components/reports/AttendanceSummaryReport'
+import AttendanceRegisterReport from '@/components/reports/AttendanceRegisterReport'
 import CatalogReport from '@/components/reports/CatalogReport'
 import ProfitLossReport from '@/components/reports/ProfitLossReport'
 import LegacyReports from '@/components/reports/LegacyReports'
@@ -29,6 +30,7 @@ const REPORTS = [
   { id: 'staff', group: 'People', label: 'Staff', hint: 'Services and revenue per employee', icon: Star, roles: MGR, range: true, branch: 'optional', Comp: StaffReport },
   { id: 'attendance-daily', group: 'People', label: 'Daily attendance', hint: 'Who is in, late or absent on one day', icon: CalendarCheck, roles: MGR, range: true, day: true, branch: 'optional', Comp: AttendanceDailyReport },
   { id: 'attendance-summary', group: 'People', label: 'Attendance summary', hint: 'Days present, late, absent and overtime per person', icon: CalendarDays, roles: MGR, range: true, branch: 'optional', Comp: AttendanceSummaryReport },
+  { id: 'attendance-register', group: 'People', label: 'Monthly register', hint: 'Check in and check out for every date, printable on A4', icon: CalendarDays, roles: MGR, range: false, branch: 'optional', Comp: AttendanceRegisterReport },
   { id: 'catalog', group: 'Catalog', label: 'Services & products', hint: 'What sells, what is slowing', icon: Scissors, roles: MGR, range: true, branch: 'optional', Comp: CatalogReport },
   { id: 'inventory', group: 'Stock', label: 'Stock levels', hint: 'Low stock and expiring items', icon: Package, roles: MGR, range: false, branch: 'none', legacy: true },
   { id: 'stock-snapshot', group: 'Stock', label: 'Stock value', hint: 'Value of stock at every location', icon: BoxesIcon, roles: OWNER, range: false, branch: 'none', legacy: true },

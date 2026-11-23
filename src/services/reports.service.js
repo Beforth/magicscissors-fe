@@ -13,6 +13,7 @@ export const reportsService = {
   hubProfitLoss: (params) => api.get('/reports/hub/profit-loss', { params }),
   hubAttendanceDaily: (params) => api.get('/reports/hub/attendance/daily', { params }),
   hubAttendanceSummary: (params) => api.get('/reports/hub/attendance/summary', { params }),
+  hubAttendanceRegister: (params) => api.get('/reports/hub/attendance/register', { params }),
   hubAttendanceDays: (params) => api.get('/reports/hub/attendance/days', { params }),
 
   getDailySales: (params) => api.get('/reports/daily-sales', { params }),
